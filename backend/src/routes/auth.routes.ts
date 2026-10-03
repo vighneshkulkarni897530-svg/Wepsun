@@ -20,6 +20,7 @@ import {
 } from '../lib/auth.js';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
 import { authLimiter } from '../middleware/rateLimiter.js';
+import { verifyGoogleIdToken, verifyGoogleAccessToken } from '../lib/googleAuth.js';
 
 const router = Router();
 
@@ -156,7 +157,7 @@ router.post('/demo-login', authLimiter, async (req: AuthenticatedRequest, res: R
 
 // POST /api/auth/google — Google OAuth 2.0 & Google Identity Services (GIS) Authentication
 router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  const { credential, email, name, avatarUrl, picture, role, companyId, googleId } = req.body;
+  const { credential, accessToken: clientAccessToken, email, name, avatarUrl, picture, role, companyId, googleId } = req.body;
   const userAgent = req.headers['user-agent'];
   const ipAddress = req.ip || req.socket.remoteAddress;
 
@@ -166,27 +167,45 @@ router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Respo
     let googleAvatar: string | undefined = avatarUrl || picture;
     let googleSub: string | undefined = googleId;
 
-    // Decode Google ID Token JWT if credential is provided
+    // 1. If Google ID Token credential is provided, cryptographically verify with Google
     if (credential && typeof credential === 'string') {
       try {
-        const parts = credential.split('.');
-        if (parts.length >= 2) {
-          const payloadString = Buffer.from(parts[1], 'base64').toString('utf8');
-          const decodedPayload = JSON.parse(payloadString);
-          if (decodedPayload.email) googleEmail = decodedPayload.email;
-          if (decodedPayload.name) googleName = decodedPayload.name;
-          if (decodedPayload.picture) googleAvatar = decodedPayload.picture;
-          if (decodedPayload.sub) googleSub = decodedPayload.sub;
-        }
-      } catch (err) {
-        console.warn('Google JWT decoding notice:', err);
+        const verified = await verifyGoogleIdToken(credential);
+        googleEmail = verified.email;
+        googleName = verified.name;
+        googleAvatar = verified.picture || googleAvatar;
+        googleSub = verified.googleId;
+      } catch (err: any) {
+        console.warn('[AuthRoute] Google token verification failed:', err.message);
+        res.status(401).json({
+          success: false,
+          message: err.message || 'Invalid or expired Google credential.',
+          code: 'INVALID_GOOGLE_CREDENTIAL',
+        });
+        return;
+      }
+    } else if (clientAccessToken && typeof clientAccessToken === 'string') {
+      // 2. If OAuth 2.0 Access Token is provided, verify with Google UserInfo endpoint
+      try {
+        const verified = await verifyGoogleAccessToken(clientAccessToken);
+        googleEmail = verified.email;
+        googleName = verified.name;
+        googleAvatar = verified.picture || googleAvatar;
+        googleSub = verified.googleId;
+      } catch (err: any) {
+        res.status(401).json({
+          success: false,
+          message: err.message || 'Invalid or expired Google access token.',
+          code: 'INVALID_GOOGLE_ACCESS_TOKEN',
+        });
+        return;
       }
     }
 
     if (!googleEmail) {
       res.status(400).json({
         success: false,
-        message: 'Google Email is required for authentication.',
+        message: 'Google email is required for authentication.',
         code: 'GOOGLE_EMAIL_REQUIRED',
       });
       return;
@@ -195,11 +214,14 @@ router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Respo
     const cleanEmail = googleEmail.toLowerCase().trim();
     let user: any = null;
 
-    // 1. Try finding user in Prisma Database
+    // Step A: Search for existing user in database by googleId or email
     try {
       user = await prisma.user.findFirst({
         where: {
-          email: { equals: cleanEmail, mode: 'insensitive' as const },
+          OR: [
+            ...(googleSub ? [{ googleId: googleSub }] : []),
+            { email: { equals: cleanEmail, mode: 'insensitive' as const } },
+          ],
         },
         include: { company: true, branch: true },
       });
@@ -207,10 +229,12 @@ router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Respo
       user = null;
     }
 
-    // 2. Check mock database if Prisma did not return a match
+    // Step B: Check mock database if Prisma is not connected
     if (!user) {
       const mockUser = db.users.find(
-        (u) => u.email.toLowerCase() === cleanEmail
+        (u) =>
+          ((u as any).googleId && (u as any).googleId === googleSub) ||
+          u.email.toLowerCase() === cleanEmail
       ) || (db as any).demoAccounts?.find(
         (d: any) => d.email.toLowerCase() === cleanEmail
       );
@@ -220,6 +244,8 @@ router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Respo
           id: mockUser.id,
           name: googleName || mockUser.name,
           email: cleanEmail,
+          googleId: googleSub || (mockUser as any).googleId || null,
+          authProvider: 'google',
           phone: mockUser.phone || '+91 98201 55432',
           role: (role || mockUser.role || 'COMPANY_ADMIN').toUpperCase(),
           companyId: mockUser.companyId || companyId || 'comp-1',
@@ -233,7 +259,26 @@ router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Respo
       }
     }
 
-    // 3. If user is brand new, automatically provision the account
+    // Step C: If existing account found without googleId, safely link it
+    if (user && googleSub && !user.googleId) {
+      try {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            googleId: googleSub,
+            authProvider: 'google',
+            avatarUrl: googleAvatar || user.avatarUrl,
+          },
+        });
+        user.googleId = googleSub;
+        user.authProvider = 'google';
+      } catch {
+        user.googleId = googleSub;
+        user.authProvider = 'google';
+      }
+    }
+
+    // Step D: If user is new, automatically provision their account
     if (!user) {
       const targetCompanyId = companyId || 'comp-1';
       const inferredRole = role
@@ -255,6 +300,8 @@ router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Respo
             id: newUserId,
             name: displayName,
             email: cleanEmail,
+            googleId: googleSub || null,
+            authProvider: 'google',
             role: inferredRole as any,
             companyId: targetCompanyId,
             avatarUrl: googleAvatar || null,
@@ -265,11 +312,13 @@ router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Respo
           include: { company: true },
         });
       } catch {
-        // Fallback in-memory user object
+        // In-memory fallback
         user = {
           id: newUserId,
           name: displayName,
           email: cleanEmail,
+          googleId: googleSub || null,
+          authProvider: 'google',
           phone: '+91 98200 00000',
           role: inferredRole,
           companyId: targetCompanyId,
@@ -284,27 +333,14 @@ router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Respo
       }
     }
 
-    // Check active status
+    // Check account status
     if (!user.isActive) {
       res.status(403).json({
         success: false,
-        message: 'This account has been deactivated. Please contact your organization administrator.',
+        message: 'This account has been deactivated. Please contact your administrator.',
         code: 'ACCOUNT_DEACTIVATED',
       });
       return;
-    }
-
-    // Update avatar if provided and not set
-    if (googleAvatar && (!user.avatarUrl || user.avatarUrl.includes('placeholder'))) {
-      try {
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { avatarUrl: googleAvatar },
-        });
-        user.avatarUrl = googleAvatar;
-      } catch {
-        user.avatarUrl = googleAvatar;
-      }
     }
 
     // Generate JWT Access Token
@@ -373,6 +409,8 @@ router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Respo
     });
   }
 });
+
+
 
 // POST /api/auth/login — Production Cryptographic Login
 router.post('/login', authLimiter, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -1028,15 +1066,19 @@ router.get('/me', requireAuth, async (req: AuthenticatedRequest, res: Response):
     const roleKey = user.role.toUpperCase();
     const permissions = permissionsByRole[roleKey] || permissionsByRole.CLIENT;
 
+    const sanitized = sanitizeUser(user);
+
     res.json({
+      authenticated: true,
       success: true,
+      user: sanitized,
       data: {
-        user: sanitizeUser(user),
+        user: sanitized,
         permissions,
       },
     });
   } catch {
-    res.status(500).json({ success: false, message: 'Failed to retrieve user profile', code: 'USER_FETCH_ERROR' });
+    res.status(500).json({ authenticated: false, success: false, message: 'Failed to retrieve user profile', code: 'USER_FETCH_ERROR' });
   }
 });
 

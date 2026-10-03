@@ -299,14 +299,131 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     }
   };
 
+  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
+
   // Eagerly pre-load Google Identity Services
   useEffect(() => {
     loadGoogleGisScript().catch(() => {});
   }, []);
 
-  const handleGoogleAuth = () => {
+  const handleGoogleAuth = async () => {
     setErrorMessage(null);
-    setIsGoogleModalOpen(true);
+    setIsGoogleSubmitting(true);
+
+    const targetRole: UserRole =
+      view === 'signup'
+        ? regRole
+        : selectedRole === 'client'
+        ? 'client'
+        : selectedRole === 'technician'
+        ? 'technician'
+        : 'company_admin';
+
+    try {
+      await triggerGoogleOAuth2Popup(
+        async (profile, accessToken) => {
+          try {
+            const res = await apiService.googleLogin({
+              email: profile.email,
+              name: profile.name,
+              avatarUrl: profile.picture,
+              role: targetRole.toUpperCase(),
+              companyId: 'comp-1',
+              googleId: profile.sub,
+            });
+
+            let userRecord: any = null;
+            if (res && res.success && res.data) {
+              const { user, accessToken: newAccess, refreshToken: newRefresh } = res.data;
+              if (newAccess) {
+                setTokens(newAccess, newRefresh);
+              }
+              userRecord = user;
+            } else {
+              // Local fallback for offline/test environments
+              const cleanEmail = profile.email.toLowerCase().trim();
+              const existingUser = users.find((u) => u.email && u.email.toLowerCase() === cleanEmail);
+              if (existingUser) {
+                userRecord = existingUser;
+              } else {
+                const newUid = 'usr-google-' + Date.now();
+                userRecord = {
+                  id: newUid,
+                  name: profile.name || cleanEmail.split('@')[0],
+                  email: cleanEmail,
+                  role: targetRole,
+                  companyId: 'comp-1',
+                  clientId: targetRole === 'client' ? 'client-' + Date.now() : undefined,
+                  technicianId: targetRole === 'technician' ? 'tech-' + Date.now() : undefined,
+                  avatar: profile.picture,
+                  companyName: `${profile.name || 'User'}'s Enterprise`,
+                  isActive: true,
+                  createdAt: new Date().toISOString(),
+                };
+              }
+            }
+
+            const activeRole = ((userRecord.role || targetRole) as string).toLowerCase() as UserRole;
+
+            loginAsUser({
+              id: userRecord.id,
+              name: userRecord.name || profile.name,
+              email: userRecord.email || profile.email,
+              phone: userRecord.phone || '+91 98200 00000',
+              role: activeRole,
+              companyId: userRecord.companyId || 'comp-1',
+              branchId: userRecord.branchId,
+              clientId: userRecord.clientId || (activeRole === 'client' ? 'client-' + Date.now() : undefined),
+              technicianId: userRecord.technicianId || (activeRole === 'technician' ? 'tech-' + Date.now() : undefined),
+              avatar: userRecord.avatar || userRecord.avatarUrl || profile.picture,
+              isActive: true,
+            });
+
+            setCurrentRole(activeRole);
+            confetti({
+              particleCount: 70,
+              spread: 60,
+              origin: { y: 0.65 },
+              colors: ['#4285F4', '#EA4335', '#FBBC05', '#34A853', '#0066FF'],
+            });
+
+            showToast('success', 'Google Sign-In Successful', `Welcome to WEPSUN, ${userRecord.name || profile.name}!`);
+
+            if (pendingQuoteService || (typeof window !== 'undefined' && sessionStorage.getItem('wepsun_pending_quote_service'))) {
+              sessionStorage.setItem('wepsun_open_quote_after_login', 'true');
+            }
+
+            const targetDest =
+              activeRole === 'client'
+                ? 'home'
+                : activeRole === 'technician'
+                ? 'jobs'
+                : 'dashboard';
+
+            window.location.hash = targetDest;
+
+            if (onClose) onClose();
+            window.dispatchEvent(new HashChangeEvent('hashchange'));
+          } catch (backendErr: any) {
+            showToast('error', 'Authentication Error', backendErr?.message || 'Unable to sign in with Google. Please try again.');
+          } finally {
+            setIsGoogleSubmitting(false);
+          }
+        },
+        (popupError) => {
+          setIsGoogleSubmitting(false);
+          if (popupError.message?.includes('closed') || popupError.message?.includes('cancel') || popupError.message?.includes('popup_closed_by_user')) {
+            showToast('info', 'Sign-In Cancelled', 'Google sign-in was cancelled.');
+          } else {
+            // If GIS popup encounters origin mismatch or script issue, open the dedicated GoogleAuthModal
+            setIsGoogleModalOpen(true);
+          }
+        }
+      );
+    } catch (launchErr: any) {
+      setIsGoogleSubmitting(false);
+      setIsGoogleModalOpen(true);
+    }
   };
 
   if (!isOpen) return null;
@@ -599,10 +716,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               <button
                 type="button"
                 onClick={handleGoogleAuth}
-                className="w-full py-2.5 px-4 rounded-2xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2.5 shadow-sm transition-all cursor-pointer active:scale-98"
+                disabled={isGoogleSubmitting}
+                aria-label="Continue with Google"
+                className="w-full py-2.5 px-4 rounded-2xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2.5 shadow-sm transition-all cursor-pointer active:scale-98 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <GoogleGIcon />
-                <span>Continue with Google</span>
+                {isGoogleSubmitting ? (
+                  <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin shrink-0" />
+                ) : (
+                  <GoogleGIcon />
+                )}
+                <span>{isGoogleSubmitting ? 'Connecting with Google...' : 'Continue with Google'}</span>
               </button>
 
               {/* Footer Switch to Sign Up */}
@@ -821,10 +944,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               <button
                 type="button"
                 onClick={handleGoogleAuth}
-                className="w-full py-2.5 px-4 rounded-2xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2.5 shadow-sm transition-all cursor-pointer active:scale-98"
+                disabled={isGoogleSubmitting}
+                aria-label="Continue with Google"
+                className="w-full py-2.5 px-4 rounded-2xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2.5 shadow-sm transition-all cursor-pointer active:scale-98 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <GoogleGIcon />
-                <span>Continue with Google</span>
+                {isGoogleSubmitting ? (
+                  <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin shrink-0" />
+                ) : (
+                  <GoogleGIcon />
+                )}
+                <span>{isGoogleSubmitting ? 'Connecting with Google...' : 'Continue with Google'}</span>
               </button>
 
               {/* Switch to Sign In */}

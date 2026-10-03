@@ -76,7 +76,7 @@ export function getGoogleClientId(): string {
   }
   return (
     import.meta.env.VITE_GOOGLE_CLIENT_ID ||
-    '168301316891-m918nolf3vlaibahj5qn36tg7gkolsv9.apps.googleusercontent.com'
+    '168301316891-6e6br98qti8u58frtj02l2k09m8r2sfe.apps.googleusercontent.com'
   );
 }
 

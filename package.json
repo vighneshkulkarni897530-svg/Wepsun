@@ -20,6 +20,7 @@
     "test:db": "tsx backend/src/tests/dbIntegration.test.ts",
     "test:auth": "tsx backend/src/tests/authSecurity.test.ts",
     "test:all": "tsx backend/src/tests/dbIntegration.test.ts && tsx backend/src/tests/authSecurity.test.ts",
+    "test": "npm run test:all",
     "cap:sync": "npm run build && cap sync",
     "cap:open:android": "cap open android",
     "cap:build:apk": "npm run build && cap sync android && cd android && gradlew assembleDebug && cd ..",

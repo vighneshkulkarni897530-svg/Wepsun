@@ -256,6 +256,8 @@ model User {
   passwordHash        String    @default("")
   role                UserRole  @default(COMPANY_ADMIN)
   avatarUrl           String?
+  googleId            String?   @unique
+  authProvider        String    @default("local")
   clientId            String?
   technicianId        String?   @unique
   isActive            Boolean   @default(true)
