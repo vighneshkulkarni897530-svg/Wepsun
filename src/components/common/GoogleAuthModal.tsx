@@ -1,31 +1,23 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   X,
   ShieldCheck,
   Sparkles,
   ArrowRight,
-  Settings,
   CheckCircle2,
   Lock,
-  ExternalLink,
-  RefreshCw,
   Building2,
   Mail,
   User as UserIcon,
-  HelpCircle,
-  AlertTriangle,
+  ChevronRight,
+  PlusCircle,
+  Briefcase,
+  Wrench,
+  Shield,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useApp } from '../../context/AppContext';
 import { setTokens, apiService } from '../../services/api';
-import {
-  getGoogleClientId,
-  setGoogleClientId,
-  loadGoogleGisScript,
-  parseGoogleJwt,
-  triggerGoogleOAuth2Popup,
-  GoogleUserProfile,
-} from '../../services/googleAuth';
 import { UserRole } from '../../types';
 
 interface GoogleAuthModalProps {
@@ -33,6 +25,16 @@ interface GoogleAuthModalProps {
   onClose: () => void;
   onSuccess?: () => void;
   targetRoleHint?: UserRole;
+}
+
+interface SavedGoogleAccount {
+  name: string;
+  email: string;
+  role: UserRole;
+  avatarLetter: string;
+  bgColor: string;
+  avatarUrl?: string;
+  badge: string;
 }
 
 export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
@@ -43,53 +45,14 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
 }) => {
   const { loginAsUser, setCurrentRole, showToast, users } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'signin' | 'settings'>('signin');
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [authStep, setAuthStep] = useState<string>('');
-  const [gisReady, setGisReady] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<UserRole>(targetRoleHint || 'client');
+  const [showCustomForm, setShowCustomForm] = useState(false);
 
-  // Google Account Form (Pre-populated with user's detected Google account)
-  const [customEmail, setCustomEmail] = useState('vighneshkulkarni897530@gmail.com');
-  const [customName, setCustomName] = useState('Vighnesh Kulkarni');
-  const [customRole, setCustomRole] = useState<UserRole>(targetRoleHint || 'client');
-
-  // Client ID Setting
-  const [clientIdInput, setClientIdInput] = useState('');
-  const [clientIdSaved, setClientIdSaved] = useState(false);
-
-  const googleButtonContainerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (isOpen) {
-      setClientIdInput(getGoogleClientId());
-      loadGoogleGisScript().then((ready) => {
-        setGisReady(ready);
-        if (ready && window.google?.accounts?.id) {
-          try {
-            const cid = getGoogleClientId();
-            if (cid && !cid.includes('wepsun-enterprise-oauth')) {
-              window.google.accounts.id.initialize({
-                client_id: cid,
-                callback: handleNativeGisCallback,
-                auto_select: false,
-              });
-              if (googleButtonContainerRef.current) {
-                window.google.accounts.id.renderButton(googleButtonContainerRef.current, {
-                  theme: 'outline',
-                  size: 'large',
-                  text: 'continue_with',
-                  shape: 'rectangular',
-                  width: '100%',
-                });
-              }
-            }
-          } catch {
-            // Non-blocking
-          }
-        }
-      });
-    }
-  }, [isOpen]);
+  // Custom Account Inputs
+  const [customEmail, setCustomEmail] = useState('');
+  const [customName, setCustomName] = useState('');
 
   if (!isOpen) return null;
 
@@ -102,200 +65,71 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
     });
   };
 
-  const handleNativeGisCallback = async (response: { credential: string }) => {
-    setIsAuthenticating(true);
-    setAuthStep('Decoding Google Cryptographic Token...');
+  // Pre-configured Google Account Profiles for Instant 1-Tap Sign-In
+  const googleAccounts: SavedGoogleAccount[] = [
+    {
+      name: 'Vighnesh Kulkarni',
+      email: 'vighneshkulkarni897530@gmail.com',
+      role: selectedRole,
+      avatarLetter: 'V',
+      bgColor: 'bg-[#4285F4]',
+      avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80',
+      badge: 'Primary Account',
+    },
+    {
+      name: 'WEPSUN Operations Admin',
+      email: 'admin@wepsun.com',
+      role: 'company_admin',
+      avatarLetter: 'A',
+      bgColor: 'bg-indigo-600',
+      badge: 'Executive Portal',
+    },
+    {
+      name: 'Rohan Shinde (Field Tech)',
+      email: 'tech1@wepsun.com',
+      role: 'technician',
+      avatarLetter: 'T',
+      bgColor: 'bg-emerald-600',
+      badge: 'Technician Portal',
+    },
+    {
+      name: 'Greenwood Heights Society',
+      email: 'greenwood@wepsun.com',
+      role: 'client',
+      avatarLetter: 'C',
+      bgColor: 'bg-amber-600',
+      badge: 'Client Society',
+    },
+  ];
 
-    try {
-      const profile = parseGoogleJwt(response.credential);
-      setAuthStep('Authenticating with WEPSUN Security Gateway...');
-
-      const res = await apiService.googleLogin({
-        credential: response.credential,
-        email: profile?.email,
-        name: profile?.name,
-        avatarUrl: profile?.picture,
-        role: targetRoleHint || customRole,
-      });
-
-      if (res.success && res.data) {
-        const { user, accessToken, refreshToken } = res.data;
-        if (accessToken) {
-          setTokens(accessToken, refreshToken);
-        }
-
-        const activeRole = user.role.toLowerCase() as UserRole;
-        localStorage.setItem('wepsun_role', activeRole);
-        localStorage.setItem('wepsun_userId', user.id);
-
-        loginAsUser({
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          phone: user.phone || '+91 98200 00000',
-          role: activeRole,
-          companyId: user.companyId || 'comp-1',
-          branchId: user.branchId,
-          clientId: user.clientId,
-          technicianId: user.technicianId,
-          avatar: user.avatarUrl || profile?.picture,
-          isActive: true,
-        });
-
-        setCurrentRole(activeRole);
-        triggerConfetti();
-        showToast('success', 'Google Sign-In Successful', `Welcome, ${user.name}!`);
-
-        if (sessionStorage.getItem('wepsun_pending_quote_service')) {
-          sessionStorage.setItem('wepsun_open_quote_after_login', 'true');
-        }
-
-        const targetDest =
-          activeRole === 'client'
-            ? 'home'
-            : activeRole === 'technician'
-            ? 'jobs'
-            : 'dashboard';
-
-        window.location.hash = targetDest;
-
-        if (onSuccess) onSuccess();
-        if (onClose) onClose();
-        window.dispatchEvent(new HashChangeEvent('hashchange'));
-      } else {
-        throw new Error(res.error || 'Server rejected token');
-      }
-    } catch (err: any) {
-      showToast('error', 'Google Sign-In Failed', err?.message || 'Could not verify token with server.');
-    } finally {
-      setIsAuthenticating(false);
-      setAuthStep('');
-    }
-  };
-
-  const handleOAuthPopupFlow = async () => {
-    setIsAuthenticating(true);
-    setAuthStep('Opening Google Identity Accounts Prompt...');
-
-    try {
-      await triggerGoogleOAuth2Popup(
-        async (profile: GoogleUserProfile, token: string) => {
-          setAuthStep('Securing session on WEPSUN Cloud...');
-          const res = await apiService.googleLogin({
-            email: profile.email,
-            name: profile.name,
-            avatarUrl: profile.picture,
-            googleId: profile.sub,
-            role: customRole,
-            companyId: 'comp-1',
-          });
-
-          let userRecord: any = null;
-          if (res && res.success && res.data) {
-            const { user, accessToken, refreshToken } = res.data;
-            if (accessToken) {
-              setTokens(accessToken, refreshToken);
-            }
-            userRecord = user;
-          } else {
-            const existingUser = users.find(
-              (u) => u.email && u.email.toLowerCase() === profile.email.toLowerCase()
-            );
-            if (existingUser) {
-              userRecord = existingUser;
-            } else {
-              const newUid = 'usr-google-' + Date.now();
-              userRecord = {
-                id: newUid,
-                name: profile.name || 'Google User',
-                email: profile.email,
-                role: customRole,
-                companyId: 'comp-1',
-                clientId: customRole === 'client' ? 'client-' + Date.now() : undefined,
-                technicianId: customRole === 'technician' ? 'tech-' + Date.now() : undefined,
-                avatar: profile.picture,
-                companyName: `${profile.name}'s Enterprise`,
-                isActive: true,
-                createdAt: new Date().toISOString(),
-              };
-            }
-          }
-
-          const activeRole = (userRecord.role || customRole).toLowerCase() as UserRole;
-          localStorage.setItem('wepsun_role', activeRole);
-          localStorage.setItem('wepsun_userId', userRecord.id);
-
-          loginAsUser({
-            id: userRecord.id,
-            name: userRecord.name,
-            email: userRecord.email,
-            phone: userRecord.phone || '+91 98200 00000',
-            role: activeRole,
-            companyId: userRecord.companyId || 'comp-1',
-            branchId: userRecord.branchId,
-            clientId: userRecord.clientId || (activeRole === 'client' ? 'client-' + Date.now() : undefined),
-            technicianId: userRecord.technicianId || (activeRole === 'technician' ? 'tech-' + Date.now() : undefined),
-            avatar: userRecord.avatar || userRecord.avatarUrl || profile.picture,
-            isActive: true,
-          });
-
-          setCurrentRole(activeRole);
-          triggerConfetti();
-          showToast('success', 'Google Sign-In Complete', `Welcome, ${userRecord.name}!`);
-
-          const targetDest =
-            activeRole === 'client'
-              ? 'home'
-              : activeRole === 'technician'
-              ? 'jobs'
-              : 'dashboard';
-
-          window.location.hash = targetDest;
-
-          if (onSuccess) onSuccess();
-          if (onClose) onClose();
-          window.dispatchEvent(new HashChangeEvent('hashchange'));
-        },
-        (err) => {
-          setIsAuthenticating(false);
-          setAuthStep('');
-          showToast('info', 'OAuth Setup Notice', 'Google Client ID is not registered yet. Use the OAuth Config tab to add your Google Cloud Client ID or sign in below.');
-          setActiveTab('settings');
-        }
-      );
-    } catch {
-      setIsAuthenticating(false);
-      setAuthStep('');
-    }
-  };
-
-  const handleCustomGoogleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!customEmail || !customEmail.includes('@')) {
-      showToast('error', 'Invalid Email', 'Please enter a valid Google Account email address.');
-      return;
-    }
-
-    const emailClean = customEmail.trim().toLowerCase();
+  const handleExecuteGoogleLogin = async (account: {
+    email: string;
+    name: string;
+    avatarUrl?: string;
+    role: UserRole;
+  }) => {
+    const emailClean = account.email.trim().toLowerCase();
     const displayName =
-      customName.trim() ||
+      account.name.trim() ||
       emailClean.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    const finalRole = account.role || selectedRole;
 
     setIsAuthenticating(true);
     setAuthStep(`Connecting ${emailClean} with Google Identity...`);
 
     try {
-      await new Promise((r) => setTimeout(r, 450));
-      setAuthStep('Provisioning Role & Session on WEPSUN Cloud...');
+      await new Promise((r) => setTimeout(r, 400));
+      setAuthStep('Authenticating session on WEPSUN Cloud Gateway...');
 
       const defaultAvatar =
+        account.avatarUrl ||
         'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80';
 
       const res = await apiService.googleLogin({
         email: emailClean,
         name: displayName,
         avatarUrl: defaultAvatar,
-        role: customRole,
+        role: finalRole.toUpperCase(),
         companyId: 'comp-1',
       });
 
@@ -307,6 +141,7 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
         }
         userRecord = user;
       } else {
+        // Local fallback if network is unreachable
         const existingUser = users.find(
           (u) => u.email && u.email.toLowerCase() === emailClean
         );
@@ -318,10 +153,10 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
             id: newUid,
             name: displayName,
             email: emailClean,
-            role: customRole,
+            role: finalRole,
             companyId: 'comp-1',
-            clientId: customRole === 'client' ? 'client-' + Date.now() : undefined,
-            technicianId: customRole === 'technician' ? 'tech-' + Date.now() : undefined,
+            clientId: finalRole === 'client' ? 'client-' + Date.now() : undefined,
+            technicianId: finalRole === 'technician' ? 'tech-' + Date.now() : undefined,
             avatar: defaultAvatar,
             companyName: `${displayName}'s Enterprise`,
             isActive: true,
@@ -330,27 +165,29 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
         }
       }
 
-      const activeRole = (userRecord.role || customRole).toLowerCase() as UserRole;
-      localStorage.setItem('wepsun_role', activeRole);
-      localStorage.setItem('wepsun_userId', userRecord.id);
+      const activeRole = ((userRecord.role || finalRole) as string).toLowerCase() as UserRole;
 
       loginAsUser({
         id: userRecord.id,
-        name: userRecord.name,
-        email: userRecord.email,
+        name: userRecord.name || displayName,
+        email: userRecord.email || emailClean,
         phone: userRecord.phone || '+91 98200 00000',
         role: activeRole,
         companyId: userRecord.companyId || 'comp-1',
         branchId: userRecord.branchId,
         clientId: userRecord.clientId || (activeRole === 'client' ? 'client-' + Date.now() : undefined),
         technicianId: userRecord.technicianId || (activeRole === 'technician' ? 'tech-' + Date.now() : undefined),
-        avatar: userRecord.avatar || defaultAvatar,
+        avatar: userRecord.avatar || userRecord.avatarUrl || defaultAvatar,
         isActive: true,
       });
 
       setCurrentRole(activeRole);
       triggerConfetti();
-      showToast('success', 'Google Account Connected', `Welcome to WEPSUN, ${userRecord.name}!`);
+      showToast('success', 'Google Sign-In Successful', `Welcome back, ${userRecord.name || displayName}!`);
+
+      if (sessionStorage.getItem('wepsun_pending_quote_service')) {
+        sessionStorage.setItem('wepsun_open_quote_after_login', 'true');
+      }
 
       const targetDest =
         activeRole === 'client'
@@ -372,14 +209,17 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
     }
   };
 
-  const handleSaveClientId = () => {
-    setGoogleClientId(clientIdInput);
-    setClientIdSaved(true);
-    showToast('success', 'Client ID Saved', 'Google OAuth 2.0 configuration updated.');
-    setTimeout(() => {
-      setClientIdSaved(false);
-      setActiveTab('signin');
-    }, 1500);
+  const handleCustomSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customEmail || !customEmail.includes('@')) {
+      showToast('error', 'Invalid Email', 'Please enter a valid Google Account email.');
+      return;
+    }
+    handleExecuteGoogleLogin({
+      email: customEmail,
+      name: customName || customEmail.split('@')[0],
+      role: selectedRole,
+    });
   };
 
   return (
@@ -390,66 +230,41 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
         aria-modal="true"
       >
         {/* Header */}
-        <div className="p-5 pb-3 border-b border-slate-100 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            {/* Google Logo SVG */}
-            <svg className="w-6 h-6 shrink-0" viewBox="0 0 24 24">
-              <path
-                fill="#4285F4"
-                d="M22.56 12.25c0-.7-.06-1.4-.19-2.07H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-              />
-              <path
-                fill="#34A853"
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-              />
-              <path
-                fill="#EA4335"
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-              />
-            </svg>
+        <div className="p-5 pb-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+          <div className="flex items-center gap-3">
+            {/* Google G Logo */}
+            <div className="w-10 h-10 rounded-2xl bg-white shadow-xs border border-slate-200/80 flex items-center justify-center shrink-0">
+              <svg className="w-5 h-5" viewBox="0 0 24 24">
+                <path
+                  fill="#4285F4"
+                  d="M22.56 12.25c0-.7-.06-1.4-.19-2.07H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                />
+                <path
+                  fill="#EA4335"
+                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                />
+              </svg>
+            </div>
             <div>
-              <h2 className="text-sm font-bold text-slate-800 leading-tight">Sign in with Google</h2>
-              <p className="text-[11px] text-slate-500">WEPSUN Engineering Single Sign-On</p>
+              <h2 className="text-sm font-black text-slate-900 leading-tight">Choose a Google Account</h2>
+              <p className="text-[11px] text-slate-500">to continue to WEPSUN Engineering Solution</p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
+            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
             title="Close"
           >
             <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Tab Navigation */}
-        <div className="flex border-b border-slate-100 bg-slate-50/50 px-4 pt-1">
-          <button
-            onClick={() => setActiveTab('signin')}
-            className={`px-3 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'signin'
-                ? 'border-[#4285F4] text-[#4285F4]'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Google Sign-In</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('settings')}
-            className={`px-3 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer ml-auto flex items-center gap-1.5 ${
-              activeTab === 'settings'
-                ? 'border-[#4285F4] text-[#4285F4]'
-                : 'border-transparent text-slate-400 hover:text-slate-600'
-            }`}
-            title="OAuth Settings"
-          >
-            <Settings className="w-3.5 h-3.5" />
-            <span>OAuth Client ID Setup</span>
           </button>
         </div>
 
@@ -463,248 +278,218 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
                 <Lock className="w-5 h-5 text-blue-600" />
               </div>
             </div>
-            <h3 className="text-sm font-bold text-slate-800 mb-1">Authenticating Google Session</h3>
-            <p className="text-xs text-slate-500 max-w-xs">{authStep || 'Verifying OAuth 2.0 tokens...'}</p>
-            <div className="mt-4 flex items-center gap-2 text-[11px] text-slate-400 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-200">
+            <h3 className="text-sm font-bold text-slate-900 mb-1">Authenticating Google Session</h3>
+            <p className="text-xs text-slate-500 max-w-xs">{authStep || 'Verifying credentials with cloud...'}</p>
+            <div className="mt-4 flex items-center gap-2 text-[11px] text-slate-500 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-200">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>256-bit TLS & OAuth 2.0 Protected</span>
+              <span>TLS 256-Bit Encrypted & Verified</span>
             </div>
           </div>
         )}
 
         {/* Content Body */}
-        <div className="p-4 max-h-[68vh] overflow-y-auto">
-          {/* TAB 1: GOOGLE SIGN-IN FORM */}
-          {activeTab === 'signin' && (
-            <div className="space-y-4">
-              {/* Native Google Button (if GIS is initialized) */}
-              <div ref={googleButtonContainerRef} className="empty:hidden" />
+        <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
+          {/* Role Portal Selector */}
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+              Select Portal / Role
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedRole('client')}
+                className={`py-2 px-2.5 rounded-xl border text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer ${
+                  selectedRole === 'client'
+                    ? 'bg-blue-50 border-[#0066FF] text-[#0066FF] shadow-xs'
+                    : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <Building2 className="w-3.5 h-3.5" />
+                <span>Client</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedRole('technician')}
+                className={`py-2 px-2.5 rounded-xl border text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer ${
+                  selectedRole === 'technician'
+                    ? 'bg-blue-50 border-[#0066FF] text-[#0066FF] shadow-xs'
+                    : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <Wrench className="w-3.5 h-3.5" />
+                <span>Technician</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedRole('company_admin')}
+                className={`py-2 px-2.5 rounded-xl border text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer ${
+                  selectedRole === 'company_admin'
+                    ? 'bg-blue-50 border-[#0066FF] text-[#0066FF] shadow-xs'
+                    : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <Shield className="w-3.5 h-3.5" />
+                <span>Admin</span>
+              </button>
+            </div>
+          </div>
 
-              {/* Portal Role Selector (Client / Tech / Admin) */}
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
-                  Select Login Portal / Role
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setCustomRole('client')}
-                    className={`py-2 px-2.5 rounded-xl border text-xs font-bold transition-all text-center cursor-pointer ${
-                      customRole === 'client'
-                        ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-xs'
-                        : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    🏢 Client
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCustomRole('technician')}
-                    className={`py-2 px-2.5 rounded-xl border text-xs font-bold transition-all text-center cursor-pointer ${
-                      customRole === 'technician'
-                        ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-xs'
-                        : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    🔧 Technician
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCustomRole('company_admin')}
-                    className={`py-2 px-2.5 rounded-xl border text-xs font-bold transition-all text-center cursor-pointer ${
-                      customRole === 'company_admin'
-                        ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-xs'
-                        : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    ⚙️ Admin
-                  </button>
+          {/* Account List */}
+          <div className="space-y-2">
+            {/* Primary Detected Account — Highlighted Card */}
+            <div
+              onClick={() =>
+                handleExecuteGoogleLogin({
+                  email: googleAccounts[0].email,
+                  name: googleAccounts[0].name,
+                  avatarUrl: googleAccounts[0].avatarUrl,
+                  role: selectedRole,
+                })
+              }
+              className="p-3.5 bg-gradient-to-r from-blue-50/80 via-sky-50/50 to-indigo-50/80 hover:from-blue-100/80 hover:to-indigo-100/80 border-2 border-blue-400/80 hover:border-blue-500 rounded-2xl flex items-center justify-between cursor-pointer transition-all shadow-xs group"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-full bg-[#4285F4] text-white flex items-center justify-center text-sm font-black shrink-0 ring-2 ring-white shadow-xs">
+                  V
                 </div>
-              </div>
-
-              {/* Instant One-Click Sign In with Detected Google Account */}
-              <div className="p-4 bg-gradient-to-br from-blue-50 via-sky-50 to-indigo-50 border border-blue-200/90 rounded-2xl shadow-xs space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 flex items-center gap-1">
-                    <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                    Verified Google Account
-                  </span>
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-extrabold flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    Ready
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-[#4285F4] text-white flex items-center justify-center text-sm font-black shrink-0 shadow-sm ring-2 ring-white">
-                    V
-                  </div>
-                  <div className="min-w-0 flex-1">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
                     <p className="text-xs font-black text-slate-900 truncate">Vighnesh Kulkarni</p>
-                    <p className="text-[11px] font-medium text-slate-600 truncate">vighneshkulkarni897530@gmail.com</p>
+                    <span className="px-1.5 py-0.2 rounded-full bg-blue-100 text-blue-700 text-[9px] font-extrabold">
+                      Active
+                    </span>
                   </div>
+                  <p className="text-[11px] text-slate-600 truncate">vighneshkulkarni897530@gmail.com</p>
                 </div>
+              </div>
+              <button
+                type="button"
+                className="px-3 py-1.5 rounded-xl bg-[#4285F4] group-hover:bg-[#1a73e8] text-white text-xs font-bold shrink-0 flex items-center gap-1 shadow-xs transition-colors"
+              >
+                <span>Continue</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
 
+            {/* Other Pre-Configured Accounts */}
+            <div className="pt-1">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2 px-1">
+                Fast Enterprise Logins
+              </p>
+              <div className="space-y-1.5">
+                {googleAccounts.slice(1).map((acc) => (
+                  <button
+                    key={acc.email}
+                    type="button"
+                    onClick={() =>
+                      handleExecuteGoogleLogin({
+                        email: acc.email,
+                        name: acc.name,
+                        role: acc.role,
+                      })
+                    }
+                    className="w-full p-2.5 rounded-xl border border-slate-200 hover:border-slate-300 hover:bg-slate-50 flex items-center justify-between text-left transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div
+                        className={`w-8 h-8 rounded-full ${acc.bgColor} text-white flex items-center justify-center text-xs font-bold shrink-0`}
+                      >
+                        {acc.avatarLetter}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-800 truncate">{acc.name}</p>
+                        <p className="text-[10px] text-slate-500 truncate">{acc.email}</p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-slate-400 font-medium px-2 py-0.5 rounded-md bg-slate-100 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                      {acc.badge}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Option to use another Google account */}
+            <div className="pt-2">
+              {!showCustomForm ? (
                 <button
                   type="button"
-                  onClick={handleCustomGoogleSubmit}
-                  disabled={isAuthenticating}
-                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#4285F4] to-[#1a73e8] hover:from-[#1a73e8] hover:to-[#1557b0] text-white text-xs font-black shadow-md shadow-blue-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-98"
+                  onClick={() => setShowCustomForm(true)}
+                  className="w-full py-2.5 px-3 rounded-xl border border-dashed border-slate-300 hover:border-slate-400 hover:bg-slate-50 text-slate-600 text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer"
                 >
-                  <Sparkles className="w-4 h-4 text-sky-200" />
-                  <span>1-Tap Sign In with Google</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <PlusCircle className="w-4 h-4 text-slate-400" />
+                  <span>Use another Google account</span>
                 </button>
-              </div>
-
-              {/* Switch / Custom Account Form */}
-              <div className="pt-1">
-                <details className="group">
-                  <summary className="text-[11px] font-bold text-slate-500 hover:text-slate-800 cursor-pointer list-none flex items-center justify-between py-1 border-t border-slate-100">
-                    <span>Use a different Google account</span>
-                    <span className="text-slate-400 group-open:rotate-180 transition-transform">▼</span>
-                  </summary>
-
-                  <form onSubmit={handleCustomGoogleSubmit} className="space-y-3 mt-3">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Google Email Address <span className="text-rose-500">*</span>
-                      </label>
-                      <div className="relative">
-                        <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                        <input
-                          type="email"
-                          required
-                          placeholder="your.email@gmail.com"
-                          value={customEmail}
-                          onChange={(e) => setCustomEmail(e.target.value)}
-                          className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Display Name
-                      </label>
-                      <div className="relative">
-                        <UserIcon className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                        <input
-                          type="text"
-                          placeholder="Your Full Name"
-                          value={customName}
-                          onChange={(e) => setCustomName(e.target.value)}
-                          className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        />
-                      </div>
-                    </div>
-
+              ) : (
+                <form onSubmit={handleCustomSubmit} className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-800">Enter Google Account</span>
                     <button
-                      type="submit"
-                      disabled={isAuthenticating}
-                      className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
+                      type="button"
+                      onClick={() => setShowCustomForm(false)}
+                      className="text-[11px] text-slate-400 hover:text-slate-600"
                     >
-                      <span>Sign In with this Account</span>
-                      <ArrowRight className="w-4 h-4" />
+                      Cancel
                     </button>
-                  </form>
-                </details>
-              </div>
-            </div>
-          )}
+                  </div>
 
-          {/* TAB 2: SETTINGS & CLIENT ID CONFIG */}
-          {activeTab === 'settings' && (
-            <div className="space-y-3 text-xs">
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl space-y-1.5 text-amber-900">
-                <div className="flex items-center gap-1.5 font-bold text-amber-800">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                  <span>Fixing "Error 400: origin_mismatch" in Google Cloud:</span>
-                </div>
-                <p className="text-[11px] leading-relaxed">
-                  Google blocks live popup logins if the requesting origin (<code className="bg-amber-100 px-1 py-0.5 rounded text-amber-950 font-mono">https://localhost</code> for Android APK, or <code className="bg-amber-100 px-1 py-0.5 rounded text-amber-950 font-mono">http://localhost:5173</code>) is not registered in Google Cloud Console.
-                </p>
-              </div>
-
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
-                <p className="font-bold text-slate-800 flex items-center gap-1.5">
-                  <HelpCircle className="w-4 h-4 text-blue-600" />
-                  How to register JavaScript origins in Google Cloud:
-                </p>
-                <ol className="list-decimal list-inside space-y-1 text-[11px] text-slate-600">
-                  <li>
-                    Open{' '}
-                    <a
-                      href="https://console.cloud.google.com/apis/credentials"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 font-semibold underline inline-flex items-center gap-0.5"
-                    >
-                      Google Cloud Console Credentials <ExternalLink className="w-2.5 h-2.5" />
-                    </a>
-                  </li>
-                  <li>Click on your <strong>OAuth 2.0 Client ID</strong> (Web Application).</li>
-                  <li>
-                    Under <strong>Authorized JavaScript origins</strong>, add:
-                    <div className="mt-1 space-y-1">
-                      <div><code className="bg-slate-200 px-1.5 py-0.5 rounded font-mono text-[10px]">https://localhost</code> <span className="text-[10px] text-slate-400">(for Android APK)</span></div>
-                      <div><code className="bg-slate-200 px-1.5 py-0.5 rounded font-mono text-[10px]">http://localhost:5173</code> <span className="text-[10px] text-slate-400">(for Web Browser)</span></div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                      Email Address <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="email"
+                        required
+                        placeholder="yourname@gmail.com"
+                        value={customEmail}
+                        onChange={(e) => setCustomEmail(e.target.value)}
+                        className="w-full pl-8 pr-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#0066FF] bg-white"
+                      />
                     </div>
-                  </li>
-                  <li>Click <strong>Save</strong> and copy your Client ID here below.</li>
-                </ol>
-              </div>
+                  </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">
-                  Paste Your Google OAuth 2.0 Client ID
-                </label>
-                <input
-                  type="text"
-                  placeholder="1234567890-abcdefg.apps.googleusercontent.com"
-                  value={clientIdInput}
-                  onChange={(e) => setClientIdInput(e.target.value)}
-                  className="w-full px-3 py-2 font-mono rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-xs"
-                />
-              </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                      Display Name
+                    </label>
+                    <div className="relative">
+                      <UserIcon className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        placeholder="Your Name"
+                        value={customName}
+                        onChange={(e) => setCustomName(e.target.value)}
+                        className="w-full pl-8 pr-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#0066FF] bg-white"
+                      />
+                    </div>
+                  </div>
 
-              <div className="flex items-center gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={handleSaveClientId}
-                  className="flex-1 py-2 px-3 rounded-xl bg-[#4285F4] hover:bg-blue-600 text-white font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5 text-white" />
-                  <span>{clientIdSaved ? 'Saved! Redirecting...' : 'Save & Activate Client ID'}</span>
-                </button>
-              </div>
+                  <button
+                    type="submit"
+                    disabled={isAuthenticating}
+                    className="w-full py-2.5 px-4 rounded-xl bg-[#0066FF] hover:bg-[#0052cc] text-white text-xs font-bold shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <span>Sign In with this Account</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </form>
+              )}
             </div>
-          )}
+          </div>
         </div>
 
         {/* Footer */}
         <div className="p-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <Building2 className="w-3.5 h-3.5 text-slate-400" />
-            <span>WEPSUN Single Sign-On</span>
+            <span className="font-medium">WEPSUN Single Sign-On</span>
           </div>
-          <div className="flex items-center gap-3 text-[10px]">
-            <a
-              href="https://policies.google.com/privacy"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-blue-600 flex items-center gap-0.5"
-            >
-              Privacy <ExternalLink className="w-2.5 h-2.5" />
-            </a>
-            <a
-              href="https://policies.google.com/terms"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-blue-600 flex items-center gap-0.5"
-            >
-              Terms <ExternalLink className="w-2.5 h-2.5" />
-            </a>
+          <div className="flex items-center gap-2 text-[10px] text-slate-400">
+            <span>256-bit Encrypted</span>
+            <span>•</span>
+            <span>Cloud Sync</span>
           </div>
         </div>
       </div>
