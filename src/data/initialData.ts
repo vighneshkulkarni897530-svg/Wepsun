@@ -21,6 +21,7 @@ import {
   AuditLog,
   PartReplacementRecord,
   ClientNotification,
+  AppNotification,
 } from '../types/index.js';
 
 export const INITIAL_COMPANIES: Company[] = [
@@ -2626,5 +2627,133 @@ export const INITIAL_CLIENT_NOTIFICATIONS: ClientNotification[] = [
     referenceId: 'inv-102'
   }
 ];
+
+export const INITIAL_APP_NOTIFICATIONS: AppNotification[] = [
+  {
+    id: 'app-notif-1',
+    type: 'emergency_breakdown',
+    category: 'emergency',
+    priority: 'critical',
+    title: '🚨 Elevator Emergency Breakdown',
+    message: 'Elevator stopped between 5th & 6th floor with passenger inside at Skyline Towers (Lift L-102). SOS protocol triggered.',
+    timestamp: new Date(Date.now() - 12 * 60 * 1000).toISOString(), // 12 mins ago
+    isRead: false,
+    targetRole: 'all',
+    buildingName: 'Skyline Towers',
+    liftNumber: 'WPS-MUM-000102',
+    ticketNumber: 'CMP-2026-0416',
+    actionTab: 'complaints',
+    actionLabel: 'Dispatch Emergency Tech'
+  },
+  {
+    id: 'app-notif-2',
+    type: 'technician_dispatched',
+    category: 'technician',
+    priority: 'high',
+    title: '👨‍🔧 Technician Dispatched & En Route',
+    message: 'Technician Rajesh Sharma assigned to Ticket #CMP-10245 (Door lock misalignment) at Royal Residency. ETA: 18 mins.',
+    timestamp: new Date(Date.now() - 35 * 60 * 1000).toISOString(), // 35 mins ago
+    isRead: false,
+    targetRole: 'all',
+    clientId: 'client-1',
+    technicianId: 'tech-1',
+    buildingName: 'Royal Residency',
+    ticketNumber: 'CMP-10245',
+    actionTab: 'complaints',
+    actionLabel: 'Track Technician'
+  },
+  {
+    id: 'app-notif-3',
+    type: 'amc_expiring',
+    category: 'amc',
+    priority: 'high',
+    title: '🛡️ AMC Contract Expiring in 5 Days',
+    message: 'Comprehensive AMC Contract #AMC-2026-904 for Skyline Heights CHS expires on 31 Dec 2026. Renewal proposal dispatched.',
+    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
+    isRead: false,
+    targetRole: 'company_admin',
+    clientId: 'client-1',
+    buildingName: 'Skyline Heights CHS',
+    referenceId: 'amc-1',
+    actionTab: 'amc',
+    actionLabel: 'Review Renewal'
+  },
+  {
+    id: 'app-notif-4',
+    type: 'pm_due',
+    category: 'pm',
+    priority: 'normal',
+    title: '🗓️ 28-Point PM Inspection Scheduled',
+    message: 'Monthly preventive maintenance visit scheduled for tomorrow morning across 4 lifts at Sunrise Apartments.',
+    timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(), // 5 hours ago
+    isRead: true,
+    targetRole: 'all',
+    buildingName: 'Sunrise Apartments',
+    referenceId: 'pm-102',
+    actionTab: 'pm',
+    actionLabel: 'View Checklist'
+  },
+  {
+    id: 'app-notif-5',
+    type: 'quotation_approved',
+    category: 'quotation',
+    priority: 'normal',
+    title: '📝 Quotation #QT-10025 Approved',
+    message: 'Chairman Arvind Joshi approved quotation for Door Interlock Switch replacement (₹2,950 incl. GST). Work order issued.',
+    timestamp: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(), // 8 hours ago
+    isRead: true,
+    targetRole: 'all',
+    clientId: 'client-1',
+    referenceId: 'qt-1',
+    amount: 2950,
+    actionTab: 'quotations',
+    actionLabel: 'Open Work Order'
+  },
+  {
+    id: 'app-notif-6',
+    type: 'payment_received',
+    category: 'payment',
+    priority: 'normal',
+    title: '💰 Payment Received ₹35,000',
+    message: 'AMC quarterly invoice #INV-2026-0142 successfully settled via UPI QR by Greenwood Heights CHS. Digital tax receipt issued.',
+    timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // Yesterday
+    isRead: true,
+    targetRole: 'all',
+    clientId: 'client-1',
+    referenceId: 'inv-102',
+    amount: 35000,
+    actionTab: 'invoices',
+    actionLabel: 'View Receipt'
+  },
+  {
+    id: 'app-notif-7',
+    type: 'inventory_low',
+    category: 'inventory',
+    priority: 'high',
+    title: '📦 Low Stock Alert: Hoist Rope 10mm',
+    message: 'Main Steel Hoist Cable 10mm inventory dropped to 45 meters (Minimum safety reserve: 100m). Restock recommended.',
+    timestamp: new Date(Date.now() - 28 * 60 * 60 * 1000).toISOString(),
+    isRead: true,
+    targetRole: 'company_admin',
+    actionTab: 'inventory',
+    actionLabel: 'Restock Inventory'
+  },
+  {
+    id: 'app-notif-8',
+    type: 'service_report_ready',
+    category: 'complaint',
+    priority: 'normal',
+    title: '✅ Service Report #SR-2026-0542 Certified',
+    message: 'Field Engineer Rajesh Sharma closed Ticket #CMP-10245 with verified OTP, client digital signature, and 5-star rating.',
+    timestamp: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(), // 2 days ago
+    isRead: true,
+    targetRole: 'all',
+    ticketNumber: 'CMP-10245',
+    referenceId: 'sr-001',
+    actionTab: 'reports',
+    actionLabel: 'Download Report'
+  }
+];
+
 
 

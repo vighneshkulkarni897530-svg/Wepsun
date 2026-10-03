@@ -29,6 +29,12 @@ import {
   LogOut,
   Sparkles,
   Wifi,
+  Volume2,
+  VolumeX,
+  CheckCheck,
+  Clock,
+  Calendar,
+  ExternalLink,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { UserRole } from '../../types';
@@ -68,9 +74,17 @@ export const Header: React.FC<HeaderProps> = ({
     clientScopedLifts,
     clientScopedComplaints,
     clientScopedFeedbacks,
+    roleNotifications,
+    unreadNotificationsCount,
+    criticalNotificationsCount,
+    markNotificationRead,
+    markAllNotificationsRead,
+    isSoundEnabled,
+    toggleSound,
   } = useApp();
 
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [notifFilter, setNotifFilter] = useState<'all' | 'unread' | 'urgent'>('all');
   const [isCompanyDropdownOpen, setIsCompanyDropdownOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [isGoogleAuthModalOpen, setIsGoogleAuthModalOpen] = useState(false);
@@ -360,53 +374,250 @@ export const Header: React.FC<HeaderProps> = ({
           <Wifi className="w-5 h-5 text-emerald-400" />
         </button>
 
-        {/* Notification Bell with red badge '3' */}
+        {/* Dynamic Notification Bell with Badge & Sound */}
         <div className="relative" ref={notifRef}>
           <button
             onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-            className="relative p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
-            title="Notifications"
+            className="relative p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            title="Notifications & Field Alerts"
           >
             <Bell className="w-5 h-5" />
-            <span className="absolute top-1 right-1 w-4 h-4 flex items-center justify-center rounded-full bg-[#D32F2F] text-white text-[9px] font-bold ring-2 ring-[#0E2238]">
-              3
-            </span>
+            {unreadNotificationsCount > 0 && (
+              <>
+                {criticalNotificationsCount > 0 && (
+                  <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-red-500 animate-ping opacity-75" />
+                )}
+                <span
+                  className={`absolute top-1 right-1 w-4 h-4 flex items-center justify-center rounded-full text-white text-[9px] font-black ring-2 ring-[#0E2238] ${
+                    criticalNotificationsCount > 0 ? 'bg-red-600' : 'bg-[#1976D2]'
+                  }`}
+                >
+                  {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
+                </span>
+              </>
+            )}
           </button>
 
-          {/* Notifications Popover */}
+          {/* Attractive & Interactive Notifications Popover */}
           {isNotificationsOpen && (
-            <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white border border-slate-200 rounded-2xl shadow-xl p-4 z-50 animate-in fade-in slide-in-from-top-2 text-slate-800">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <h3 className="font-bold text-sm text-[#263238]">Notifications</h3>
-                <span className="text-[11px] font-semibold text-[#1976D2] bg-blue-50 px-2 py-0.5 rounded-full">
-                  3 New
-                </span>
+            <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white border border-slate-200 rounded-3xl shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 text-slate-800 overflow-hidden ring-1 ring-black/5">
+              {/* Popover Header */}
+              <div className="p-4 bg-gradient-to-r from-slate-900 via-[#0E2238] to-slate-900 text-white flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center border border-white/10 shadow-xs">
+                    <Bell className="w-4 h-4 text-blue-300" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm tracking-tight leading-tight">Notifications</h3>
+                    <p className="text-[10px] text-slate-300 font-mono">
+                      {unreadNotificationsCount > 0 ? `${unreadNotificationsCount} unread alert${unreadNotificationsCount > 1 ? 's' : ''}` : 'All caught up'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  {/* Sound Audio Chime Toggle */}
+                  <button
+                    onClick={toggleSound}
+                    className={`p-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
+                      isSoundEnabled
+                        ? 'bg-white/15 text-emerald-300 hover:bg-white/25'
+                        : 'bg-white/10 text-slate-400 hover:bg-white/20'
+                    }`}
+                    title={isSoundEnabled ? 'Audio Alerts: ON (click to mute)' : 'Audio Alerts: MUTED (click to enable)'}
+                  >
+                    {isSoundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                  </button>
+
+                  {/* Mark All Read */}
+                  {unreadNotificationsCount > 0 && (
+                    <button
+                      onClick={markAllNotificationsRead}
+                      className="px-2 py-1 rounded-lg bg-blue-600/80 hover:bg-blue-600 text-white text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                      title="Mark all as read"
+                    >
+                      <CheckCheck className="w-3.5 h-3.5" />
+                      <span>Read all</span>
+                    </button>
+                  )}
+                </div>
               </div>
-              <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
-                <div className="py-3 flex gap-3 text-xs">
-                  <span className="w-2 h-2 rounded-full bg-[#D32F2F] mt-1.5 shrink-0" />
-                  <div>
-                    <p className="text-[#263238] font-semibold">Elevator Emergency at Skyline Towers</p>
-                    <p className="text-slate-500 text-[11px] mt-0.5">Ticket #CMP-2025-0416 logged. Lift L-102 trapped passenger.</p>
-                    <span className="text-[10px] text-slate-400 font-mono mt-1 block">2 hours ago</span>
-                  </div>
-                </div>
-                <div className="py-3 flex gap-3 text-xs">
-                  <span className="w-2 h-2 rounded-full bg-[#F9A825] mt-1.5 shrink-0" />
-                  <div>
-                    <p className="text-[#263238] font-semibold">AMC Renewal Due in 5 Days</p>
-                    <p className="text-slate-500 text-[11px] mt-0.5">Skyline Towers contract expires on 21 Apr 2025.</p>
-                    <span className="text-[10px] text-slate-400 font-mono mt-1 block">5 hours ago</span>
-                  </div>
-                </div>
-                <div className="py-3 flex gap-3 text-xs">
-                  <span className="w-2 h-2 rounded-full bg-[#2E7D32] mt-1.5 shrink-0" />
-                  <div>
-                    <p className="text-[#263238] font-semibold">Payment Received ₹ 35,000</p>
-                    <p className="text-slate-500 text-[11px] mt-0.5">Invoice #INV-2025-0142 settled via UPI.</p>
-                    <span className="text-[10px] text-slate-400 font-mono mt-1 block">6 hours ago</span>
-                  </div>
-                </div>
+
+              {/* Filter Tabs */}
+              <div className="px-3 pt-2.5 pb-2 bg-slate-50 border-b border-slate-100 flex items-center gap-1.5 text-xs">
+                <button
+                  onClick={() => setNotifFilter('all')}
+                  className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all cursor-pointer ${
+                    notifFilter === 'all'
+                      ? 'bg-white text-[#1976D2] shadow-xs border border-slate-200'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  All ({roleNotifications.length})
+                </button>
+                <button
+                  onClick={() => setNotifFilter('unread')}
+                  className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all cursor-pointer ${
+                    notifFilter === 'unread'
+                      ? 'bg-white text-[#1976D2] shadow-xs border border-slate-200'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Unread ({unreadNotificationsCount})
+                </button>
+                {criticalNotificationsCount > 0 && (
+                  <button
+                    onClick={() => setNotifFilter('urgent')}
+                    className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all cursor-pointer flex items-center gap-1 ${
+                      notifFilter === 'urgent'
+                        ? 'bg-red-50 text-red-700 shadow-xs border border-red-200'
+                        : 'text-red-600 hover:bg-red-50/50'
+                    }`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" />
+                    <span>Urgent ({criticalNotificationsCount})</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Scrollable Notification Items List */}
+              <div className="divide-y divide-slate-100 max-h-80 overflow-y-auto scrollbar-thin">
+                {(() => {
+                  const filtered = roleNotifications.filter((n) => {
+                    if (notifFilter === 'unread') return !n.isRead;
+                    if (notifFilter === 'urgent') return n.priority === 'critical' || n.priority === 'urgent';
+                    return true;
+                  });
+
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="py-10 px-4 text-center text-slate-400 space-y-1.5">
+                        <Check className="w-8 h-8 mx-auto text-emerald-500 bg-emerald-50 p-1.5 rounded-full" />
+                        <p className="font-bold text-xs text-slate-700">All caught up!</p>
+                        <p className="text-[11px] text-slate-400">No notifications in this view.</p>
+                      </div>
+                    );
+                  }
+
+                  return filtered.map((notif) => {
+                    const isUrgent = notif.priority === 'critical' || notif.priority === 'urgent';
+                    return (
+                      <div
+                        key={notif.id}
+                        onClick={() => {
+                          markNotificationRead(notif.id);
+                          if (notif.actionTab && onNavigateTab) {
+                            onNavigateTab(notif.actionTab as NavTabId);
+                            setIsNotificationsOpen(false);
+                          }
+                        }}
+                        className={`p-3.5 flex items-start gap-3 transition-colors cursor-pointer group relative ${
+                          !notif.isRead
+                            ? isUrgent
+                              ? 'bg-rose-50/50 hover:bg-rose-50'
+                              : 'bg-blue-50/40 hover:bg-blue-50/70'
+                            : 'bg-white hover:bg-slate-50/80'
+                        }`}
+                      >
+                        {/* Icon */}
+                        <div
+                          className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 border shadow-2xs ${
+                            isUrgent
+                              ? 'bg-red-100 border-red-200 text-red-600'
+                              : notif.category === 'technician'
+                              ? 'bg-blue-100 border-blue-200 text-blue-600'
+                              : notif.category === 'pm'
+                              ? 'bg-indigo-100 border-indigo-200 text-indigo-600'
+                              : notif.category === 'amc'
+                              ? 'bg-purple-100 border-purple-200 text-purple-600'
+                              : notif.category === 'payment'
+                              ? 'bg-emerald-100 border-emerald-200 text-emerald-600'
+                              : 'bg-slate-100 border-slate-200 text-slate-600'
+                          }`}
+                        >
+                          {notif.category === 'emergency' && <Zap className="w-4 h-4 text-red-600 animate-pulse" />}
+                          {notif.category === 'complaint' && <AlertTriangle className="w-4 h-4 text-amber-600" />}
+                          {notif.category === 'technician' && <Wrench className="w-4 h-4 text-blue-600" />}
+                          {notif.category === 'pm' && <Calendar className="w-4 h-4 text-indigo-600" />}
+                          {notif.category === 'amc' && <ShieldCheck className="w-4 h-4 text-purple-600" />}
+                          {notif.category === 'quotation' && <FileSpreadsheet className="w-4 h-4 text-amber-600" />}
+                          {notif.category === 'payment' && <CreditCard className="w-4 h-4 text-emerald-600" />}
+                          {notif.category === 'inventory' && <Package className="w-4 h-4 text-teal-600" />}
+                          {notif.category === 'system' && <Bell className="w-4 h-4 text-slate-600" />}
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-1.5">
+                            <h4 className="font-bold text-xs text-slate-900 leading-snug truncate">
+                              {notif.title}
+                            </h4>
+                            <span className="text-[10px] text-slate-400 font-mono shrink-0 flex items-center gap-0.5">
+                              <Clock className="w-2.5 h-2.5" />
+                              {(() => {
+                                try {
+                                  const diffMs = Date.now() - new Date(notif.timestamp).getTime();
+                                  const diffMins = Math.floor(diffMs / 60000);
+                                  if (diffMins < 1) return 'Now';
+                                  if (diffMins < 60) return `${diffMins}m`;
+                                  const diffHours = Math.floor(diffMins / 60);
+                                  if (diffHours < 24) return `${diffHours}h`;
+                                  return `${Math.floor(diffHours / 24)}d`;
+                                } catch {
+                                  return '';
+                                }
+                              })()}
+                            </span>
+                          </div>
+
+                          <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed line-clamp-2">
+                            {notif.message}
+                          </p>
+
+                          {/* Metadata Tags */}
+                          <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                            {notif.ticketNumber && (
+                              <span className="text-[9px] font-mono font-bold bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded border border-slate-200">
+                                #{notif.ticketNumber}
+                              </span>
+                            )}
+                            {notif.buildingName && (
+                              <span className="text-[9px] text-slate-500 font-medium">
+                                • {notif.buildingName}
+                              </span>
+                            )}
+                            {isUrgent && (
+                              <span className="text-[9px] font-black uppercase tracking-wider bg-red-100 text-red-700 px-1.5 py-0.2 rounded">
+                                URGENT
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Unread Indicator Dot */}
+                        {!notif.isRead && (
+                          <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0 mt-1" />
+                        )}
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+
+              {/* Popover Footer: Go to Full Notification Hub */}
+              <div className="p-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+                <button
+                  onClick={() => {
+                    setIsNotificationsOpen(false);
+                    const targetTab = currentRole === 'client' ? 'home' : currentRole === 'technician' ? 'notifications' : 'notifications';
+                    if (onNavigateTab) onNavigateTab(targetTab as NavTabId);
+                    window.location.hash = targetTab;
+                  }}
+                  className="w-full py-2 px-3 rounded-xl bg-white hover:bg-blue-50 text-[#1976D2] font-bold text-xs flex items-center justify-center gap-1.5 border border-slate-200 transition-colors shadow-2xs cursor-pointer"
+                >
+                  <span>Open Full Notification Hub</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
               </div>
             </div>
           )}

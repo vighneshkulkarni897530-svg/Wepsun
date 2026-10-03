@@ -387,7 +387,7 @@ export const AppContent: React.FC = () => {
         return <AdminReportsView />;
 
       case 'notifications':
-        return <AdminNotificationsView />;
+        return <AdminNotificationsView onNavigateTab={setActiveTab} />;
 
       case 'settings':
         return <AdminProfileSettingsView />;

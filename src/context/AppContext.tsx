@@ -29,6 +29,9 @@ import {
   PartReplacementRecord,
   ClientNotification,
   ClientProfile,
+  AppNotification,
+  NotificationPriority,
+  NotificationCategory,
 } from '../types';
 import {
   INITIAL_COMPANIES,
@@ -52,9 +55,11 @@ import {
   INITIAL_FEEDBACKS,
   INITIAL_PARTS_REPLACEMENTS,
   INITIAL_CLIENT_NOTIFICATIONS,
+  INITIAL_APP_NOTIFICATIONS,
 } from '../data/initialData';
 import { apiService, checkServerHealth } from '../services/api';
 import { getNetworkStatus, subscribeNetworkStatus } from '../services/nativeApp';
+import { playNotificationSound, isSoundEnabled as getSoundPref, setSoundEnabled } from '../utils/notificationSound';
 
 export interface ToastNotification {
   id: string;
@@ -141,8 +146,21 @@ interface AppContextType {
   rejectQuotation: (quoteId: string, reason?: string) => void;
   requestQuoteClarification: (quoteId: string, notes: string) => void;
   requestPmReschedule: (liftId: string, preferredDate: string, timeSlot: string, reason: string) => void;
+  
+  // Centralized Notification System
+  notifications: AppNotification[];
+  roleNotifications: AppNotification[];
+  unreadNotificationsCount: number;
+  criticalNotificationsCount: number;
   markNotificationRead: (id: string) => void;
+  markAllNotificationsRead: () => void;
+  deleteNotification: (id: string) => void;
   clearAllNotifications: () => void;
+  addNotification: (
+    notif: Omit<AppNotification, 'id' | 'timestamp' | 'isRead'> & { timestamp?: string; isRead?: boolean }
+  ) => AppNotification;
+  isSoundEnabled: boolean;
+  toggleSound: () => void;
   createComplaint: (complaintData: Partial<Complaint>) => Complaint;
   assignTechnician: (ticketId: string, technicianId: string, eta?: string) => void;
   updateComplaintStatus: (ticketId: string, status: ComplaintStatus, extra?: Partial<Complaint>) => void;
@@ -963,6 +981,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return safeStorageParse(STORAGE_PREFIX + 'clientNotifications', INITIAL_CLIENT_NOTIFICATIONS);
   });
 
+  const [appNotifications, setAppNotifications] = useState<AppNotification[]>(() => {
+    return safeStorageParse(STORAGE_PREFIX + 'appNotifications', INITIAL_APP_NOTIFICATIONS);
+  });
+
+  const [soundEnabled, setSoundEnabledState] = useState<boolean>(() => {
+    return getSoundPref();
+  });
+
+  const toggleSound = useCallback(() => {
+    setSoundEnabledState((prev) => {
+      const next = !prev;
+      setSoundEnabled(next);
+      if (next) {
+        playNotificationSound('standard');
+      }
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_PREFIX + 'appNotifications', JSON.stringify(appNotifications));
+  }, [appNotifications]);
+
   const [clientProfiles, setClientProfiles] = useState<Record<string, ClientProfile>>(() => {
     return safeStorageParse<Record<string, ClientProfile>>(STORAGE_PREFIX + 'clientProfiles', {
       'client-1': {
@@ -1143,6 +1184,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return clientNotifications.filter((n) => n.clientId === effectiveClientId);
   }, [clientNotifications, effectiveClientId]);
 
+  const roleNotifications = useMemo(() => {
+    return appNotifications.filter((n) => {
+      if (currentRole === 'client') {
+        return (
+          (!n.clientId || n.clientId === effectiveClientId) &&
+          (n.targetRole === 'client' || n.targetRole === 'all' || !n.targetRole)
+        );
+      }
+      if (currentRole === 'technician') {
+        return (
+          (!n.technicianId || n.technicianId === activeTechnicianId) &&
+          (n.targetRole === 'technician' || n.targetRole === 'all' || !n.targetRole)
+        );
+      }
+      return true;
+    });
+  }, [appNotifications, currentRole, effectiveClientId, activeTechnicianId]);
+
+  const unreadNotificationsCount = useMemo(() => {
+    return roleNotifications.filter((n) => !n.isRead).length;
+  }, [roleNotifications]);
+
+  const criticalNotificationsCount = useMemo(() => {
+    return roleNotifications.filter((n) => !n.isRead && (n.priority === 'critical' || n.priority === 'urgent')).length;
+  }, [roleNotifications]);
+
   const verifyClientAccess = useCallback(
     (resourceClientId?: string | null): boolean => {
       if (currentRole !== 'client') return true; // Admins and technicians have staff visibility
@@ -1321,24 +1388,87 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
-  const markNotificationRead = (id: string) => {
+  const markNotificationRead = useCallback((id: string) => {
+    setAppNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+    );
     setClientNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
     );
+    playNotificationSound('markRead');
     apiService.markNotificationRead(id, {
       companyId: activeCompanyId,
       branchId: activeBranchId,
       userRole: currentRole,
       userId: activeUserId,
     }).catch((err) => console.warn('[AppContext] Background markNotificationRead API sync:', err));
-  };
+  }, [activeCompanyId, activeBranchId, currentRole, activeUserId]);
 
-  const clearAllNotifications = () => {
+  const markAllNotificationsRead = useCallback(() => {
+    const roleIds = new Set(roleNotifications.map((n) => n.id));
+    setAppNotifications((prev) =>
+      prev.map((n) => (roleIds.has(n.id) ? { ...n, isRead: true } : n))
+    );
+    setClientNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    playNotificationSound('markRead');
+    showToast('success', 'All Caught Up!', 'All notifications marked as read.');
+  }, [roleNotifications, showToast]);
+
+  const deleteNotification = useCallback((id: string) => {
+    setAppNotifications((prev) => prev.filter((n) => n.id !== id));
+    setClientNotifications((prev) => prev.filter((n) => n.id !== id));
+  }, []);
+
+  const clearAllNotifications = useCallback(() => {
+    const roleIds = new Set(roleNotifications.map((n) => n.id));
+    setAppNotifications((prev) => prev.filter((n) => !roleIds.has(n.id)));
     setClientNotifications((prev) =>
       prev.filter((n) => n.clientId !== effectiveClientId)
     );
     showToast('info', 'Notifications Cleared', 'All alerts have been cleared from your notification center.');
-  };
+  }, [roleNotifications, effectiveClientId, showToast]);
+
+  const addNotification = useCallback(
+    (
+      notif: Omit<AppNotification, 'id' | 'timestamp' | 'isRead'> & { timestamp?: string; isRead?: boolean }
+    ): AppNotification => {
+      const newNotif: AppNotification = {
+        id: 'notif-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+        timestamp: notif.timestamp || new Date().toISOString(),
+        isRead: notif.isRead || false,
+        ...notif,
+      };
+
+      setAppNotifications((prev) => [newNotif, ...prev]);
+
+      if (notif.clientId) {
+        const clientNotif: ClientNotification = {
+          id: newNotif.id,
+          clientId: notif.clientId,
+          title: notif.title,
+          message: notif.message,
+          timestamp: newNotif.timestamp,
+          category: (notif.category === 'emergency' ? 'complaint' : notif.category) as any,
+          priority: notif.priority,
+          isRead: false,
+          actionTab: notif.actionTab,
+          referenceId: notif.referenceId,
+          buildingName: notif.buildingName,
+          liftNumber: notif.liftNumber,
+        };
+        setClientNotifications((prev) => [clientNotif, ...prev]);
+      }
+
+      if (newNotif.priority === 'critical' || newNotif.priority === 'urgent') {
+        playNotificationSound('urgent');
+      } else {
+        playNotificationSound('standard');
+      }
+
+      return newNotif;
+    },
+    []
+  );
 
   // Complaints Mutator
   const createComplaint = (complaintData: Partial<Complaint>): Complaint => {
@@ -1416,6 +1546,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       userId: activeUserId,
     }).catch((err) => console.warn('[AppContext] Background createComplaint API sync:', err));
 
+    addNotification({
+      type: newComplaint.isEmergency ? 'emergency_breakdown' : 'complaint_assigned',
+      category: newComplaint.isEmergency ? 'emergency' : 'complaint',
+      priority: newComplaint.isEmergency ? 'critical' : (newComplaint.priority === 'high' ? 'high' : 'normal'),
+      title: newComplaint.isEmergency ? `🚨 Emergency SOS: ${newComplaint.buildingName}` : `Breakdown Ticket #${newComplaint.ticketNumber}`,
+      message: `${newComplaint.title} - ${newComplaint.buildingName} (${newComplaint.liftNumber}).`,
+      targetRole: 'all',
+      buildingName: newComplaint.buildingName,
+      liftNumber: newComplaint.liftNumber,
+      ticketNumber: newComplaint.ticketNumber,
+      clientId: newComplaint.clientId,
+      actionTab: 'complaints',
+      actionLabel: 'View Ticket',
+    });
+
     if (newComplaint.isEmergency) {
       showToast('emergency', '🚨 Emergency SOS Dispatched!', `Ticket ${ticketNumber} created. Priority escalated to CRITICAL.`);
     } else {
@@ -1483,6 +1628,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       userRole: currentRole,
       userId: activeUserId,
     }).catch((err) => console.warn('[AppContext] Background assignTechnician API sync:', err));
+
+    const targetComp = complaints.find((c) => c.id === ticketId);
+    addNotification({
+      type: 'technician_dispatched',
+      category: 'technician',
+      priority: 'high',
+      title: `👨‍🔧 Technician Dispatched: ${tech.name}`,
+      message: `${tech.name} assigned to Ticket #${targetComp?.ticketNumber || ticketId} at ${targetComp?.buildingName || 'Building'} (ETA: ${eta}).`,
+      targetRole: 'all',
+      buildingName: targetComp?.buildingName,
+      ticketNumber: targetComp?.ticketNumber,
+      technicianId: tech.id,
+      clientId: targetComp?.clientId,
+      actionTab: 'complaints',
+      actionLabel: 'Track Technician',
+    });
 
     showToast('info', 'Technician Dispatched', `${tech.name} has been assigned (ETA: ${eta}).`);
   };
@@ -2067,6 +2228,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!quote) return;
 
     updateQuotationStatus(quoteId, 'approved');
+    addNotification({
+      type: 'quotation_approved',
+      category: 'quotation',
+      priority: 'normal',
+      title: `📝 Quotation #${quote.quoteNumber} Approved`,
+      message: `Quotation approved for ${quote.buildingName}. Total: ₹${quote.grandTotal.toLocaleString('en-IN')}. Work order generated.`,
+      targetRole: 'all',
+      clientId: quote.clientId,
+      buildingName: quote.buildingName,
+      referenceId: quote.id,
+      amount: quote.grandTotal,
+      actionTab: 'quotations',
+      actionLabel: 'View Quotation',
+    });
     showToast('success', 'Quotation Approved', `Quotation ${quote.quoteNumber} has been approved.`);
   };
 
@@ -2245,6 +2420,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       userRole: currentRole,
       userId: activeUserId,
     }).catch((err) => console.warn('[AppContext] Background payInvoice API sync:', err));
+
+    const targetInv = invoices.find((inv) => inv.id === invoiceId);
+    if (targetInv) {
+      addNotification({
+        type: 'payment_received',
+        category: 'payment',
+        priority: 'normal',
+        title: `💰 Payment Received: ₹${targetInv.grandTotal.toLocaleString('en-IN')}`,
+        message: `Invoice #${targetInv.invoiceNumber} for ${targetInv.buildingName} settled via ${method}.`,
+        targetRole: 'all',
+        clientId: targetInv.clientId,
+        buildingName: targetInv.buildingName,
+        referenceId: targetInv.id,
+        amount: targetInv.grandTotal,
+        actionTab: 'invoices',
+        actionLabel: 'View Receipt',
+      });
+    }
 
     showToast('success', 'Payment Successful', `Verified transaction ${txId}. Receipt emailed.`);
   };
@@ -2709,8 +2902,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         rejectQuotation,
         requestQuoteClarification,
         requestPmReschedule,
+        notifications: appNotifications,
+        roleNotifications,
+        unreadNotificationsCount,
+        criticalNotificationsCount,
         markNotificationRead,
+        markAllNotificationsRead,
+        deleteNotification,
         clearAllNotifications,
+        addNotification,
+        isSoundEnabled: soundEnabled,
+        toggleSound,
         createComplaint,
         assignTechnician,
         updateComplaintStatus,
