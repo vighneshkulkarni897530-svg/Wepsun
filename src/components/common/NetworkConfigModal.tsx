@@ -175,14 +175,14 @@ export const NetworkConfigModal: React.FC<NetworkConfigModalProps> = ({ isOpen, 
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => setPreset('http://192.168.1.9:5000/api')}
+                onClick={() => setPreset('https://wepsun.onrender.com/api')}
                 className="p-2 text-left rounded-xl border border-slate-200 hover:border-emerald-400 bg-emerald-50/50 hover:bg-emerald-50 transition-all cursor-pointer"
               >
                 <div className="flex items-center gap-1.5 font-bold text-emerald-800 text-[11px]">
-                  <Wifi className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Wi-Fi Phone Test</span>
+                  <Globe className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Cloud Production</span>
                 </div>
-                <span className="font-mono text-[10px] text-emerald-700 block truncate">192.168.1.9:5000</span>
+                <span className="font-mono text-[10px] text-emerald-700 block truncate">wepsun.onrender.com</span>
               </button>
 
               <button

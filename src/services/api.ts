@@ -8,42 +8,20 @@ const STORAGE_API_URL_KEY = 'wepsun_custom_api_url';
 const TOKEN_KEY = 'wepsun_access_token';
 const REFRESH_TOKEN_KEY = 'wepsun_refresh_token';
 
-/**
- * Resolves the active backend API base URL.
- * Priority order:
- * 1. Runtime User Config (localStorage 'wepsun_custom_api_url')
+const DEFAULT_CLOUD_API_URL = 'https://wepsun.onrender.com/api';
+
 /**
  * Resolves the active backend API base URL automatically.
  * Priority order:
  * 1. Runtime User Config (localStorage 'wepsun_custom_api_url')
- * 2. Mobile / Capacitor Native detection: automatically routes directly to http://192.168.1.9:5000/api
- * 3. Mobile LAN Browser detection: automatically routes directly to http://<hostname>:5000/api
- * 4. Vite Environment Variable (VITE_API_URL)
- * 5. Default http://localhost:5000/api or /api
+ * 2. Vite Environment Variable (VITE_API_URL)
+ * 3. Default Production Cloud Backend (https://wepsun.onrender.com/api)
  */
 export function getApiBaseUrl(): string {
   if (typeof window !== 'undefined') {
     const custom = localStorage.getItem(STORAGE_API_URL_KEY);
     if (custom && custom.trim().length > 0) {
       return custom.trim().replace(/\/+$/, '');
-    }
-
-    const hostname = window.location.hostname;
-    const protocol = window.location.protocol;
-
-    // Direct connect inside Capacitor Native Mobile App (Android APK / iOS)
-    const isCapacitor = (window as any).Capacitor?.isNativePlatform?.() || 
-                        protocol === 'capacitor:' || 
-                        protocol === 'content:' ||
-                        (hostname === 'localhost' && !window.location.port);
-
-    if (isCapacitor) {
-      return 'http://192.168.1.9:5000/api';
-    }
-
-    // Direct connect when accessed via mobile browser on local Wi-Fi (e.g. 192.168.1.9:5173)
-    if (hostname && hostname !== 'localhost' && hostname !== '127.0.0.1' && !hostname.includes('wepsun.com')) {
-      return `http://${hostname}:5000/api`;
     }
   }
 
@@ -52,7 +30,7 @@ export function getApiBaseUrl(): string {
     return envUrl.trim().replace(/\/+$/, '');
   }
 
-  return 'http://localhost:5000/api';
+  return DEFAULT_CLOUD_API_URL;
 }
 
 export function setApiBaseUrl(url: string): void {
