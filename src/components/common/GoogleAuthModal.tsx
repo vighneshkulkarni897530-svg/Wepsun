@@ -18,7 +18,9 @@ import {
 import confetti from 'canvas-confetti';
 import { useApp } from '../../context/AppContext';
 import { setTokens, apiService } from '../../services/api';
+import { triggerGoogleOAuth2Popup } from '../../services/googleAuth';
 import { UserRole } from '../../types';
+import { ExternalLink, Globe } from 'lucide-react';
 
 interface GoogleAuthModalProps {
   isOpen: boolean;
@@ -206,6 +208,32 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
     } finally {
       setIsAuthenticating(false);
       setAuthStep('');
+    }
+  };
+
+  const handleTriggerGisPopup = async () => {
+    setIsAuthenticating(true);
+    setAuthStep('Opening official Google Sign-In popup...');
+    try {
+      await triggerGoogleOAuth2Popup(
+        (profile) => {
+          handleExecuteGoogleLogin({
+            email: profile.email,
+            name: profile.name,
+            avatarUrl: profile.picture,
+            role: selectedRole,
+          });
+        },
+        (error) => {
+          setIsAuthenticating(false);
+          setAuthStep('');
+          showToast('warning', 'Google Sign-In Cancelled', error.message || 'The Google sign-in window was closed.');
+        }
+      );
+    } catch (err: any) {
+      setIsAuthenticating(false);
+      setAuthStep('');
+      showToast('error', 'Google Sign-In Error', err?.message || 'Could not launch Google Sign-In.');
     }
   };
 
@@ -409,8 +437,18 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
               </div>
             </div>
 
-            {/* Option to use another Google account */}
-            <div className="pt-2">
+            {/* Additional Google Sign-In Options */}
+            <div className="pt-2 space-y-2">
+              <button
+                type="button"
+                onClick={handleTriggerGisPopup}
+                className="w-full py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer border border-slate-200"
+              >
+                <Globe className="w-3.5 h-3.5 text-blue-600" />
+                <span>Launch Google Sign-In Window (Web GIS)</span>
+                <ExternalLink className="w-3 h-3 text-slate-400" />
+              </button>
+
               {!showCustomForm ? (
                 <button
                   type="button"
