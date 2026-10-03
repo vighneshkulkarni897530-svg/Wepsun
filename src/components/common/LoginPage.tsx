@@ -19,6 +19,7 @@ import {
   Settings,
   Wifi,
 } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { useApp } from '../../context/AppContext';
 import { GeometricBlueWLogo } from './WepsunLogo';
 import { apiService, setTokens } from '../../services/api';
@@ -307,9 +308,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   }, []);
 
   const handleGoogleAuth = async () => {
-    setErrorMessage(null);
-    setIsGoogleSubmitting(true);
-
     const targetRole: UserRole =
       view === 'signup'
         ? regRole
@@ -318,6 +316,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         : selectedRole === 'technician'
         ? 'technician'
         : 'company_admin';
+
+    // On native mobile app (Android), embedded WebViews block GIS popups (Google disallowed_useragent rule).
+    // Open the Google Identity Selection Modal directly on mobile for a smooth 1-tap experience.
+    if (Capacitor.isNativePlatform()) {
+      setIsGoogleModalOpen(true);
+      return;
+    }
+
+    setIsGoogleSubmitting(true);
 
     try {
       await triggerGoogleOAuth2Popup(
@@ -1078,7 +1085,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       <GoogleAuthModal
         isOpen={isGoogleModalOpen}
         onClose={() => setIsGoogleModalOpen(false)}
-        targetRoleHint={selectedRole === 'admin' ? 'company_admin' : selectedRole}
+        targetRoleHint={view === 'signup' ? regRole : (selectedRole === 'admin' ? 'company_admin' : selectedRole)}
         onSuccess={() => {
           if (onClose) onClose();
         }}
