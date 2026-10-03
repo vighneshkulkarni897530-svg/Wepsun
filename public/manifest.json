@@ -1,0 +1,41 @@
+{
+  "short_name": "WEPSUN",
+  "name": "WEPSUN",
+  "description": "Enterprise elevator OEM operations, digital lift passports, 24/7 breakdown dispatch, technician portal, and AMC lifecycle management.",
+  "icons": [
+    {
+      "src": "/wepsun-shield.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "/wepsun-logo.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0b2545",
+  "theme_color": "#0b2545",
+  "display": "standalone",
+  "orientation": "portrait",
+  "categories": ["business", "productivity", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Report Breakdown",
+      "short_name": "Breakdown",
+      "description": "Report an urgent lift breakdown",
+      "url": "/?action=breakdown",
+      "icons": [{ "src": "/wepsun-shield.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Technician Portal",
+      "short_name": "Technician",
+      "description": "Technician job attendance & QR scan",
+      "url": "/?action=technician",
+      "icons": [{ "src": "/wepsun-shield.png", "sizes": "192x192" }]
+    }
+  ]
+}

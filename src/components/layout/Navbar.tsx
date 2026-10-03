@@ -1,0 +1,131 @@
+import React, { useState } from 'react';
+import { useApp } from '../../context/AppContext';
+import {
+  QrCode,
+  AlertTriangle,
+  GitBranch,
+} from 'lucide-react';
+import { Lift } from '../../types';
+import { QrScannerModal } from '../common/QrScannerModal';
+import { LiftPassportModal } from '../common/LiftPassportModal';
+
+interface NavbarProps {
+  onOpenRaiseComplaint?: () => void;
+}
+
+export const Navbar: React.FC<NavbarProps> = ({ onOpenRaiseComplaint }) => {
+  const {
+    currentUser,
+    activeCompany,
+    activeBranchId,
+    branches,
+    tenantComplaints,
+    tenantLifts,
+  } = useApp();
+
+  const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
+  const [selectedLiftForPassport, setSelectedLiftForPassport] = useState<Lift | null>(null);
+
+  const criticalCount = tenantComplaints.filter(
+    (c) => (c.isEmergency || c.priority === 'critical') && c.status !== 'closed'
+  ).length;
+
+  const currentBranch = branches.find((b) => b.id === activeBranchId);
+
+  return (
+    <>
+      <header className="bg-white border-b border-slate-200 text-slate-800 sticky top-0 z-30 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+          {/* Company Brand Logo & Subtitle */}
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-[#123B5D] flex items-center justify-center text-white font-bold text-sm font-sans shadow-sm">
+              {activeCompany.code || 'WEP'}
+            </div>
+
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-base text-slate-900 tracking-tight">
+                  {activeCompany.name}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-slate-500">
+                <span className="flex items-center gap-1">
+                  <GitBranch className="w-3 h-3 text-[#00A896]" />
+                  {currentBranch ? currentBranch.name : 'All Branches'}
+                </span>
+                <span>•</span>
+                <span>{tenantLifts.length} Elevators</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Center Actions / QR & Emergency */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              onClick={() => setIsQrScannerOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors"
+            >
+              <QrCode className="w-3.5 h-3.5 text-[#1976D2]" />
+              <span className="hidden sm:inline">Scan Lift QR</span>
+            </button>
+
+            {onOpenRaiseComplaint && (
+              <button
+                onClick={onOpenRaiseComplaint}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#D32F2F] hover:bg-red-700 text-white text-xs font-bold shadow-sm shadow-red-500/20 transition-all"
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+                <span>Report Breakdown</span>
+              </button>
+            )}
+          </div>
+
+          {/* Right User & Live Breakdown Alerts */}
+          <div className="flex items-center gap-3">
+            {criticalCount > 0 && (
+              <div className="hidden md:flex items-center gap-1.5 bg-red-100 border border-red-200 px-2.5 py-1 rounded-full text-red-800 text-xs font-semibold">
+                <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
+                <span>{criticalCount} Critical Ticket{criticalCount > 1 ? 's' : ''}</span>
+              </div>
+            )}
+
+            {/* User Profile */}
+            <div className="flex items-center gap-2.5 pl-3 border-l border-slate-200">
+              <img
+                src={
+                  currentUser.avatar ||
+                  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'
+                }
+                alt={currentUser.name}
+                className="w-8 h-8 rounded-full object-cover border border-slate-200"
+              />
+              <div className="hidden sm:block text-left">
+                <p className="text-xs font-bold text-slate-900 truncate max-w-[120px]">
+                  {currentUser.name}
+                </p>
+                <span className="text-[11px] text-slate-500 capitalize block">
+                  {currentUser.role.replace('_', ' ')}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* QR Scanner Modal */}
+      <QrScannerModal
+        isOpen={isQrScannerOpen}
+        onClose={() => setIsQrScannerOpen(false)}
+        onScanLift={(lift) => setSelectedLiftForPassport(lift)}
+      />
+
+      {/* Lift Passport Modal */}
+      <LiftPassportModal
+        lift={selectedLiftForPassport}
+        isOpen={!!selectedLiftForPassport}
+        onClose={() => setSelectedLiftForPassport(null)}
+        onRaiseTicket={onOpenRaiseComplaint}
+      />
+    </>
+  );
+};

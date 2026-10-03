@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico?v=3" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/wepsun-shield.png?v=3" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3" />
+    <link rel="apple-touch-icon" href="/wepsun-shield.png?v=3" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b2545" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="WEPSUN" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="description" content="WEPSUN Engineering Solution — ISO 9001:2015 Certified Elevator OEM, Smart Lift Service Operations, 24/7 Breakdown Control Room & Digital Lift Passports." />
+    <title>WEPSUN Engineering Solution — Smart Lift Service Operations Portal</title>
+    <!-- Preload Animation Video for 0ms Startup -->
+    <link rel="preload" href="/animation.mp4" as="video" type="video/mp4" />
+    <!-- Google Fonts Inter & Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        background-color: #ffffff;
+        overflow-x: hidden;
+      }
+      #wepsun-splash-wrapper {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100vw;
+        height: 100vh;
+        height: 100dvh;
+        background-color: #ffffff;
+        z-index: 999999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        user-select: none;
+        -webkit-user-select: none;
+        transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      #wepsun-splash-video,
+      .wepsun-splash-video-fullscreen {
+        width: 100%;
+        height: 100%;
+        max-width: 100vw;
+        max-height: 100vh;
+        max-height: 100dvh;
+        object-fit: contain;
+        background-color: #ffffff;
+        outline: none;
+        border: none;
+        pointer-events: none;
+        user-select: none;
+        -webkit-user-select: none;
+        opacity: 0;
+        transform: translateZ(0) scale(1);
+        -webkit-transform: translateZ(0) scale(1);
+        transform-origin: center center;
+        -webkit-transform-origin: center center;
+        backface-visibility: hidden;
+        -webkit-backface-visibility: hidden;
+        transition: opacity 0.08s ease-in, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      /* Mobile Phones in Portrait: Scale up so WEPSUN logo fits the screen prominently */
+      @media screen and (orientation: portrait) and (max-width: 640px) {
+        #wepsun-splash-video,
+        .wepsun-splash-video-fullscreen {
+          transform: translateZ(0) scale(2.22);
+          -webkit-transform: translateZ(0) scale(2.22);
+        }
+      }
+      /* Modern Tall & Slim Phones (19:9, 19.5:9, 20:9) */
+      @media screen and (max-aspect-ratio: 9/16) and (max-width: 480px) {
+        #wepsun-splash-video,
+        .wepsun-splash-video-fullscreen {
+          transform: translateZ(0) scale(2.32);
+          -webkit-transform: translateZ(0) scale(2.32);
+        }
+      }
+      /* Small Mobile Screens (<= 360px) */
+      @media screen and (orientation: portrait) and (max-width: 360px) {
+        #wepsun-splash-video,
+        .wepsun-splash-video-fullscreen {
+          transform: translateZ(0) scale(2.05);
+          -webkit-transform: translateZ(0) scale(2.05);
+        }
+      }
+      /* Tablets & Foldables in Portrait */
+      @media screen and (orientation: portrait) and (min-width: 641px) and (max-width: 1024px) {
+        #wepsun-splash-video,
+        .wepsun-splash-video-fullscreen {
+          transform: translateZ(0) scale(1.55);
+          -webkit-transform: translateZ(0) scale(1.55);
+        }
+      }
+      video::-webkit-media-controls,
+      video::-webkit-media-controls-panel,
+      video::-webkit-media-controls-play-button,
+      video::-webkit-media-controls-start-playback-button,
+      video::-webkit-media-controls-overlay-play-button,
+      video::-webkit-media-controls-enclosure,
+      video::-webkit-media-controls-timeline,
+      video::-webkit-media-controls-current-time-display,
+      video::-webkit-media-controls-time-remaining-display,
+      video::-webkit-media-controls-mute-button,
+      video::-webkit-media-controls-toggle-closed-captions-button,
+      video::-webkit-media-controls-volume-slider {
+        display: none !important;
+        -webkit-appearance: none !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+      }
+      video::-internal-media-controls-overlay-cast-button {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body class="bg-white text-slate-800 font-sans antialiased selection:bg-blue-500 selection:text-white min-h-screen">
+    <!-- Instant Native Splash Screen (True First Screen - 0ms Instant Playback) -->
+    <div id="wepsun-splash-wrapper">
+      <video
+        id="wepsun-splash-video"
+        src="/animation.mp4"
+        autoplay
+        muted
+        playsinline
+        webkit-playsinline
+        x5-playsinline
+        x5-video-player-type="h5-page"
+        preload="auto"
+        tabindex="-1"
+        controlslist="nodownload nofullscreen noremoteplayback noplaybackrate"
+      ></video>
+    </div>
+    <script>
+      (function() {
+        var v = document.getElementById('wepsun-splash-video');
+        if (v) {
+          v.muted = true;
+          v.defaultMuted = true;
+          v.playsInline = true;
+          
+          var hasRevealed = false;
+          function reveal() {
+            if (!hasRevealed) {
+              hasRevealed = true;
+              v.style.opacity = '1';
+            }
+          }
+
+          v.addEventListener('playing', reveal);
+          v.addEventListener('timeupdate', function() {
+            if (v.currentTime > 0.01) {
+              reveal();
+            }
+          });
+          v.addEventListener('loadeddata', function() {
+            if (v.readyState >= 2) {
+              var p = v.play();
+              if (p !== undefined) {
+                p.then(reveal).catch(function() {});
+              }
+            }
+          });
+
+          var p = v.play();
+          if (p !== undefined) {
+            p.then(reveal).catch(function() {});
+          }
+          window.__WEPSUN_SPLASH_VIDEO = v;
+          window.__WEPSUN_SPLASH_WRAPPER = document.getElementById('wepsun-splash-wrapper');
+        }
+      })();
+    </script>
+    <div id="root"></div>
+    <!-- Google Identity Services (GIS) OAuth 2.0 SDK -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <!-- Razorpay Standard Checkout SDK -->
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

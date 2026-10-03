@@ -1,0 +1,139 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-brand-primary: #2563eb;
+    --color-brand-dark: #0c1427;
+    --color-bg-canvas: #f4f6fb;
+  }
+
+  body {
+    @apply bg-[#f4f6fb] text-slate-800 antialiased font-sans;
+  }
+
+  /* Custom clean scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+}
+
+/* Eliminate all browser/WebKit native video symbols, play buttons, and overlays */
+video::-webkit-media-controls,
+video::-webkit-media-controls-start-playback-button,
+video::-webkit-media-controls-play-button,
+video::-webkit-media-controls-panel,
+video::-webkit-media-controls-enclosure,
+video::-webkit-media-controls-overlay-play-button,
+video::-webkit-media-controls-overlay-enclosure {
+  display: none !important;
+  -webkit-appearance: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+video::-moz-media-controls {
+  display: none !important;
+}
+
+/* Splash Video Mobile Screen Adaptation */
+.wepsun-splash-video-fullscreen {
+  width: 100%;
+  height: 100%;
+  max-width: 100vw;
+  max-height: 100vh;
+  max-height: 100dvh;
+  object-fit: contain;
+  background-color: #ffffff;
+  outline: none;
+  border: none;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  transform: translateZ(0) scale(1);
+  -webkit-transform: translateZ(0) scale(1);
+  transform-origin: center center;
+  -webkit-transform-origin: center center;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transition: opacity 0.08s ease-in, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media screen and (orientation: portrait) and (max-width: 640px) {
+  .wepsun-splash-video-fullscreen {
+    transform: translateZ(0) scale(2.22) !important;
+    -webkit-transform: translateZ(0) scale(2.22) !important;
+  }
+}
+
+@media screen and (max-aspect-ratio: 9/16) and (max-width: 480px) {
+  .wepsun-splash-video-fullscreen {
+    transform: translateZ(0) scale(2.32) !important;
+    -webkit-transform: translateZ(0) scale(2.32) !important;
+  }
+}
+
+@media screen and (orientation: portrait) and (max-width: 360px) {
+  .wepsun-splash-video-fullscreen {
+    transform: translateZ(0) scale(2.05) !important;
+    -webkit-transform: translateZ(0) scale(2.05) !important;
+  }
+}
+
+@media screen and (orientation: portrait) and (min-width: 641px) and (max-width: 1024px) {
+  .wepsun-splash-video-fullscreen {
+    transform: translateZ(0) scale(1.55) !important;
+    -webkit-transform: translateZ(0) scale(1.55) !important;
+  }
+}
+
+/* Modern Enterprise SaaS Card Styling */
+.card-enterprise {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.875rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+  transition: all 0.2s ease;
+}
+
+.card-enterprise:hover {
+  box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.07);
+}
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid #e2e8f0;
+}
+
+/* Print stylesheet for PDF and Service Report generation */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  .card-enterprise, .glass-panel {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    color: #0f172a !important;
+    box-shadow: none !important;
+  }
+}

@@ -1,0 +1,1015 @@
+// WEPSUN Engineering Solution — Multi-Tenant Lift Service & AMC Management SaaS
+// Database Schema for PostgreSQL / Supabase with Prisma ORM
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// --------------------------------------------------------
+// ENUMS
+// --------------------------------------------------------
+
+enum UserRole {
+  SUPER_ADMIN
+  COMPANY_ADMIN
+  SERVICE_MANAGER
+  TECHNICIAN
+  ACCOUNTS
+  SALES
+  CLIENT
+}
+
+enum LiftType {
+  PASSENGER
+  HOSPITAL_STRETCHER
+  FREIGHT_GOODS
+  CAPSULE
+  HYDRAULIC
+  HOME_LIFT
+}
+
+enum MachineType {
+  GEARLESS_PMSM
+  GEARED_TRACTION
+  MRL_TRACTION
+  HYDRAULIC
+}
+
+enum LiftStatus {
+  OPERATIONAL
+  BREAKDOWN
+  UNDER_MAINTENANCE
+  INSPECTION_REQUIRED
+}
+
+enum AmcStatus {
+  ACTIVE
+  EXPIRING_SOON
+  EXPIRED
+  UNASSIGNED
+}
+
+enum AmcType {
+  COMPREHENSIVE
+  SEMI_COMPREHENSIVE
+  NON_COMPREHENSIVE
+}
+
+enum ComplaintPriority {
+  CRITICAL
+  HIGH
+  NORMAL
+  LOW
+}
+
+enum ComplaintStatus {
+  NEW
+  ASSIGNED
+  TECHNICIAN_ON_WAY
+  IN_PROGRESS
+  INSPECTION_REPAIR
+  WAITING_FOR_PARTS
+  RESOLVED
+  CLIENT_CONFIRMATION
+  CLOSED
+  CANCELLED
+}
+
+enum IssueType {
+  STUCK_PASSENGERS
+  LIFT_NOT_MOVING
+  DOOR_JAMMED
+  UNUSUAL_SOUND_VIBRATION
+  FLOOR_LEVELING_ERROR
+  BUTTONS_NOT_WORKING
+  ARD_FAILURE
+  EMERGENCY_ALARM
+  WATER_SEEPAGE
+  ROUTINE_CHECK
+  OTHER
+}
+
+enum WorkOrderStatus {
+  SCHEDULED
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum WorkOrderPriority {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum QuotationStatus {
+  DRAFT
+  SENT_TO_CLIENT
+  APPROVED
+  REJECTED
+  CLARIFICATION_REQUESTED
+  CONVERTED_TO_WORK_ORDER
+  EXPIRED
+}
+
+enum PaymentStatus {
+  PENDING
+  PARTIAL
+  PAID
+  OVERDUE
+  REFUNDED
+}
+
+enum PaymentMethod {
+  UPI_QR
+  NEFT_RTGS
+  CREDIT_CARD
+  CHEQUE
+  CASH
+}
+
+enum InventoryCategory {
+  ELECTRICAL
+  MECHANICAL
+  ELECTRONIC
+  SAFETY
+  CONSUMABLE
+}
+
+enum InventoryMovementType {
+  PURCHASE
+  TECHNICIAN_ISSUE
+  JOB_CONSUMPTION
+  RETURN
+  ADJUSTMENT
+}
+
+enum ServiceType {
+  BREAKDOWN_REPAIR
+  PREVENTIVE_MAINTENANCE
+  EMERGENCY_CALL
+  SAFETY_AUDIT
+  MODERNIZATION
+  PART_REPLACEMENT
+}
+
+enum PmZone {
+  MACHINE_ROOM
+  CAR_TOP
+  LANDING
+  PIT
+}
+
+enum PmItemStatus {
+  OK
+  ATTENTION_REQUIRED
+  FAULTY
+  NOT_APPLICABLE
+}
+
+// --------------------------------------------------------
+// MULTI-TENANT ROOTS
+// --------------------------------------------------------
+
+model Company {
+  id                 String   @id @default(uuid())
+  name               String
+  code               String   @unique
+  registrationNumber String?
+  logoUrl            String?
+  contactEmail       String
+  contactPhone       String
+  address            String
+  city               String
+  state              String
+  gstNumber          String?
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  // Relations
+  branches           Branch[]
+  users              User[]
+  buildings          Building[]
+  clients            Client[]
+  lifts              Lift[]
+  complaints         Complaint[]
+  amcContracts       AmcContract[]
+  quotations         Quotation[]
+  workOrders         WorkOrder[]
+  invoices           Invoice[]
+  inventoryParts     InventoryPart[]
+  inventoryMovements InventoryMovement[]
+  technicians        Technician[]
+  serviceReports     ServiceReport[]
+  auditLogs          AuditLog[]
+  qrCodeTokens       QRCodeToken[]
+  customerFeedbacks  CustomerFeedback[]
+  notifications      Notification[]
+  systemSettings     SystemSetting[]
+  userSessions       UserSession[]
+
+  @@map("companies")
+}
+
+model Branch {
+  id           String   @id @default(uuid())
+  companyId    String
+  name         String
+  code         String
+  city         String
+  state        String
+  address      String
+  contactPerson String?
+  contactPhone String?
+  contactEmail String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  users        User[]
+  buildings    Building[]
+  lifts        Lift[]
+  complaints   Complaint[]
+  technicians  Technician[]
+
+  @@unique([companyId, code])
+  @@map("branches")
+}
+
+model User {
+  id                  String    @id @default(uuid())
+  companyId           String
+  branchId            String?
+  name                String
+  email               String    @unique
+  phone               String?
+  passwordHash        String    @default("")
+  role                UserRole  @default(COMPANY_ADMIN)
+  avatarUrl           String?
+  clientId            String?
+  technicianId        String?   @unique
+  isActive            Boolean   @default(true)
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+  tokenVersion        Int       @default(0)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  company             Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch              Branch?   @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  client              Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  technician          Technician? @relation(fields: [technicianId], references: [id], onDelete: SetNull)
+  sessions            UserSession[]
+  passwordResetTokens PasswordResetToken[]
+
+  @@index([companyId, role])
+  @@map("users")
+}
+
+model Client {
+  id             String      @id @default(uuid())
+  companyId      String
+  name           String
+  contactPerson  String
+  phone          String
+  email          String?
+  billingAddress String
+  gstNumber      String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  company        Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  users          User[]
+  buildings      Building[]
+  lifts          Lift[]
+  amcContracts   AmcContract[]
+  quotations     Quotation[]
+  invoices       Invoice[]
+
+  @@index([companyId])
+  @@map("clients")
+}
+
+model Building {
+  id            String    @id @default(uuid())
+  companyId     String
+  branchId      String
+  clientId      String
+  name          String
+  address       String
+  landmark      String?
+  city          String
+  pinCode       String
+  contactPerson String
+  contactPhone  String
+  latitude      Float?
+  longitude     Float?
+  totalLifts    Int       @default(1)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch        Branch    @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  client        Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  lifts         Lift[]
+
+  @@index([companyId, branchId])
+  @@map("buildings")
+}
+
+// --------------------------------------------------------
+// LIFT DIGITAL PASSPORT & SPECIFICATIONS
+// --------------------------------------------------------
+
+model Lift {
+  id                      String              @id @default(uuid())
+  companyId               String
+  branchId                String
+  buildingId              String
+  clientId                String
+  permanentLiftId         String              @unique // e.g. "WPS-PUN-000123"
+  brand                   String              // Otis, Kone, Schindler, WEPSUN
+  model                   String
+  type                    LiftType            @default(PASSENGER)
+  capacityPersons         Int                 @default(8)
+  capacityKg              Int                 @default(544)
+  speedMps                Float               @default(1.5)
+  floors                  String              // "G + 14 Floors"
+  stops                   Int                 @default(15)
+  machineType             MachineType         @default(GEARLESS_PMSM)
+  motorKw                 Float               @default(5.5)
+  controllerBrand         String              // "Monarch NICE 3000+"
+  doorOperator            String              // "Fermator VVVF4+"
+  ardSystem               String?             // "Automatic Rescue Device 15kVA"
+  governorSpeed           Float?              @default(1.75)
+  ropeDiaMm               Float?              @default(10.0)
+  installationDate        DateTime
+  warrantyExpiry          DateTime?
+  currentStatus           LiftStatus          @default(OPERATIONAL)
+  amcStatus               AmcStatus           @default(UNASSIGNED)
+  activeAmcId             String?
+  lastPmDate              DateTime?
+  nextPmDate              DateTime?
+  safetyCertificateNumber String?
+  safetyCertificateExpiry DateTime?
+  locationDetails         String?             // "Wing A - Passenger Lift 1"
+  drawingsUrl             String?
+  wiringDiagramUrl        String?
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+
+  // Relations
+  company                 Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch                  Branch              @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  building                Building            @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  client                  Client              @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  amcContract             AmcContract?        @relation(fields: [activeAmcId], references: [id], onDelete: SetNull)
+  complaints              Complaint[]
+  serviceReports          ServiceReport[]
+  serviceRecords          ServiceRecord[]
+  pmExecutions            PMExecution[]
+  workOrders              WorkOrder[]
+  quotations              Quotation[]
+  qrCodeTokens            QRCodeToken[]
+
+  @@index([companyId, branchId, buildingId])
+  @@map("lifts")
+}
+
+model QRCodeToken {
+  id          String    @id @default(uuid())
+  token       String    @unique // Secure cryptographic random string
+  companyId   String
+  liftId      String
+  generatedAt DateTime  @default(now())
+  expiresAt   DateTime?
+  isActive    Boolean   @default(true)
+
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lift        Lift      @relation(fields: [liftId], references: [id], onDelete: Cascade)
+
+  @@index([token, isActive])
+  @@map("qr_code_tokens")
+}
+
+// --------------------------------------------------------
+// SERVICE HISTORY (IMMUTABLE LIFECYCLE)
+// --------------------------------------------------------
+
+model ServiceRecord {
+  id                  String      @id @default(uuid())
+  liftId              String
+  technicianId        String?
+  serviceType         ServiceType
+  title               String
+  description         String
+  findings            String?
+  actionsTaken        String?
+  partsUsedSummary    String?
+  technicianSignature String?
+  clientSignature     String?
+  reportUrl           String?
+  serviceDate         DateTime    @default(now())
+  createdAt           DateTime    @default(now())
+
+  lift                Lift        @relation(fields: [liftId], references: [id], onDelete: Cascade)
+  technician          Technician? @relation(fields: [technicianId], references: [id], onDelete: SetNull)
+
+  @@index([liftId, serviceDate])
+  @@map("service_records")
+}
+
+// --------------------------------------------------------
+// COMPLAINTS & TICKETS
+// --------------------------------------------------------
+
+model Complaint {
+  id                   String            @id @default(uuid())
+  companyId            String
+  branchId             String
+  liftId               String
+  ticketNumber         String            @unique // e.g. "TKT-2026-0412"
+  issueType            IssueType
+  title                String
+  description          String
+  priority             ComplaintPriority @default(NORMAL)
+  isEmergency          Boolean           @default(false)
+  status               ComplaintStatus   @default(NEW)
+  reportedAt           DateTime          @default(now())
+  assignedAt           DateTime?
+  assignedTechnicianId String?
+  technicianEta        String?
+  checkInTime          DateTime?
+  checkOutTime         DateTime?
+  diagnosisRemarks     String?
+  actionTaken          String?
+  clientOtp            String?
+  clientOtpVerified    Boolean           @default(false)
+  clientSignature      String?
+  technicianSignature  String?
+  clientRating         Int?
+  clientFeedback       String?
+  closedAt             DateTime?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  company              Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch               Branch            @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  lift                 Lift              @relation(fields: [liftId], references: [id], onDelete: Cascade)
+  assignedTechnician   Technician?       @relation(fields: [assignedTechnicianId], references: [id], onDelete: SetNull)
+  serviceReport        ServiceReport?
+  gpsCheckIns          GPSCheckIn[]
+  workOrders           WorkOrder[]
+  timelineEntries      ComplaintTimeline[]
+
+  @@index([companyId, status, priority])
+  @@map("complaints")
+}
+
+model ComplaintTimeline {
+  id          String          @id @default(uuid())
+  complaintId String
+  status      ComplaintStatus
+  title       String
+  description String
+  actorName   String
+  actorRole   String
+  timestamp   DateTime        @default(now())
+
+  complaint   Complaint       @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+
+  @@index([complaintId, timestamp])
+  @@map("complaint_timelines")
+}
+
+// --------------------------------------------------------
+// TECHNICIANS & FIELD JOBS
+// --------------------------------------------------------
+
+model Technician {
+  id                         String              @id @default(uuid())
+  companyId                  String
+  branchId                   String
+  name                       String
+  employeeCode               String              @unique
+  phone                      String
+  email                      String              @unique
+  avatarUrl                  String?
+  zone                       String
+  currentStatus              String              @default("available")
+  currentLocationName        String?
+  latitude                   Float?
+  longitude                  Float?
+  totalResolved              Int                 @default(0)
+  avgResolutionMinutes       Int                 @default(45)
+  customerRating             Float               @default(4.8)
+  totalRatingsCount          Int                 @default(0)
+  createdAt                  DateTime            @default(now())
+  updatedAt                  DateTime            @updatedAt
+
+  company                    Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch                     Branch              @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  user                       User?
+  assignedComplaints         Complaint[]
+  workOrders                 WorkOrder[]
+  serviceReports             ServiceReport[]
+  serviceRecords             ServiceRecord[]
+  pmExecutions               PMExecution[]
+  gpsCheckIns                GPSCheckIn[]
+  inventoryMovements         InventoryMovement[]
+
+  @@index([companyId, branchId])
+  @@map("technicians")
+}
+
+model GPSCheckIn {
+  id                     String     @id @default(uuid())
+  companyId              String
+  ticketId               String
+  technicianId           String
+  latitude               Float
+  longitude              Float
+  accuracyMeters         Float
+  locationAddress        String
+  distanceFromSiteMeters Float?
+  isVerified             Boolean    @default(true)
+  checkInTime            DateTime   @default(now())
+
+  complaint              Complaint  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  technician             Technician @relation(fields: [technicianId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, checkInTime])
+  @@map("gps_check_ins")
+}
+
+// --------------------------------------------------------
+// DYNAMIC PREVENTIVE MAINTENANCE (PM)
+// --------------------------------------------------------
+
+model PMTemplate {
+  id          String              @id @default(uuid())
+  name        String
+  description String?
+  items       PMTemplateItem[]
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@map("pm_templates")
+}
+
+model PMTemplateItem {
+  id          String     @id @default(uuid())
+  templateId  String
+  zone        PmZone
+  name        String
+  description String
+
+  template    PMTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@map("pm_template_items")
+}
+
+model PMExecution {
+  id                  String             @id @default(uuid())
+  pmNumber            String             @unique // e.g. "PM-2026-0088"
+  liftId              String
+  technicianId        String
+  date                DateTime           @default(now())
+  overallStatus       String             @default("passed")
+  remarks             String?
+  technicianSignature String
+  clientSignature     String?
+  nextPmDate          DateTime
+  createdAt           DateTime           @default(now())
+
+  lift                Lift               @relation(fields: [liftId], references: [id], onDelete: Cascade)
+  technician          Technician         @relation(fields: [technicianId], references: [id], onDelete: Cascade)
+  responses           PMItemResponse[]
+
+  @@index([liftId, date])
+  @@map("pm_executions")
+}
+
+model PMItemResponse {
+  id          String       @id @default(uuid())
+  executionId String
+  zone        PmZone
+  name        String
+  status      PmItemStatus @default(OK)
+  remarks     String?
+  photoUrl    String?
+
+  execution   PMExecution  @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+  @@map("pm_item_responses")
+}
+
+// --------------------------------------------------------
+// AMC CONTRACTS & RENEWALS
+// --------------------------------------------------------
+
+model AmcContract {
+  id             String        @id @default(uuid())
+  companyId      String
+  branchId       String
+  clientId       String
+  contractNumber String        @unique // e.g. "AMC-WEP-2025-904"
+  amcType        AmcType       @default(COMPREHENSIVE)
+  startDate      DateTime
+  endDate        DateTime
+  contractValue  Float
+  gstRate        Float         @default(18.0)
+  gstAmount      Float
+  totalAmount    Float
+  paymentStatus  PaymentStatus @default(PENDING)
+  coveredParts   String[]
+  excludedParts  String[]
+  pmFrequency    String        @default("Monthly (12 Visits/Year)")
+  pmVisitsDone   Int           @default(0)
+  pmVisitsTotal  Int           @default(12)
+  status         String        @default("active")
+  agreementDocUrl String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  company        Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  client         Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  lifts          Lift[]
+  invoices       Invoice[]
+
+  @@index([companyId, status, endDate])
+  @@map("amc_contracts")
+}
+
+// --------------------------------------------------------
+// QUOTATIONS & WORK ORDERS
+// --------------------------------------------------------
+
+model Quotation {
+  id                     String          @id @default(uuid())
+  companyId              String
+  branchId               String
+  clientId               String
+  liftId                 String
+  complaintId            String?
+  quoteNumber            String          @unique // e.g. "QT-WEP-2026-031"
+  subject                String
+  subtotal               Float
+  gstRate                Float           @default(18.0)
+  gstAmount              Float
+  grandTotal             Float
+  terms                  String[]
+  status                 QuotationStatus @default(SENT_TO_CLIENT)
+  clarificationNotes     String?
+  convertedToWorkOrderId String?
+  validUntil             DateTime
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+
+  company                Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  client                 Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  lift                   Lift            @relation(fields: [liftId], references: [id], onDelete: Cascade)
+  items                  QuotationItem[]
+  workOrders             WorkOrder[]
+  invoices               Invoice[]
+
+  @@index([companyId, status])
+  @@map("quotations")
+}
+
+model QuotationItem {
+  id          String    @id @default(uuid())
+  quotationId String
+  description String
+  hsnCode     String
+  quantity    Int       @default(1)
+  unitRate    Float
+  amount      Float
+
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  @@map("quotation_items")
+}
+
+model WorkOrder {
+  id              String            @id @default(uuid())
+  companyId       String
+  branchId        String
+  workOrderNumber String            @unique // e.g. "WO-2026-0045"
+  quotationId     String?
+  complaintId     String?
+  liftId          String
+  technicianId    String?
+  title           String
+  description     String
+  priority        WorkOrderPriority @default(MEDIUM)
+  status          WorkOrderStatus   @default(SCHEDULED)
+  scheduledDate   DateTime
+  estimatedHours  Float             @default(3.0)
+  totalAmount     Float
+  invoiceId       String?
+  remarks         String?
+  completedAt     DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  company         Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  quotation       Quotation?        @relation(fields: [quotationId], references: [id], onDelete: SetNull)
+  complaint       Complaint?        @relation(fields: [complaintId], references: [id], onDelete: SetNull)
+  lift            Lift              @relation(fields: [liftId], references: [id], onDelete: Cascade)
+  technician      Technician?       @relation(fields: [technicianId], references: [id], onDelete: SetNull)
+  invoice         Invoice?          @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, status])
+  @@map("work_orders")
+}
+
+// --------------------------------------------------------
+// INVOICES & PAYMENTS
+// --------------------------------------------------------
+
+model Invoice {
+  id                String        @id @default(uuid())
+  companyId         String
+  branchId          String
+  clientId          String
+  invoiceNumber     String        @unique // e.g. "INV-WEP-2026-102"
+  type              String        // AMC Contract, Breakdown Repair, Parts Replacement
+  relatedContractId String?
+  relatedQuoteId    String?
+  subtotal          Float
+  gstAmount         Float
+  grandTotal        Float
+  paidAmount        Float         @default(0.0)
+  status            PaymentStatus @default(PENDING)
+  dueDate           DateTime
+  invoiceDate       DateTime      @default(now())
+  paymentMethod     PaymentMethod?
+  transactionId     String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  company           Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  client            Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  amcContract       AmcContract?  @relation(fields: [relatedContractId], references: [id], onDelete: SetNull)
+  quotation         Quotation?    @relation(fields: [relatedQuoteId], references: [id], onDelete: SetNull)
+  workOrders        WorkOrder[]
+  payments          Payment[]
+
+  @@index([companyId, status, dueDate])
+  @@map("invoices")
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  invoiceId     String
+  amount        Float
+  method        PaymentMethod
+  transactionId String        @unique
+  gatewayRef    String?       // Razorpay payment ID
+  verified      Boolean       @default(true)
+  paymentDate   DateTime      @default(now())
+
+  invoice       Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+// --------------------------------------------------------
+// INVENTORY & DOUBLE-ENTRY MOVEMENT LEDGER
+// --------------------------------------------------------
+
+model InventoryPart {
+  id                String            @id @default(uuid())
+  companyId         String
+  branchId          String
+  partNumber        String            @unique
+  name              String
+  category          InventoryCategory @default(MECHANICAL)
+  currentStock      Int               @default(0)
+  minStockThreshold Int               @default(5)
+  unit              String            @default("Nos")
+  purchasePrice     Float
+  sellingPrice      Float
+  hsnCode           String
+  supplier          String
+  locationRack      String
+  compatibleModels  String[]
+  imageUrl          String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  company           Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  movements         InventoryMovement[]
+
+  @@index([companyId, category])
+  @@map("inventory_parts")
+}
+
+model InventoryMovement {
+  id            String                @id @default(uuid())
+  companyId     String
+  branchId      String
+  partId        String
+  type          InventoryMovementType
+  quantity      Int                   // + for purchase/return, - for issue/consumed
+  previousStock Int
+  newStock      Int
+  referenceId   String?               // PO#, Ticket#, WorkOrder#
+  technicianId  String?
+  performedBy   String
+  notes         String?
+  timestamp     DateTime              @default(now())
+
+  company       Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  part          InventoryPart         @relation(fields: [partId], references: [id], onDelete: Cascade)
+  technician    Technician?           @relation(fields: [technicianId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, partId, timestamp])
+  @@map("inventory_movements")
+}
+
+// --------------------------------------------------------
+// SERVICE REPORTS (PDF & AUDIT)
+// --------------------------------------------------------
+
+model ServiceReport {
+  id                          String      @id @default(uuid())
+  companyId                   String
+  branchId                    String
+  reportNumber                String      @unique // e.g. "WPS-SR-000182"
+  ticketId                    String      @unique
+  liftId                      String
+  technicianId                String
+  serviceDate                 DateTime    @default(now())
+  serviceStartTime            String
+  serviceEndTime              String
+  serviceType                 ServiceType @default(BREAKDOWN_REPAIR)
+  initialDiagnosis            String
+  rootCause                   String
+  workPerformed               String
+  technicianRecommendations   String?
+  liftOperatingStatusAfterWork String     @default("Fully Operational & Safe")
+  technicianSignature         String
+  clientSignature             String
+  clientOtpVerified           Boolean     @default(true)
+  clientRating                Int?
+  clientFeedback              String?
+  pdfUrl                      String?
+  createdAt                   DateTime    @default(now())
+
+  company                     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  complaint                   Complaint   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  lift                        Lift        @relation(fields: [liftId], references: [id], onDelete: Cascade)
+  technician                  Technician  @relation(fields: [technicianId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, liftId, serviceDate])
+  @@map("service_reports")
+}
+
+// --------------------------------------------------------
+// AUDIT LOGS
+// --------------------------------------------------------
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  companyId   String
+  entityType  String   // Lift, Complaint, AmcContract, Quotation, WorkOrder, Invoice, Inventory
+  entityId    String
+  action      String   // CREATE, UPDATE, DISPATCH, CONVERT, RESTOCK, CONSUME
+  performedBy String
+  userRole    String
+  details     String
+  timestamp   DateTime @default(now())
+
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, entityType, timestamp])
+  @@map("audit_logs")
+}
+
+// --------------------------------------------------------
+// CUSTOMER FEEDBACK & CSAT
+// --------------------------------------------------------
+
+model CustomerFeedback {
+  id             String    @id @default(uuid())
+  companyId      String
+  clientName     String
+  clientPhone    String?
+  buildingName   String
+  liftNumber     String
+  technicianName String
+  ticketNumber   String?
+  serviceType    String    @default("Breakdown Resolution")
+  overallRating  Int       @default(5)
+  punctuality    Int       @default(5)
+  technicalSkill Int       @default(5)
+  rideSmoothness Int       @default(5)
+  communication  Int       @default(5)
+  tags           String[]
+  comments       String
+  adminReply     String?
+  adminReplyBy   String?
+  adminReplyAt   DateTime?
+  status         String    @default("published")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  company        Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, overallRating, createdAt])
+  @@map("customer_feedbacks")
+}
+
+// --------------------------------------------------------
+// NOTIFICATIONS
+// --------------------------------------------------------
+
+model Notification {
+  id         String   @id @default(uuid())
+  companyId  String
+  userId     String?
+  title      String
+  message    String
+  type       String   @default("INFO") // BREAKDOWN, PM_DUE, AMC_EXPIRY, PAYMENT, SYSTEM
+  entityType String?
+  entityId   String?
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, userId, isRead])
+  @@map("notifications")
+}
+
+// --------------------------------------------------------
+// SYSTEM SETTINGS
+// --------------------------------------------------------
+
+model SystemSetting {
+  id        String   @id @default(uuid())
+  companyId String
+  key       String   @unique
+  value     String
+  category  String   @default("GENERAL")
+  updatedAt DateTime @updatedAt
+
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, key])
+  @@map("system_settings")
+}
+
+// --------------------------------------------------------
+// AUTHENTICATION & REFRESH TOKEN SESSIONS
+// --------------------------------------------------------
+
+model UserSession {
+  id          String    @id @default(uuid())
+  userId      String
+  companyId   String
+  tokenHash   String    @unique
+  userAgent   String?
+  ipAddress   String?
+  isRevoked   Boolean   @default(false)
+  revokedAt   DateTime?
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+  lastUsedAt  DateTime  @default(now())
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([userId, tokenHash])
+  @@index([companyId])
+  @@map("user_sessions")
+}
+
+model PasswordResetToken {
+  id          String    @id @default(uuid())
+  userId      String
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  isUsed      Boolean   @default(false)
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tokenHash])
+  @@map("password_reset_tokens")
+}
+
+
