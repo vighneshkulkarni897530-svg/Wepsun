@@ -29,9 +29,10 @@ import {
 import { useApp } from '../../context/AppContext';
 import { AppNotification, NotificationPriority, NotificationCategory } from '../../types';
 import { playNotificationSound } from '../../utils/notificationSound';
+import { NavTabId } from '../layout/Sidebar';
 
 interface AdminNotificationsViewProps {
-  onNavigateTab?: (tab: string) => void;
+  onNavigateTab?: (tab: NavTabId | string) => void;
 }
 
 export const AdminNotificationsView: React.FC<AdminNotificationsViewProps> = ({ onNavigateTab }) => {
