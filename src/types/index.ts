@@ -569,6 +569,40 @@ export interface ClientProfile {
   totalLifts: number;
 }
 
+export type NotificationPriority = 'critical' | 'urgent' | 'high' | 'normal' | 'low';
+
+export type NotificationCategory =
+  | 'emergency'
+  | 'complaint'
+  | 'technician'
+  | 'pm'
+  | 'amc'
+  | 'quotation'
+  | 'payment'
+  | 'inventory'
+  | 'system';
+
+export interface AppNotification {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  timestamp: string;
+  category: NotificationCategory;
+  priority: NotificationPriority;
+  isRead: boolean;
+  targetRole?: UserRole | 'all';
+  clientId?: string;
+  technicianId?: string;
+  buildingName?: string;
+  liftNumber?: string;
+  ticketNumber?: string;
+  referenceId?: string;
+  actionTab?: string;
+  actionLabel?: string;
+  amount?: number;
+}
+
 export interface ClientNotification {
   id: string;
   clientId: string;
@@ -576,9 +610,12 @@ export interface ClientNotification {
   message: string;
   timestamp: string;
   category: 'complaint' | 'technician' | 'pm' | 'amc' | 'quotation' | 'payment' | 'system';
+  priority?: NotificationPriority;
   isRead: boolean;
   actionTab?: string;
   referenceId?: string;
+  buildingName?: string;
+  liftNumber?: string;
 }
 
 export interface AiErrorCode {

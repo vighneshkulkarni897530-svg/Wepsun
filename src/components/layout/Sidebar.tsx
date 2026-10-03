@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   LayoutDashboard,
+  Bell,
   Building2,
   GitBranch,
   Building,
@@ -96,11 +97,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCloseMobile,
   onOpenLoginModal,
 }) => {
-  const { currentUser, currentRole, clientScopedNotifications, clientScopedComplaints, clientScopedQuotations, clientScopedInvoices } = useApp();
+  const {
+    currentUser,
+    currentRole,
+    clientScopedNotifications,
+    clientScopedComplaints,
+    clientScopedQuotations,
+    clientScopedInvoices,
+    unreadNotificationsCount: globalUnreadCount,
+  } = useApp();
+
+  const unreadNotificationsCount = globalUnreadCount !== undefined
+    ? globalUnreadCount
+    : (clientScopedNotifications ? clientScopedNotifications.filter(n => !n.isRead).length : 0);
+  const openComplaintsCount = clientScopedComplaints ? clientScopedComplaints.filter(c => c.status !== 'resolved' && c.status !== 'closed').length : 0;
+  const pendingQuotesCount = clientScopedQuotations ? clientScopedQuotations.filter(q => q.status === 'pending').length : 0;
+  const pendingInvoicesCount = clientScopedInvoices ? clientScopedInvoices.filter(i => i.status === 'unpaid' || i.status === 'partial').length : 0;
 
   // Role-specific menu configurations strictly matching recommended structure
   const adminMenuItems: { id: NavTabId; label: string; icon: React.ReactNode; badge?: number | string }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-[18px] h-[18px]" /> },
+    { id: 'notifications', label: 'Notifications', icon: <Bell className="w-[18px] h-[18px]" />, badge: unreadNotificationsCount > 0 ? unreadNotificationsCount : undefined },
     { id: 'clients', label: 'Clients', icon: <Users className="w-[18px] h-[18px]" /> },
     { id: 'buildings', label: 'Buildings', icon: <Building className="w-[18px] h-[18px]" /> },
     { id: 'lifts', label: 'Lifts', icon: <Layers className="w-[18px] h-[18px]" /> },
@@ -124,13 +141,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'photos', label: 'Photos', icon: <Camera className="w-[18px] h-[18px]" /> },
     { id: 'report', label: 'Report', icon: <FileText className="w-[18px] h-[18px]" /> },
     { id: 'signature', label: 'Client Signature', icon: <FileCheck className="w-[18px] h-[18px]" /> },
+    { id: 'notifications', label: 'Notifications', icon: <Bell className="w-[18px] h-[18px]" />, badge: unreadNotificationsCount > 0 ? unreadNotificationsCount : undefined },
     { id: 'profile', label: 'Profile & Sync', icon: <User className="w-[18px] h-[18px]" /> },
   ];
-
-  const unreadNotificationsCount = clientScopedNotifications ? clientScopedNotifications.filter(n => !n.isRead).length : 0;
-  const openComplaintsCount = clientScopedComplaints ? clientScopedComplaints.filter(c => c.status !== 'resolved' && c.status !== 'closed').length : 0;
-  const pendingQuotesCount = clientScopedQuotations ? clientScopedQuotations.filter(q => q.status === 'pending').length : 0;
-  const pendingInvoicesCount = clientScopedInvoices ? clientScopedInvoices.filter(i => i.status === 'unpaid' || i.status === 'partial').length : 0;
 
   const clientMenuItems: { id: NavTabId; label: string; icon: React.ReactNode; badge?: number | string }[] = [
     { id: 'home', label: 'Home', icon: <LayoutDashboard className="w-[18px] h-[18px]" /> },
