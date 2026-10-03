@@ -229,18 +229,30 @@ export async function seedDatabase() {
 
   // 6. USERS (RBAC)
   console.log('🔐 Seeding Multi-Tenant RBAC User Accounts with Hashed Passwords...');
-  const defaultPasswordHash = bcrypt.hashSync('Wepsun@2026', 10);
+  const adminPasswordHash = bcrypt.hashSync('admin123', 10);
+  const techPasswordHash = bcrypt.hashSync('tech123', 10);
+  const clientPasswordHash = bcrypt.hashSync('client123', 10);
+  const superPasswordHash = bcrypt.hashSync('super123', 10);
+  const defaultPasswordHash = adminPasswordHash;
+
+  // Clean user sessions and users for fresh credentials
+  try {
+    await prisma.userSession.deleteMany({});
+    await prisma.user.deleteMany({});
+  } catch {
+    // Non-blocking
+  }
 
   // 1. Super Admin
   await prisma.user.upsert({
     where: { email: 'superadmin@wepsun.com' },
-    update: { passwordHash: defaultPasswordHash, role: 'SUPER_ADMIN', isActive: true },
+    update: { passwordHash: superPasswordHash, role: 'SUPER_ADMIN', isActive: true },
     create: {
       id: 'usr-super-1',
       companyId: wepsun.id,
       name: 'System Super Admin',
       email: 'superadmin@wepsun.com',
-      passwordHash: defaultPasswordHash,
+      passwordHash: superPasswordHash,
       phone: '+91 98000 00000',
       role: 'SUPER_ADMIN',
       isActive: true,
@@ -251,14 +263,14 @@ export async function seedDatabase() {
   // 2. Company Admin (WEPSUN)
   await prisma.user.upsert({
     where: { email: 'admin@wepsun.com' },
-    update: { passwordHash: defaultPasswordHash, role: 'COMPANY_ADMIN', isActive: true },
+    update: { passwordHash: adminPasswordHash, role: 'COMPANY_ADMIN', isActive: true },
     create: {
       id: 'usr-admin-1',
       companyId: wepsun.id,
       branchId: brMum.id,
       name: 'Sunil Mehta (Managing Director)',
       email: 'admin@wepsun.com',
-      passwordHash: defaultPasswordHash,
+      passwordHash: adminPasswordHash,
       phone: '+91 98201 55432',
       role: 'COMPANY_ADMIN',
       isActive: true,
@@ -269,14 +281,14 @@ export async function seedDatabase() {
   // 3. Service Manager
   await prisma.user.upsert({
     where: { email: 'service.manager@wepsun.com' },
-    update: { passwordHash: defaultPasswordHash, role: 'SERVICE_MANAGER', isActive: true },
+    update: { passwordHash: adminPasswordHash, role: 'SERVICE_MANAGER', isActive: true },
     create: {
       id: 'usr-mgr-1',
       companyId: wepsun.id,
       branchId: brMum.id,
       name: 'Vikram Joshi (Service Manager)',
       email: 'service.manager@wepsun.com',
-      passwordHash: defaultPasswordHash,
+      passwordHash: adminPasswordHash,
       phone: '+91 98202 99887',
       role: 'SERVICE_MANAGER',
       isActive: true,
@@ -286,15 +298,15 @@ export async function seedDatabase() {
 
   // 4. Technician
   await prisma.user.upsert({
-    where: { email: 'rajesh.sharma@wepsun.com' },
-    update: { passwordHash: defaultPasswordHash, role: 'TECHNICIAN', technicianId: tech1.id, isActive: true },
+    where: { email: 'tech1@wepsun.com' },
+    update: { passwordHash: techPasswordHash, role: 'TECHNICIAN', technicianId: tech1.id, isActive: true },
     create: {
       id: 'usr-tech-1',
       companyId: wepsun.id,
       branchId: brMum.id,
-      name: 'Rajesh Sharma',
-      email: 'rajesh.sharma@wepsun.com',
-      passwordHash: defaultPasswordHash,
+      name: 'Rajesh Sharma (Lead Tech)',
+      email: 'tech1@wepsun.com',
+      passwordHash: techPasswordHash,
       phone: '+91 98203 11223',
       role: 'TECHNICIAN',
       technicianId: tech1.id,
@@ -305,15 +317,15 @@ export async function seedDatabase() {
 
   // 5. Client
   await prisma.user.upsert({
-    where: { email: 'client@greenwood.com' },
-    update: { passwordHash: defaultPasswordHash, role: 'CLIENT', clientId: client1.id, isActive: true },
+    where: { email: 'greenwood@wepsun.com' },
+    update: { passwordHash: clientPasswordHash, role: 'CLIENT', clientId: client1.id, isActive: true },
     create: {
       id: 'usr-client-1',
       companyId: wepsun.id,
       branchId: brMum.id,
-      name: 'Sanjay Deshmukh (Secretary)',
-      email: 'client@greenwood.com',
-      passwordHash: defaultPasswordHash,
+      name: 'Greenwood Society Secretary',
+      email: 'greenwood@wepsun.com',
+      passwordHash: clientPasswordHash,
       phone: '+91 98220 11223',
       role: 'CLIENT',
       clientId: client1.id,
