@@ -195,3 +195,22 @@ export async function triggerGoogleOAuth2Popup(
     onError(err);
   }
 }
+
+/**
+ * Open official Google Account Chooser in native In-App Chrome Custom Tab on Android/iOS
+ */
+export async function openNativeGoogleOAuth(customRedirectUri?: string): Promise<void> {
+  const { Browser } = await import('@capacitor/browser');
+  const clientId = getGoogleClientId();
+  const redirectUri = customRedirectUri || 'https://wepsun.onrender.com/api/auth/google/callback';
+  const nonce = 'wepsun_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
+  
+  const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token%20id_token&scope=${encodeURIComponent('openid email profile')}&prompt=select_account&nonce=${nonce}`;
+
+  await Browser.open({
+    url: googleAuthUrl,
+    windowName: '_self',
+    presentationStyle: 'popover',
+  });
+}
+

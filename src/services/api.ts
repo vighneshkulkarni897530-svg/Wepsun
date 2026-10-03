@@ -286,6 +286,7 @@ export const apiService = {
     apiFetch('/auth/login', { method: 'POST', body: JSON.stringify(payload), skipAuth: true }),
   googleLogin: (payload: {
     credential?: string;
+    accessToken?: string;
     email?: string;
     name?: string;
     avatarUrl?: string;

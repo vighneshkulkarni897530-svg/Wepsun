@@ -26,7 +26,7 @@ import { apiService, setTokens } from '../../services/api';
 import type { User as UserRecord, UserRole } from '../../types';
 import { DEMO_ACCOUNTS } from '../../data/initialData';
 import { GoogleAuthModal } from './GoogleAuthModal';
-import { loadGoogleGisScript, triggerGoogleOAuth2Popup } from '../../services/googleAuth';
+import { loadGoogleGisScript, triggerGoogleOAuth2Popup, parseGoogleJwt } from '../../services/googleAuth';
 import elevatorGlassLobbyImg from '../../assets/elevator-glass-lobby.jpg';
 import constructionPlansSunsetImg from '../../assets/construction-plans-sunset.jpg';
 
@@ -307,7 +307,158 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     loadGoogleGisScript().catch(() => {});
   }, []);
 
+  // Listen for Google OAuth callback deep-links in native Android app (wepsun://auth-callback)
+  useEffect(() => {
+    let appUrlListener: any;
+    let browserFinishedListener: any;
+
+    const setupNativeAuthListeners = async () => {
+      try {
+        const { Browser } = await import('@capacitor/browser');
+        const { App } = await import('@capacitor/app');
+
+        browserFinishedListener = await Browser.addListener('browserFinished', () => {
+          setIsGoogleSubmitting(false);
+        });
+
+        appUrlListener = await App.addListener('appUrlOpen', async (event) => {
+          if (event.url && event.url.includes('auth-callback')) {
+            try {
+              await Browser.close();
+            } catch {}
+
+            try {
+              setIsGoogleSubmitting(true);
+              const rawQuery = event.url.split(/auth-callback[?#]/)[1] || '';
+              const searchParams = new URLSearchParams(rawQuery);
+              const accessToken = searchParams.get('access_token') || undefined;
+              const idToken = searchParams.get('id_token') || searchParams.get('credential') || undefined;
+
+              let googleProfile: any = null;
+              if (idToken) {
+                googleProfile = parseGoogleJwt(idToken);
+              }
+
+              if (!googleProfile && accessToken) {
+                try {
+                  const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                    headers: { Authorization: `Bearer ${accessToken}` },
+                  });
+                  if (userInfoRes.ok) {
+                    googleProfile = await userInfoRes.json();
+                  }
+                } catch {}
+              }
+
+              if (accessToken || idToken || googleProfile) {
+                const targetRole: UserRole =
+                  view === 'signup'
+                    ? regRole
+                    : selectedRole === 'client'
+                    ? 'client'
+                    : selectedRole === 'technician'
+                    ? 'technician'
+                    : 'company_admin';
+
+                let userRecord: any = null;
+                try {
+                  const res = await apiService.googleLogin({
+                    credential: idToken,
+                    accessToken: accessToken,
+                    email: googleProfile?.email,
+                    name: googleProfile?.name,
+                    avatarUrl: googleProfile?.picture,
+                    role: targetRole.toUpperCase(),
+                    companyId: 'comp-1',
+                    googleId: googleProfile?.sub,
+                  });
+
+                  if (res && res.success && res.data) {
+                    const { user, accessToken: newAccess, refreshToken: newRefresh } = res.data;
+                    if (newAccess) {
+                      setTokens(newAccess, newRefresh);
+                    }
+                    userRecord = user;
+                  }
+                } catch {}
+
+                if (!userRecord && googleProfile?.email) {
+                  // Fallback: local account creation with Google profile
+                  const cleanEmail = googleProfile.email.toLowerCase().trim();
+                  const existingUser = users.find((u) => u.email && u.email.toLowerCase() === cleanEmail);
+                  if (existingUser) {
+                    userRecord = existingUser;
+                  } else {
+                    const newUid = 'usr-google-' + Date.now();
+                    userRecord = {
+                      id: newUid,
+                      name: googleProfile.name || cleanEmail.split('@')[0],
+                      email: cleanEmail,
+                      role: targetRole,
+                      companyId: 'comp-1',
+                      clientId: targetRole === 'client' ? 'client-' + Date.now() : undefined,
+                      technicianId: targetRole === 'technician' ? 'tech-' + Date.now() : undefined,
+                      avatar: googleProfile.picture,
+                      companyName: `${googleProfile.name || 'User'}'s Enterprise`,
+                      isActive: true,
+                      createdAt: new Date().toISOString(),
+                    };
+                  }
+                }
+
+                if (userRecord) {
+                  const activeRole = ((userRecord.role || targetRole) as string).toLowerCase() as UserRole;
+                  loginAsUser({
+                    id: userRecord.id,
+                    name: userRecord.name || googleProfile?.name,
+                    email: userRecord.email || googleProfile?.email,
+                    phone: userRecord.phone || '+91 98200 00000',
+                    role: activeRole,
+                    companyId: userRecord.companyId || 'comp-1',
+                    branchId: userRecord.branchId,
+                    clientId: userRecord.clientId || (activeRole === 'client' ? 'client-' + Date.now() : undefined),
+                    technicianId: userRecord.technicianId || (activeRole === 'technician' ? 'tech-' + Date.now() : undefined),
+                    avatar: userRecord.avatar || userRecord.avatarUrl || googleProfile?.picture,
+                    isActive: true,
+                  });
+                  setCurrentRole(activeRole);
+                  confetti({
+                    particleCount: 70,
+                    spread: 60,
+                    origin: { y: 0.65 },
+                    colors: ['#4285F4', '#EA4335', '#FBBC05', '#34A853', '#0066FF'],
+                  });
+                  showToast('success', 'Google Sign-In Successful', `Welcome to WEPSUN, ${userRecord.name || googleProfile?.name}!`);
+                  window.location.hash = activeRole === 'client' ? 'home' : activeRole === 'technician' ? 'jobs' : 'dashboard';
+                  if (onClose) onClose();
+                } else {
+                  showToast('error', 'Google Sign-In', 'Could not complete Google authentication.');
+                }
+              }
+            } catch (err: any) {
+              showToast('error', 'Google Auth Error', err?.message || 'Authentication encountered an error.');
+            } finally {
+              setIsGoogleSubmitting(false);
+            }
+          }
+        });
+      } catch {}
+    };
+
+    if (Capacitor.isNativePlatform()) {
+      setupNativeAuthListeners();
+    }
+
+    return () => {
+      if (appUrlListener?.remove) appUrlListener.remove();
+      if (browserFinishedListener?.remove) browserFinishedListener.remove();
+    };
+  }, [view, regRole, selectedRole, users]);
+
   const handleGoogleAuth = async () => {
+    setErrorMessage(null);
+    setIsGoogleSubmitting(true);
+
     const targetRole: UserRole =
       view === 'signup'
         ? regRole
@@ -317,15 +468,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         ? 'technician'
         : 'company_admin';
 
-    // On native mobile app (Android), embedded WebViews block GIS popups (Google disallowed_useragent rule).
-    // Open the Google Identity Selection Modal directly on mobile for a smooth 1-tap experience.
+    // On native mobile app (Android), open official Google OAuth Account Chooser in secure In-App Custom Tab
     if (Capacitor.isNativePlatform()) {
-      setIsGoogleModalOpen(true);
+      try {
+        const { openNativeGoogleOAuth } = await import('../../services/googleAuth');
+        await openNativeGoogleOAuth();
+      } catch (nativeErr: any) {
+        setIsGoogleSubmitting(false);
+        setIsGoogleModalOpen(true);
+      }
       return;
     }
 
-    setIsGoogleSubmitting(true);
-
+    // On Web (Desktop/Browser), launch Google Identity Services popup
     try {
       await triggerGoogleOAuth2Popup(
         async (profile, accessToken) => {
@@ -422,7 +577,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           if (popupError.message?.includes('closed') || popupError.message?.includes('cancel') || popupError.message?.includes('popup_closed_by_user')) {
             showToast('info', 'Sign-In Cancelled', 'Google sign-in was cancelled.');
           } else {
-            // If GIS popup encounters origin mismatch or script issue, open the dedicated GoogleAuthModal
             setIsGoogleModalOpen(true);
           }
         }
