@@ -25,7 +25,6 @@ import { apiService, setTokens } from '../../services/api';
 import type { User as UserRecord, UserRole } from '../../types';
 import { DEMO_ACCOUNTS } from '../../data/initialData';
 import { GoogleAuthModal } from './GoogleAuthModal';
-import { NetworkConfigModal } from './NetworkConfigModal';
 import { loadGoogleGisScript, triggerGoogleOAuth2Popup } from '../../services/googleAuth';
 import elevatorGlassLobbyImg from '../../assets/elevator-glass-lobby.jpg';
 import constructionPlansSunsetImg from '../../assets/construction-plans-sunset.jpg';
@@ -106,8 +105,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
   // Google OAuth Modal
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
-  // Network / Server Settings Modal
-  const [isNetworkModalOpen, setIsNetworkModalOpen] = useState(false);
 
   // Role tab switch
   const handleRoleChange = (role: 'admin' | 'technician' | 'client') => {
@@ -369,16 +366,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           <span>← Back to Home</span>
         </button>
 
-        {/* Network & Server Settings Button */}
-        <button
-          type="button"
-          onClick={() => setIsNetworkModalOpen(true)}
-          className={`absolute top-4 ${onClose ? 'right-14 sm:right-20' : 'right-4 sm:right-8'} px-3 py-1.5 rounded-full bg-white/20 hover:bg-white/35 text-white backdrop-blur-md text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer`}
-          title="Internet & Server Network Settings"
-        >
-          <Wifi className="w-3.5 h-3.5 text-emerald-300" />
-          <span className="hidden sm:inline">Network</span>
-        </button>
 
         {/* Modal Close Button */}
         {onClose && (
@@ -968,11 +955,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         }}
       />
 
-      {/* Internet & Server Network Configuration Modal */}
-      <NetworkConfigModal
-        isOpen={isNetworkModalOpen}
-        onClose={() => setIsNetworkModalOpen(false)}
-      />
     </div>
   );
 };

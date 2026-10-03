@@ -35,7 +35,6 @@ import { UserRole } from '../../types';
 import { NavTabId } from './Sidebar';
 import { WepsunLiftServicesLogo } from '../common/WepsunLogo';
 import { GoogleAuthModal } from '../common/GoogleAuthModal';
-import { NetworkConfigModal } from '../common/NetworkConfigModal';
 
 interface HeaderProps {
   onToggleSidebar: () => void;
@@ -74,7 +73,6 @@ export const Header: React.FC<HeaderProps> = ({
   const [isCompanyDropdownOpen, setIsCompanyDropdownOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [isGoogleAuthModalOpen, setIsGoogleAuthModalOpen] = useState(false);
-  const [isNetworkModalOpen, setIsNetworkModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
 
@@ -351,14 +349,6 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Right: Actions, Notifications, User Dropdown */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-        {/* Network & Internet Server Status Button */}
-        <button
-          onClick={() => setIsNetworkModalOpen(true)}
-          className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-colors flex items-center gap-1 cursor-pointer"
-          title="Internet & Server Network Settings"
-        >
-          <Wifi className="w-5 h-5 text-emerald-400" />
-        </button>
 
         {/* Notification Bell with red badge '3' */}
         <div className="relative" ref={notifRef}>
@@ -500,16 +490,6 @@ export const Header: React.FC<HeaderProps> = ({
                   <span>Google Account / Switch</span>
                 </button>
 
-                <button
-                  onClick={() => {
-                    setIsProfileDropdownOpen(false);
-                    setIsNetworkModalOpen(true);
-                  }}
-                  className="w-full py-2 px-3 rounded-xl border border-slate-200 hover:border-emerald-300 bg-slate-50 hover:bg-emerald-50/50 text-slate-700 hover:text-emerald-700 text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
-                >
-                  <Wifi className="w-4 h-4 shrink-0 text-emerald-600" />
-                  <span>Internet & Server Settings</span>
-                </button>
 
                 <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
                   <button
@@ -550,11 +530,6 @@ export const Header: React.FC<HeaderProps> = ({
         onClose={() => setIsGoogleAuthModalOpen(false)}
       />
 
-      {/* Network & Internet Configuration Modal */}
-      <NetworkConfigModal
-        isOpen={isNetworkModalOpen}
-        onClose={() => setIsNetworkModalOpen(false)}
-      />
     </header>
   );
 };
