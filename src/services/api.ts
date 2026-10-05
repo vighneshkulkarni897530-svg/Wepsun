@@ -22,6 +22,8 @@ export function getApiBaseUrl(): string {
     const custom = localStorage.getItem(STORAGE_API_URL_KEY);
     if (custom && custom.trim().length > 0) {
       return custom.trim().replace(/\/+$/, '');
+    }
+
     const isNative = Boolean((window as any).Capacitor?.isNativePlatform?.());
     const isLocalhost =
       window.location.hostname === 'localhost' ||
