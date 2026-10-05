@@ -537,15 +537,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
   const handleGoogleAuth = async () => {
     setErrorMessage(null);
+    setIsGoogleSubmitting(true);
 
-    // On native mobile app (Android/iOS), directly open Google Account Chooser Modal
+    // On native mobile app (Android/iOS), open official Google OAuth Account Chooser in secure In-App Custom Tab
     if (Capacitor.isNativePlatform()) {
-      setIsGoogleSubmitting(false);
-      setIsGoogleModalOpen(true);
+      try {
+        const { openNativeGoogleOAuth } = await import('../../services/googleAuth');
+        await openNativeGoogleOAuth();
+      } catch {
+        setIsGoogleSubmitting(false);
+        setIsGoogleModalOpen(true);
+      }
       return;
     }
-
-    setIsGoogleSubmitting(true);
 
     // On Web (Desktop/Browser), launch Google Identity Services flow
     try {
@@ -1394,11 +1398,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         </div>
       )}
 
-      {/* Interactive Google OAuth 2.0 Identity Modal */}
+      {/* Interactive Google OAuth 2.0 Identity Modal (Clients only) */}
       <GoogleAuthModal
         isOpen={isGoogleModalOpen}
         onClose={() => setIsGoogleModalOpen(false)}
-        targetRoleHint={view === 'signup' ? regRole : (selectedRole === 'technician' ? 'technician' : 'client')}
+        targetRoleHint={view === 'signup' ? regRole : 'client'}
         onSuccess={() => {
           if (onClose) onClose();
         }}
