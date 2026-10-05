@@ -9,7 +9,7 @@ import { checkDatabaseConnection } from './lib/prisma.js';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = Number(process.env.PORT) || 5000;
 
 // Trust proxy for production hosting (Render, Railway, AWS, Vercel, Cloudflare, Fly.io, Nginx)
 app.set('trust proxy', 1);

@@ -265,8 +265,8 @@ async function runAuthSecurityTests() {
   );
 
   // 3. Client Role Escalation Defense: Frontend request body { role: 'ADMIN' } is rejected/ignored
-  const requestedRoleFromFrontend = 'ADMIN';
-  const serverEnforcedRole = 'CLIENT'; // Backend overrides frontend requested role for Google signups
+  const requestedRoleFromFrontend: string = 'ADMIN';
+  const serverEnforcedRole: string = 'CLIENT'; // Backend overrides frontend requested role for Google signups
   assert(
     serverEnforcedRole === 'CLIENT' && serverEnforcedRole !== requestedRoleFromFrontend,
     'Privilege escalation defense: Frontend role payload cannot elevate Google account permissions'

@@ -265,7 +265,7 @@ router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Respo
     // CASE A: Search for existing Google user by stable Google Sub identifier
     // --------------------------------------------------------------------------
     try {
-      user = await prisma.user.findUnique({
+      user = await (prisma.user as any).findFirst({
         where: { googleId: googleSub },
         include: { company: true, branch: true },
       });
@@ -530,13 +530,14 @@ router.get('/google/callback', (_req, res: Response): void => {
 </html>`);
 });
 
-// POST /api/auth/master-id — Cryptographic Master ID Authentication (Technician Entry Point)
-router.post('/master-id', authLimiter, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+// Handler for Master ID / Master Login Authentication
+const handleMasterIdAuth = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const { masterId, rememberMe } = req.body;
+  const rawInput = String(masterId || '').trim();
   const userAgent = req.headers['user-agent'];
   const ipAddress = req.ip || req.socket.remoteAddress;
 
-  if (!masterId || typeof masterId !== 'string' || !masterId.trim()) {
+  if (!rawInput) {
     res.status(400).json({
       success: false,
       message: 'Please enter your Master ID.',
@@ -546,7 +547,7 @@ router.post('/master-id', authLimiter, async (req: AuthenticatedRequest, res: Re
   }
 
   try {
-    const validation = validateMasterId(masterId.trim());
+    const validation = validateMasterId(rawInput);
 
     if (!validation.isValid || !validation.masterSlot) {
       // Record failed authentication in audit log
@@ -635,13 +636,13 @@ router.post('/master-id', authLimiter, async (req: AuthenticatedRequest, res: Re
       error: err?.message,
     });
   }
-});
+};
+
+// POST /api/auth/master-id — Cryptographic Master ID Authentication (Technician Entry Point)
+router.post('/master-id', authLimiter, handleMasterIdAuth);
 
 // Alias: POST /api/auth/master-login
-router.post('/master-login', authLimiter, (req, res, next) => {
-  req.url = '/master-id';
-  router.handle(req, res, next);
-});
+router.post('/master-login', authLimiter, handleMasterIdAuth);
 
 // POST /api/auth/login — Production Cryptographic Login
 router.post('/login', authLimiter, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
