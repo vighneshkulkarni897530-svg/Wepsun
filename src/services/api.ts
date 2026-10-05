@@ -22,9 +22,13 @@ export function getApiBaseUrl(): string {
     const custom = localStorage.getItem(STORAGE_API_URL_KEY);
     if (custom && custom.trim().length > 0) {
       return custom.trim().replace(/\/+$/, '');
-    }
-    // In local development, route to relative '/api' so Vite dev proxy forwards to local backend (port 5000)
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    const isNative = Boolean((window as any).Capacitor?.isNativePlatform?.());
+    const isLocalhost =
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1' ||
+      window.location.hostname === '0.0.0.0';
+
+    if (isLocalhost && !isNative) {
       return '/api';
     }
   }

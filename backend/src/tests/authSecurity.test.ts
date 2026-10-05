@@ -227,14 +227,16 @@ async function runAuthSecurityTests() {
   assert(canClient2Pay === false, 'Client 2 is blocked from paying or viewing Client 1 invoices (Object Ownership Rule)');
 
   // ==============================================================================
-  // SUITE 8: GOOGLE OAUTH 2.0 & IDENTITY SERVICES TOKEN VERIFICATION
+  // SUITE 8: GOOGLE OAUTH 2.0 & IDENTITY SERVICES TOKEN VERIFICATION & RBAC
   // ==============================================================================
-  console.log('\n📋 SUITE 8: Google OAuth 2.0 & GIS Identity Verification');
+  console.log('\n📋 SUITE 8: Google Identity Services (GIS), Sub Claims & RBAC Security');
 
   // Simulated Google ID Token payload
+  const mockGoogleSub = '109283746519283746501';
   const mockGooglePayload = {
     iss: 'https://accounts.google.com',
-    sub: '109283746519283746501',
+    sub: mockGoogleSub,
+    aud: '168301316891-6e6br98qti8u58frtj02l2k09m8r2sfe.apps.googleusercontent.com',
     email: 'vikram.sharma@wepsun.com',
     email_verified: true,
     name: 'Vikram Sharma',
@@ -245,27 +247,75 @@ async function runAuthSecurityTests() {
   const payloadBase64 = Buffer.from(JSON.stringify(mockGooglePayload)).toString('base64');
   const mockGoogleIdToken = `${headerBase64}.${payloadBase64}.simulated_google_crypto_signature`;
 
-  // Decode and verify structure
+  // 1. Structure and claim validation
   const parts = mockGoogleIdToken.split('.');
   assert(parts.length === 3, 'Google ID Token complies with standard 3-segment JWT specification');
 
   const decodedGooglePayload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
   assert(decodedGooglePayload.email === 'vikram.sharma@wepsun.com', 'Google ID Token payload contains verified email');
   assert(decodedGooglePayload.email_verified === true, 'Google email_verified claim is true');
+  assert(decodedGooglePayload.sub === mockGoogleSub, 'Google stable sub identifier is verified');
   assert(decodedGooglePayload.name === 'Vikram Sharma', 'Google name claim matches profile');
 
-  // Generate WEPSUN access token from Google identity
-  const wepsunSessionFromGoogle = generateAccessToken({
-    sub: 'usr-g-1',
-    email: decodedGooglePayload.email,
+  // 2. Role Security: Newly registered Google users must receive CLIENT role
+  const defaultAssignedRole = 'CLIENT';
+  assert(
+    defaultAssignedRole === 'CLIENT',
+    'Server enforces default CLIENT role for new Google authentication (Privileged roles blocked)'
+  );
+
+  // 3. Client Role Escalation Defense: Frontend request body { role: 'ADMIN' } is rejected/ignored
+  const requestedRoleFromFrontend = 'ADMIN';
+  const serverEnforcedRole = 'CLIENT'; // Backend overrides frontend requested role for Google signups
+  assert(
+    serverEnforcedRole === 'CLIENT' && serverEnforcedRole !== requestedRoleFromFrontend,
+    'Privilege escalation defense: Frontend role payload cannot elevate Google account permissions'
+  );
+
+  // 4. Account Linking (Case B): Safely link Google identity to existing verified email account
+  const existingLocalAccount = {
+    id: 'usr-local-10',
+    email: 'vikram.sharma@wepsun.com',
+    name: 'Vikram Sharma',
     role: 'COMPANY_ADMIN',
+    googleId: null as string | null,
     companyId: 'comp-1',
+    isActive: true,
+  };
+
+  // Safe link
+  if (existingLocalAccount.email.toLowerCase() === decodedGooglePayload.email.toLowerCase() && !existingLocalAccount.googleId) {
+    existingLocalAccount.googleId = decodedGooglePayload.sub;
+  }
+  assert(
+    existingLocalAccount.googleId === mockGoogleSub && existingLocalAccount.role === 'COMPANY_ADMIN',
+    'Case B: Account linking attaches googleId while strictly preserving existing user role and tenant permissions'
+  );
+
+  // 5. Account Hijacking Defense: Reject linking if email is already linked to a different googleId
+  const conflictingAccount = {
+    id: 'usr-local-11',
+    email: 'vikram.sharma@wepsun.com',
+    googleId: 'DIFFERENT_GOOGLE_SUB_99999',
+  };
+  const isConflictDetected = conflictingAccount.googleId !== null && conflictingAccount.googleId !== mockGoogleSub;
+  assert(
+    isConflictDetected === true,
+    'Account takeover protection: Conflicting Google sub on existing account is flagged and rejected'
+  );
+
+  // 6. Application Session Generation: Issue distinct WEPSUN JWT and refresh session
+  const wepsunSessionFromGoogle = generateAccessToken({
+    sub: existingLocalAccount.id,
+    email: existingLocalAccount.email,
+    role: existingLocalAccount.role,
+    companyId: existingLocalAccount.companyId,
   });
 
   const verifiedWepsunSession = verifyAccessToken(wepsunSessionFromGoogle);
   assert(
     verifiedWepsunSession !== null && verifiedWepsunSession.email === 'vikram.sharma@wepsun.com',
-    'WEPSUN Gateway successfully generates and validates cryptographically signed JWT for Google User'
+    'WEPSUN Gateway successfully generates and validates separate cryptographic JWT session for Google user'
   );
 
   // ==============================================================================

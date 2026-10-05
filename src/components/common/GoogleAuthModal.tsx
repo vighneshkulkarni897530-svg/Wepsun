@@ -22,7 +22,7 @@ import {
 import confetti from 'canvas-confetti';
 import { useApp } from '../../context/AppContext';
 import { setTokens, apiService } from '../../services/api';
-import { triggerGoogleOAuth2Popup } from '../../services/googleAuth';
+import { triggerGoogleSignIn, triggerGoogleOAuth2Popup } from '../../services/googleAuth';
 import { UserRole } from '../../types';
 
 interface GoogleAuthModalProps {
@@ -263,19 +263,107 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
     setIsAuthenticating(true);
     setAuthStep('Opening official Google Sign-In popup...');
     try {
-      await triggerGoogleOAuth2Popup(
-        (profile) => {
-          handleExecuteGoogleLogin({
-            email: profile.email,
-            name: profile.name,
-            avatarUrl: profile.picture,
-            role: selectedRole,
-          });
+      await triggerGoogleSignIn(
+        async (credential, profile) => {
+          try {
+            const isIdToken = credential && credential.split('.').length === 3;
+            let userRecord: any = null;
+
+            try {
+              const res = await apiService.googleLogin({
+                credential: isIdToken ? credential : (typeof credential === 'string' && credential.length > 50 ? credential : undefined),
+                accessToken: !isIdToken ? credential : undefined,
+                email: profile?.email,
+                name: profile?.name,
+                avatarUrl: profile?.picture,
+                picture: profile?.picture,
+                googleId: profile?.sub,
+                role: selectedRole.toUpperCase(),
+                companyId: 'comp-1',
+              });
+
+              if (res && res.success && res.data) {
+                const { user, accessToken: newAccess, refreshToken: newRefresh } = res.data;
+                if (newAccess) {
+                  setTokens(newAccess, newRefresh);
+                }
+                userRecord = user;
+              }
+            } catch (err: any) {
+              console.warn('[GoogleModalGIS] Backend verification notice:', err?.message);
+            }
+
+            if (!userRecord && profile?.email) {
+              const cleanEmail = profile.email.toLowerCase().trim();
+              const existingUser = users.find((u) => u.email && u.email.toLowerCase() === cleanEmail);
+              if (existingUser) {
+                userRecord = existingUser;
+              } else {
+                userRecord = {
+                  id: 'usr-google-' + Date.now(),
+                  name: profile.name || cleanEmail.split('@')[0],
+                  email: cleanEmail,
+                  phone: '+91 98200 00000',
+                  role: selectedRole,
+                  companyId: 'comp-1',
+                  clientId: selectedRole === 'client' ? 'client-' + Date.now() : undefined,
+                  technicianId: selectedRole === 'technician' ? 'tech-' + Date.now() : undefined,
+                  avatar: profile.picture,
+                  isActive: true,
+                  createdAt: new Date().toISOString(),
+                };
+              }
+            }
+
+            if (!userRecord) {
+              throw new Error('Google authentication could not be completed.');
+            }
+
+            const activeRole = ((userRecord.role || selectedRole) as string).toLowerCase() as UserRole;
+
+            loginAsUser({
+              id: userRecord.id,
+              name: userRecord.name || profile?.name || 'Google User',
+              email: userRecord.email || profile?.email || '',
+              phone: userRecord.phone || '+91 98200 00000',
+              role: activeRole,
+              companyId: userRecord.companyId || 'comp-1',
+              branchId: userRecord.branchId,
+              clientId: userRecord.clientId || (activeRole === 'client' ? 'client-' + Date.now() : undefined),
+              technicianId: userRecord.technicianId || (activeRole === 'technician' ? 'tech-' + Date.now() : undefined),
+              avatar: userRecord.avatarUrl || userRecord.avatar || profile?.picture,
+              isActive: userRecord.isActive ?? true,
+            });
+
+            setCurrentRole(activeRole);
+            triggerConfetti();
+            showToast('success', 'Google Sign-In Successful', `Welcome, ${userRecord.name}!`);
+
+            const targetDest =
+              activeRole === 'client'
+                ? 'home'
+                : activeRole === 'technician'
+                ? 'jobs'
+                : 'dashboard';
+
+            window.location.hash = targetDest;
+
+            if (onSuccess) onSuccess();
+            if (onClose) onClose();
+            window.dispatchEvent(new HashChangeEvent('hashchange'));
+          } catch (backendErr: any) {
+            showToast('error', 'Authentication Error', backendErr?.message || 'Unable to sign in with Google.');
+          } finally {
+            setIsAuthenticating(false);
+            setAuthStep('');
+          }
         },
         (error) => {
           setIsAuthenticating(false);
           setAuthStep('');
-          showToast('warning', 'Google Sign-In Cancelled', error.message || 'The Google sign-in window was closed.');
+          if (!error.message?.includes('closed') && !error.message?.includes('cancel')) {
+            showToast('error', 'Google Sign-In Error', error.message || 'Could not launch Google Sign-In.');
+          }
         }
       );
     } catch (err: any) {

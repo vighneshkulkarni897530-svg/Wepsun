@@ -59,20 +59,21 @@ export interface GoogleUserProfile {
   family_name?: string;
   picture?: string;
   email_verified?: boolean;
-  hd?: string; // Hosted domain (e.g., wepsun.com)
-  role?: string;
+  hd?: string; // Hosted domain
 }
 
 const STORAGE_GOOGLE_CLIENT_ID_KEY = 'wepsun_custom_google_client_id';
 
 /**
  * Get active Google OAuth 2.0 Client ID
- * Priority: 1. Runtime User Config (localStorage) -> 2. Vite Environment (.env) -> 3. Default fallback
+ * Priority: 1. Runtime User Config (localStorage) -> 2. Vite Environment (.env) -> 3. Default enterprise fallback
  */
 export function getGoogleClientId(): string {
-  const customId = localStorage.getItem(STORAGE_GOOGLE_CLIENT_ID_KEY);
-  if (customId && customId.trim().length > 0) {
-    return customId.trim();
+  if (typeof window !== 'undefined') {
+    const customId = localStorage.getItem(STORAGE_GOOGLE_CLIENT_ID_KEY);
+    if (customId && customId.trim().length > 0) {
+      return customId.trim();
+    }
   }
   return (
     import.meta.env.VITE_GOOGLE_CLIENT_ID ||
@@ -92,11 +93,13 @@ export function setGoogleClientId(clientId: string): void {
 }
 
 /**
- * Decode base64 Google ID Token (JWT) on client side
+ * Decode base64 Google ID Token (JWT) on client side for immediate UI feedback.
+ * Note: Server MUST still independently cryptographically verify the token.
  */
 export function parseGoogleJwt(token: string): GoogleUserProfile | null {
   try {
     const base64Url = token.split('.')[1];
+    if (!base64Url) return null;
     const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
     const jsonPayload = decodeURIComponent(
       window
@@ -144,10 +147,94 @@ export async function loadGoogleGisScript(): Promise<boolean> {
 }
 
 /**
+ * Primary Google Sign-In Flow:
+ * Initializes Google Identity Services (GIS), triggers Google Account Selection,
+ * obtains cryptographically signed ID Token (JWT credential), and passes to callback.
+ */
+export async function triggerGoogleSignIn(
+  onSuccess: (credential: string, profile: GoogleUserProfile | null) => void,
+  onError: (error: Error) => void
+): Promise<void> {
+  try {
+    await loadGoogleGisScript();
+
+    const clientId = getGoogleClientId();
+    if (!clientId) {
+      throw new Error('Google Client ID is not configured.');
+    }
+
+    if (window.google?.accounts?.oauth2) {
+      // Use GIS Token Client for popup account chooser
+      const tokenClient = window.google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: 'openid email profile',
+        callback: async (tokenResponse) => {
+          if (tokenResponse.error) {
+            onError(new Error(tokenResponse.error));
+            return;
+          }
+
+          if (tokenResponse.access_token) {
+            try {
+              const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                headers: {
+                  Authorization: `Bearer ${tokenResponse.access_token}`,
+                },
+              });
+              if (userInfoRes.ok) {
+                const profile = await userInfoRes.json();
+                onSuccess(tokenResponse.access_token, profile);
+              } else {
+                onSuccess(tokenResponse.access_token, null);
+              }
+            } catch {
+              onSuccess(tokenResponse.access_token, null);
+            }
+          }
+        },
+        error_callback: (err: any) => {
+          onError(new Error(err?.message || 'Google Sign-In popup was closed or encountered an error.'));
+        },
+      });
+
+      tokenClient.requestAccessToken({ prompt: 'select_account' });
+      return;
+    }
+
+    if (window.google?.accounts?.id) {
+      window.google.accounts.id.initialize({
+        client_id: clientId,
+        callback: (response) => {
+          if (response.credential) {
+            const profile = parseGoogleJwt(response.credential);
+            onSuccess(response.credential, profile);
+          } else {
+            onError(new Error('Google did not return an authentication credential.'));
+          }
+        },
+        auto_select: false,
+        cancel_on_tap_outside: true,
+      });
+
+      window.google.accounts.id.prompt((notification) => {
+        if (notification && notification.isNotDisplayed && notification.isNotDisplayed()) {
+          console.warn('[GoogleGIS] Prompt not displayed:', notification.getNotDisplayedReason());
+        }
+      });
+      return;
+    }
+
+    throw new Error('Google Identity Services SDK is not available.');
+  } catch (err: any) {
+    onError(err);
+  }
+}
+
+/**
  * Trigger official Google OAuth 2.0 Popup using GIS token client
  */
 export async function triggerGoogleOAuth2Popup(
-  onSuccess: (profile: GoogleUserProfile, accessToken: string) => void,
+  onSuccess: (profile: GoogleUserProfile, token: string) => void,
   onError: (error: Error) => void
 ): Promise<void> {
   try {
@@ -213,4 +300,3 @@ export async function openNativeGoogleOAuth(customRedirectUri?: string): Promise
     presentationStyle: 'popover',
   });
 }
-

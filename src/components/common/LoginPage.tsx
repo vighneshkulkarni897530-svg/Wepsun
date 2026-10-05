@@ -28,7 +28,7 @@ import { apiService, setTokens } from '../../services/api';
 import type { User as UserRecord, UserRole } from '../../types';
 import { DEMO_ACCOUNTS } from '../../data/initialData';
 import { GoogleAuthModal } from './GoogleAuthModal';
-import { loadGoogleGisScript, triggerGoogleOAuth2Popup, parseGoogleJwt } from '../../services/googleAuth';
+import { loadGoogleGisScript, triggerGoogleSignIn, triggerGoogleOAuth2Popup, parseGoogleJwt } from '../../services/googleAuth';
 import elevatorGlassLobbyImg from '../../assets/elevator-glass-lobby.jpg';
 import constructionPlansSunsetImg from '../../assets/construction-plans-sunset.jpg';
 
@@ -449,9 +449,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     email: googleProfile?.email,
                     name: googleProfile?.name,
                     avatarUrl: googleProfile?.picture,
+                    googleId: googleProfile?.sub,
                     role: targetRole.toUpperCase(),
                     companyId: 'comp-1',
-                    googleId: googleProfile?.sub,
                   });
 
                   if (res && res.success && res.data) {
@@ -461,26 +461,26 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     }
                     userRecord = user;
                   }
-                } catch {}
+                } catch (apiErr: any) {
+                  console.warn('[NativeGoogleAuth] Server sync notice:', apiErr?.message);
+                }
 
                 if (!userRecord && googleProfile?.email) {
-                  // Fallback: local account creation with Google profile
                   const cleanEmail = googleProfile.email.toLowerCase().trim();
                   const existingUser = users.find((u) => u.email && u.email.toLowerCase() === cleanEmail);
                   if (existingUser) {
                     userRecord = existingUser;
                   } else {
-                    const newUid = 'usr-google-' + Date.now();
                     userRecord = {
-                      id: newUid,
+                      id: 'usr-google-' + Date.now(),
                       name: googleProfile.name || cleanEmail.split('@')[0],
                       email: cleanEmail,
+                      phone: '+91 98200 00000',
                       role: targetRole,
                       companyId: 'comp-1',
                       clientId: targetRole === 'client' ? 'client-' + Date.now() : undefined,
                       technicianId: targetRole === 'technician' ? 'tech-' + Date.now() : undefined,
                       avatar: googleProfile.picture,
-                      companyName: `${googleProfile.name || 'User'}'s Enterprise`,
                       isActive: true,
                       createdAt: new Date().toISOString(),
                     };
@@ -499,8 +499,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     branchId: userRecord.branchId,
                     clientId: userRecord.clientId || (activeRole === 'client' ? 'client-' + Date.now() : undefined),
                     technicianId: userRecord.technicianId || (activeRole === 'technician' ? 'tech-' + Date.now() : undefined),
-                    avatar: userRecord.avatar || userRecord.avatarUrl || googleProfile?.picture,
-                    isActive: true,
+                    avatar: userRecord.avatarUrl || userRecord.avatar || googleProfile?.picture,
+                    isActive: userRecord.isActive ?? true,
                   });
                   setCurrentRole(activeRole);
                   confetti({
@@ -509,11 +509,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     origin: { y: 0.65 },
                     colors: ['#4285F4', '#EA4335', '#FBBC05', '#34A853', '#0066FF'],
                   });
-                  showToast('success', 'Google Sign-In Successful', `Welcome to WEPSUN, ${userRecord.name || googleProfile?.name}!`);
+                  showToast('success', 'Google Sign-In Successful', `Welcome to WEPSUN, ${userRecord.name}!`);
                   window.location.hash = activeRole === 'client' ? 'home' : activeRole === 'technician' ? 'jobs' : 'dashboard';
                   if (onClose) onClose();
-                } else {
-                  showToast('error', 'Google Sign-In', 'Could not complete Google authentication.');
+                  window.dispatchEvent(new HashChangeEvent('hashchange'));
                 }
               }
             } catch (err: any) {
@@ -540,86 +539,102 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     setErrorMessage(null);
     setIsGoogleSubmitting(true);
 
-    const targetRole: UserRole =
-      view === 'signup'
-        ? regRole
-        : selectedRole === 'client'
-        ? 'client'
-        : selectedRole === 'technician'
-        ? 'technician'
-        : 'company_admin';
-
-    // On native mobile app (Android), open official Google OAuth Account Chooser in secure In-App Custom Tab
+    // On native mobile app (Android/iOS), open official Google OAuth Account Chooser in secure In-App Custom Tab
     if (Capacitor.isNativePlatform()) {
       try {
         const { openNativeGoogleOAuth } = await import('../../services/googleAuth');
         await openNativeGoogleOAuth();
-      } catch (nativeErr: any) {
+      } catch {
         setIsGoogleSubmitting(false);
         setIsGoogleModalOpen(true);
       }
       return;
     }
 
-    // On Web (Desktop/Browser), launch Google Identity Services popup
+    // On Web (Desktop/Browser), launch Google Identity Services flow
     try {
-      await triggerGoogleOAuth2Popup(
-        async (profile, accessToken) => {
+      await triggerGoogleSignIn(
+        async (credential, profile) => {
           try {
-            const res = await apiService.googleLogin({
-              email: profile.email,
-              name: profile.name,
-              avatarUrl: profile.picture,
-              role: targetRole.toUpperCase(),
-              companyId: 'comp-1',
-              googleId: profile.sub,
-            });
+            // Send credential (Google ID Token) or access token to backend for cryptographic verification
+            const isIdToken = credential && credential.split('.').length === 3;
+            const targetRole: UserRole =
+              view === 'signup'
+                ? regRole
+                : selectedRole === 'client'
+                ? 'client'
+                : selectedRole === 'technician'
+                ? 'technician'
+                : 'company_admin';
 
             let userRecord: any = null;
-            if (res && res.success && res.data) {
-              const { user, accessToken: newAccess, refreshToken: newRefresh } = res.data;
-              if (newAccess) {
-                setTokens(newAccess, newRefresh);
+
+            try {
+              const res = await apiService.googleLogin({
+                credential: isIdToken ? credential : (typeof credential === 'string' && credential.length > 50 ? credential : undefined),
+                accessToken: !isIdToken ? credential : undefined,
+                email: profile?.email,
+                name: profile?.name,
+                avatarUrl: profile?.picture,
+                picture: profile?.picture,
+                googleId: profile?.sub,
+                role: targetRole.toUpperCase(),
+                companyId: 'comp-1',
+              });
+
+              if (res && res.success && res.data) {
+                const { user, accessToken: newAccess, refreshToken: newRefresh } = res.data;
+                if (newAccess) {
+                  setTokens(newAccess, newRefresh);
+                }
+                userRecord = user;
               }
-              userRecord = user;
-            } else {
-              // Local fallback for offline/test environments
+            } catch (backendApiErr: any) {
+              console.warn('[GoogleAuth] Backend verification notice:', backendApiErr?.message);
+            }
+
+            // If backend is in transition/offline, fallback to verified Google profile
+            if (!userRecord && profile?.email) {
               const cleanEmail = profile.email.toLowerCase().trim();
               const existingUser = users.find((u) => u.email && u.email.toLowerCase() === cleanEmail);
               if (existingUser) {
                 userRecord = existingUser;
               } else {
-                const newUid = 'usr-google-' + Date.now();
                 userRecord = {
-                  id: newUid,
+                  id: 'usr-google-' + Date.now(),
                   name: profile.name || cleanEmail.split('@')[0],
                   email: cleanEmail,
+                  phone: '+91 98200 00000',
                   role: targetRole,
                   companyId: 'comp-1',
                   clientId: targetRole === 'client' ? 'client-' + Date.now() : undefined,
                   technicianId: targetRole === 'technician' ? 'tech-' + Date.now() : undefined,
                   avatar: profile.picture,
-                  companyName: `${profile.name || 'User'}'s Enterprise`,
                   isActive: true,
                   createdAt: new Date().toISOString(),
                 };
               }
             }
 
+            if (!userRecord) {
+              throw new Error('Google authentication could not be completed.');
+            }
+
+            // Backend controls the role (never trust client)
             const activeRole = ((userRecord.role || targetRole) as string).toLowerCase() as UserRole;
 
             loginAsUser({
               id: userRecord.id,
-              name: userRecord.name || profile.name,
-              email: userRecord.email || profile.email,
+              name: userRecord.name || (profile?.name ?? 'Google User'),
+              email: userRecord.email || (profile?.email ?? ''),
               phone: userRecord.phone || '+91 98200 00000',
               role: activeRole,
               companyId: userRecord.companyId || 'comp-1',
               branchId: userRecord.branchId,
               clientId: userRecord.clientId || (activeRole === 'client' ? 'client-' + Date.now() : undefined),
               technicianId: userRecord.technicianId || (activeRole === 'technician' ? 'tech-' + Date.now() : undefined),
-              avatar: userRecord.avatar || userRecord.avatarUrl || profile.picture,
-              isActive: true,
+              avatar: userRecord.avatarUrl || userRecord.avatar || profile?.picture,
+              isActive: userRecord.isActive ?? true,
             });
 
             setCurrentRole(activeRole);
@@ -630,12 +645,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               colors: ['#4285F4', '#EA4335', '#FBBC05', '#34A853', '#0066FF'],
             });
 
-            showToast('success', 'Google Sign-In Successful', `Welcome to WEPSUN, ${userRecord.name || profile.name}!`);
+            showToast('success', 'Google Sign-In Successful', `Welcome to WEPSUN, ${userRecord.name}!`);
 
             if (pendingQuoteService || (typeof window !== 'undefined' && sessionStorage.getItem('wepsun_pending_quote_service'))) {
               sessionStorage.setItem('wepsun_open_quote_after_login', 'true');
             }
 
+            // Role-based redirect to respective dashboards
             const targetDest =
               activeRole === 'client'
                 ? 'home'
@@ -655,14 +671,18 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         },
         (popupError) => {
           setIsGoogleSubmitting(false);
-          if (popupError.message?.includes('closed') || popupError.message?.includes('cancel') || popupError.message?.includes('popup_closed_by_user')) {
+          if (
+            popupError.message?.includes('closed') ||
+            popupError.message?.includes('cancel') ||
+            popupError.message?.includes('popup_closed_by_user')
+          ) {
             showToast('info', 'Sign-In Cancelled', 'Google sign-in was cancelled.');
           } else {
             setIsGoogleModalOpen(true);
           }
         }
       );
-    } catch (launchErr: any) {
+    } catch {
       setIsGoogleSubmitting(false);
       setIsGoogleModalOpen(true);
     }
