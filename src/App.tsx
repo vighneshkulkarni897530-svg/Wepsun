@@ -38,8 +38,43 @@ import { PhoneCall } from 'lucide-react';
 import { AppInstallBanner } from './components/common/AppInstallBanner';
 import { MobileBottomNav } from './components/layout/MobileBottomNav';
 
+const ADMIN_PROTECTED_TABS = [
+  'dashboard',
+  'flowchart',
+  'complaints',
+  'service_jobs',
+  'work_orders',
+  'pm',
+  'amc',
+  'lifts',
+  'quotations',
+  'inventory',
+  'technicians',
+  'feedback',
+  'companies',
+  'branches',
+  'buildings',
+  'clients',
+  'invoices',
+  'reports',
+  'analytics',
+  'notifications',
+  'settings',
+  'design_system',
+];
+
+export function isMasterAdminAuthenticated(): boolean {
+  if (typeof window === 'undefined') return false;
+  const isMasterAuth =
+    sessionStorage.getItem('wepsun_master_authenticated') === 'true' ||
+    localStorage.getItem('wepsun_master_authenticated') === 'true';
+  const role = localStorage.getItem('wepsun_role');
+  const hasAdminRole = role === 'master_admin' || role === 'company_admin' || role === 'super_admin';
+  return isMasterAuth && hasAdminRole;
+}
+
 export const AppContent: React.FC = () => {
-  const { currentRole, setCurrentRole, activeCompany, branches, buildings, users, tenantInvoices, lifts } = useApp();
+  const { currentRole, setCurrentRole, activeCompany, branches, buildings, users, tenantInvoices, lifts, showToast } = useApp();
 
   const [activeTab, setActiveTab] = useState<NavTabId>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
@@ -55,12 +90,27 @@ export const AppContent: React.FC = () => {
   });
 
   const [isFullLoginPage, setIsFullLoginPage] = useState(() => {
+    if (typeof window === 'undefined') return true;
     const rawHash = window.location.hash.toLowerCase().replace('#', '');
     const hash = rawHash.split('?')[0];
-    // Landing page is the Login page by default (when no hash or hash is login/signup/landing)
-    if (!hash || hash === 'login' || hash === 'signin' || hash === 'signup' || hash === 'register' || hash === 'landing' || hash === 'login-admin' || hash === 'login-technician' || hash === 'login-client') {
+
+    const path = window.location.pathname.toLowerCase();
+    if ((path.startsWith('/admin') || path.startsWith('/dashboard')) && !isMasterAdminAuthenticated()) {
+      window.history.replaceState(null, '', '/#login-technician');
       return true;
     }
+
+    // Default landing page is Login Page
+    if (!hash || hash === 'login' || hash === 'signin' || hash === 'signup' || hash === 'register' || hash === 'landing' || hash === 'login-technician' || hash === 'login-client' || hash === 'login-admin') {
+      return true;
+    }
+
+    // If directly accessing an admin protected route without Master Auth
+    if ((ADMIN_PROTECTED_TABS.includes(hash) || hash.startsWith('admin')) && !isMasterAdminAuthenticated()) {
+      window.history.replaceState(null, '', '#login-technician');
+      return true;
+    }
+
     return false;
   });
   const [isPublicFeedbackPage, setIsPublicFeedbackPage] = useState(false);
@@ -86,9 +136,26 @@ export const AppContent: React.FC = () => {
       setIsSplashPage(false);
 
       // Default landing page is Login Page
-      if (!hash || hash === 'login' || hash === 'signin' || hash === 'signup' || hash === 'register' || hash === 'landing' || hash === 'login-admin' || hash === 'login-technician' || hash === 'login-client') {
+      if (!hash || hash === 'login' || hash === 'signin' || hash === 'signup' || hash === 'register' || hash === 'landing' || hash === 'login-technician' || hash === 'login-client' || hash === 'login-admin') {
         setIsFullLoginPage(true);
         setIsPublicFeedbackPage(false);
+        return;
+      }
+
+      // Route Protection: Prevent unauthorized access to Admin Dashboard
+      const isAdminRoute =
+        ADMIN_PROTECTED_TABS.includes(hash) ||
+        hash === 'admin' ||
+        hash === 'admin-dashboard' ||
+        hash.startsWith('dashboard/') ||
+        hash.startsWith('admin/');
+
+      if (isAdminRoute && !isMasterAdminAuthenticated()) {
+        window.history.replaceState(null, '', '#login-technician');
+        setCurrentHash('login-technician');
+        setIsFullLoginPage(true);
+        setIsPublicFeedbackPage(false);
+        showToast('warning', 'Master Authentication Required', 'Please enter your authorized Master ID to access the Admin Dashboard.');
         return;
       }
 
@@ -181,7 +248,12 @@ export const AppContent: React.FC = () => {
       );
     }
 
-    // Admin / Operations / Management Portal
+    // Admin / Operations / Management Portal (Protected: Requires Verified Master Admin Session)
+    if (!isMasterAdminAuthenticated()) {
+      window.location.hash = 'login-technician';
+      return null;
+    }
+
     switch (activeTab) {
       case 'dashboard':
         return <OverviewDashboard onNavigateTab={setActiveTab} />;
@@ -422,11 +494,9 @@ export const AppContent: React.FC = () => {
   if (isFullLoginPage) {
     const hash = currentHash;
 
-    const defaultRole = hash.includes('client')
-      ? 'client'
-      : hash.includes('technician')
+    const defaultRole: 'technician' | 'client' = hash.includes('technician')
       ? 'technician'
-      : 'admin';
+      : 'client';
 
     // If explicit login or signup hash, show dedicated full screen
     if (
@@ -449,6 +519,11 @@ export const AppContent: React.FC = () => {
               const savedRole = localStorage.getItem('wepsun_role') || currentRole;
               if (!rawH || rawH === 'login' || rawH === 'signin' || rawH === 'signup' || rawH === 'landing' || rawH.startsWith('login-')) {
                 const target = savedRole === 'client' ? 'home' : savedRole === 'technician' ? 'jobs' : 'dashboard';
+                if (target === 'dashboard' && !isMasterAdminAuthenticated()) {
+                  window.location.hash = 'login-technician';
+                  setIsFullLoginPage(true);
+                  return;
+                }
                 window.location.hash = target;
                 setActiveTab(target as NavTabId);
               } else {

@@ -37,12 +37,12 @@ import constructionPlansImg from '../../assets/construction-plans-sunset.jpg';
 
 interface LandingPageProps {
   onClose?: () => void;
-  defaultRole?: 'admin' | 'technician' | 'client';
+  defaultRole?: 'technician' | 'client';
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({
   onClose,
-  defaultRole = 'admin',
+  defaultRole = 'client',
 }) => {
   const { currentUser, submitBusinessEnquiry, showToast, currentRole } = useApp();
 
@@ -274,11 +274,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <span>Sign In</span>
           </button>
 
-          {/* Quick Sign Up Button (Desktop & Tablet) */}
+          {/* Quick Sign Up Button (Visible on all screens beside Sign In) */}
           <button
             type="button"
             onClick={() => setAuthScreen('signup')}
-            className="hidden sm:inline-flex px-3.5 sm:px-4 py-1.5 rounded-full border border-slate-300 hover:border-slate-400 bg-white text-slate-800 text-xs sm:text-sm font-semibold hover:bg-slate-50 transition-all shadow-sm active:scale-95 cursor-pointer"
+            className="inline-flex px-3 sm:px-4 py-1.5 rounded-full border border-slate-300 hover:border-slate-400 bg-white text-slate-800 text-xs sm:text-sm font-semibold hover:bg-slate-50 transition-all shadow-sm active:scale-95 cursor-pointer"
           >
             Sign Up
           </button>

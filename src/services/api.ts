@@ -23,10 +23,14 @@ export function getApiBaseUrl(): string {
     if (custom && custom.trim().length > 0) {
       return custom.trim().replace(/\/+$/, '');
     }
+    // In local development, route to relative '/api' so Vite dev proxy forwards to local backend (port 5000)
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return '/api';
+    }
   }
 
   const envUrl = import.meta.env.VITE_API_URL;
-  if (envUrl && envUrl.trim().length > 0 && envUrl !== '/api') {
+  if (envUrl && envUrl.trim().length > 0) {
     return envUrl.trim().replace(/\/+$/, '');
   }
 
@@ -207,7 +211,7 @@ export async function apiFetch<T = any>(
     clearTimeout(timeoutId);
 
     // If 401 Unauthorized, attempt transparent refresh (unless calling auth routes)
-    if (response.status === 401 && !endpoint.startsWith('/auth/login') && !endpoint.startsWith('/auth/refresh')) {
+    if (response.status === 401 && !endpoint.startsWith('/auth/login') && !endpoint.startsWith('/auth/master') && !endpoint.startsWith('/auth/refresh')) {
       if (!isRefreshing) {
         isRefreshing = true;
         const newToken = await tryRefreshToken();
@@ -282,6 +286,8 @@ export async function apiFetch<T = any>(
  */
 export const apiService = {
   // Authentication & Session
+  verifyMasterId: (payload: { masterId: string; rememberMe?: boolean }) =>
+    apiFetch('/auth/master-id', { method: 'POST', body: JSON.stringify(payload), skipAuth: true }),
   login: (payload: { email?: string; phone?: string; password?: string; otp?: string; companyCode?: string }) =>
     apiFetch('/auth/login', { method: 'POST', body: JSON.stringify(payload), skipAuth: true }),
   googleLogin: (payload: {

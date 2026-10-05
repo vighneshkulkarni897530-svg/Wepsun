@@ -4,13 +4,13 @@ import { LoginPage } from './LoginPage';
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
-  defaultRolePortal?: 'admin' | 'technician' | 'client';
+  defaultRolePortal?: 'technician' | 'client';
 }
 
 export const LoginModal: React.FC<LoginModalProps> = ({
   isOpen,
   onClose,
-  defaultRolePortal = 'admin',
+  defaultRolePortal = 'client',
 }) => {
   if (!isOpen) return null;
 

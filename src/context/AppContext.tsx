@@ -57,7 +57,7 @@ import {
   INITIAL_CLIENT_NOTIFICATIONS,
   INITIAL_APP_NOTIFICATIONS,
 } from '../data/initialData';
-import { apiService, checkServerHealth } from '../services/api';
+import { apiService, checkServerHealth, clearTokens, getRefreshToken } from '../services/api';
 import { getNetworkStatus, subscribeNetworkStatus } from '../services/nativeApp';
 import { playNotificationSound, isSoundEnabled as getSoundPref, setSoundEnabled } from '../utils/notificationSound';
 
@@ -84,6 +84,8 @@ interface AppContextType {
   users: User[];
   demoAccounts: DemoAccount[];
   loginAsUser: (userOrId: User | string) => void;
+  logout: () => void;
+  isMasterAuthenticated: boolean;
   activeClientId: string;
   setActiveClientId: (id: string) => void;
   activeTechnicianId: string;
@@ -263,13 +265,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const activeCompany = companies.find((c) => c.id === activeCompanyId) || companies[0];
 
-  // Current Role & Mock User
+  // Current Role & Mock User (Defaults to Client unless valid Master Admin session exists)
   const [currentRole, setCurrentRoleState] = useState<UserRole>(() => {
-    return (localStorage.getItem(STORAGE_PREFIX + 'role') as UserRole) || 'company_admin';
+    const isMasterAuth =
+      typeof window !== 'undefined' &&
+      (localStorage.getItem('wepsun_master_authenticated') === 'true' ||
+       sessionStorage.getItem('wepsun_master_authenticated') === 'true');
+
+    const savedRole = localStorage.getItem(STORAGE_PREFIX + 'role') as UserRole;
+    if (savedRole === 'company_admin' || savedRole === 'master_admin' || savedRole === 'super_admin') {
+      if (isMasterAuth) {
+        return savedRole;
+      }
+      return 'client';
+    }
+    return savedRole || 'client';
   });
 
   const [activeUserId, setActiveUserId] = useState<string>(() => {
-    return localStorage.getItem(STORAGE_PREFIX + 'userId') || 'usr-admin-1';
+    const isMasterAuth =
+      typeof window !== 'undefined' &&
+      (localStorage.getItem('wepsun_master_authenticated') === 'true' ||
+       sessionStorage.getItem('wepsun_master_authenticated') === 'true');
+    const savedUserId = localStorage.getItem(STORAGE_PREFIX + 'userId');
+    if (savedUserId && (savedUserId.includes('admin') || savedUserId.includes('master')) && !isMasterAuth) {
+      return 'usr-client-priya';
+    }
+    return savedUserId || 'usr-client-priya';
   });
 
   const [activeClientId, setActiveClientId] = useState<string>('client-1');
@@ -581,12 +603,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Current User representation based on activeUserId or current role
   const [currentUser, setCurrentUserState] = useState<User>(() => {
+    const isMasterAuth =
+      typeof window !== 'undefined' &&
+      (localStorage.getItem('wepsun_master_authenticated') === 'true' ||
+       sessionStorage.getItem('wepsun_master_authenticated') === 'true');
+
     const saved = safeStorageParse<User | null>(STORAGE_PREFIX + 'currentUser', null);
-    if (saved) return saved;
-    const savedUserId = localStorage.getItem(STORAGE_PREFIX + 'userId') || 'usr-admin-1';
-    const found = INITIAL_USERS.find((u) => u.id === savedUserId);
-    if (found) return found;
-    return INITIAL_USERS[1] || INITIAL_USERS[0];
+    if (saved) {
+      if ((saved.role === 'company_admin' || saved.role === 'master_admin' || saved.role === 'super_admin') && !isMasterAuth) {
+        return INITIAL_USERS.find((u) => u.role === 'client') || INITIAL_USERS[2];
+      }
+      return saved;
+    }
+    const savedUserId = localStorage.getItem(STORAGE_PREFIX + 'userId');
+    if (savedUserId) {
+      const found = INITIAL_USERS.find((u) => u.id === savedUserId);
+      if (found) {
+        if ((found.role === 'company_admin' || found.role === 'master_admin' || found.role === 'super_admin') && !isMasterAuth) {
+          return INITIAL_USERS.find((u) => u.role === 'client') || INITIAL_USERS[2];
+        }
+        return found;
+      }
+    }
+    return INITIAL_USERS.find((u) => u.role === 'client') || INITIAL_USERS[2] || INITIAL_USERS[0];
   });
 
   useEffect(() => {
@@ -929,6 +968,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const removeToast = (id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
+
+  const isMasterAuthenticated = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    const isMasterAuth =
+      sessionStorage.getItem('wepsun_master_authenticated') === 'true' ||
+      localStorage.getItem('wepsun_master_authenticated') === 'true';
+    const hasAdminRole =
+      currentRole === 'master_admin' || currentRole === 'company_admin' || currentRole === 'super_admin';
+    return isMasterAuth && hasAdminRole;
+  }, [currentRole]);
+
+  const logout = useCallback(async () => {
+    try {
+      const refreshToken = getRefreshToken();
+      await apiService.logout(refreshToken || undefined).catch(() => {});
+    } catch {
+      // Non-blocking
+    }
+    clearTokens();
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('wepsun_master_authenticated');
+      localStorage.removeItem('wepsun_master_authenticated');
+      localStorage.removeItem(STORAGE_PREFIX + 'role');
+      localStorage.removeItem(STORAGE_PREFIX + 'userId');
+      localStorage.removeItem(STORAGE_PREFIX + 'currentUser');
+
+      const clientUser = INITIAL_USERS.find((u) => u.role === 'client') || INITIAL_USERS[2];
+      setCurrentUserState(clientUser);
+      setCurrentRoleState('client');
+      setActiveUserId(clientUser.id);
+
+      window.history.replaceState(null, '', '#login');
+      window.location.hash = 'login';
+    }
+
+    showToast('info', 'Logged Out', 'You have been signed out. Please enter your Master ID via Technician sign in to access the Admin Dashboard.');
+  }, [showToast]);
 
   // Audit Log Mutator
   const addAuditLog = (entry: Omit<AuditLog, 'id' | 'timestamp'>) => {
@@ -2848,6 +2924,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         users,
         demoAccounts,
         loginAsUser,
+        logout,
+        isMasterAuthenticated,
         activeClientId,
         setActiveClientId,
         activeTechnicianId,

@@ -103,19 +103,22 @@ export async function createSession(
   const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRES_DAYS * 24 * 60 * 60 * 1000);
 
   try {
-    await prisma.userSession.create({
-      data: {
-        userId,
-        companyId,
-        tokenHash,
-        userAgent: userAgent || null,
-        ipAddress: ipAddress || null,
-        expiresAt,
-        isRevoked: false,
-      },
-    });
+    await Promise.race([
+      prisma.userSession.create({
+        data: {
+          userId,
+          companyId,
+          tokenHash,
+          userAgent: userAgent || null,
+          ipAddress: ipAddress || null,
+          expiresAt,
+          isRevoked: false,
+        },
+      }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('DB Timeout')), 400)),
+    ]);
   } catch {
-    // If DB offline, non-blocking fallback
+    // If DB offline or timed out, non-blocking fallback
   }
 
   return { refreshToken: rawRefreshToken, expiresAt };

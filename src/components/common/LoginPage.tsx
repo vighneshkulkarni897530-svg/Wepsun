@@ -18,6 +18,8 @@ import {
   ChevronRight,
   Settings,
   Wifi,
+  KeyRound,
+  Loader2,
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { useApp } from '../../context/AppContext';
@@ -33,7 +35,7 @@ import constructionPlansSunsetImg from '../../assets/construction-plans-sunset.j
 interface LoginPageProps {
   isOpen?: boolean;
   onClose?: () => void;
-  defaultRole?: 'admin' | 'technician' | 'client';
+  defaultRole?: 'technician' | 'client';
   initialView?: 'signin' | 'signup';
   isModal?: boolean;
 }
@@ -41,7 +43,7 @@ interface LoginPageProps {
 export const LoginPage: React.FC<LoginPageProps> = ({
   isOpen = true,
   onClose,
-  defaultRole = 'admin',
+  defaultRole = 'client',
   initialView = 'signin',
   isModal = false,
 }) => {
@@ -61,14 +63,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     return 'signin';
   });
 
-  // Selected Role for authentication
-  const [selectedRole, setSelectedRole] = useState<'admin' | 'technician' | 'client'>(() => {
+  // Selected Role for authentication (Only Client and Technician)
+  const [selectedRole, setSelectedRole] = useState<'technician' | 'client'>(() => {
     const hash = window.location.hash.toLowerCase();
-    if (hash.includes('login-admin') || hash.includes('admin')) return 'admin';
     if (hash.includes('login-technician') || hash.includes('technician')) return 'technician';
     if (hash.includes('login-client') || hash.includes('client')) return 'client';
-    if (defaultRole && defaultRole !== 'admin') return defaultRole;
-    if (currentRole === 'client') return 'client';
+    if (defaultRole === 'technician') return 'technician';
     if (currentRole === 'technician') return 'technician';
     return 'client';
   });
@@ -88,8 +88,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Technician Master ID State
+  const [masterId, setMasterId] = useState('');
+  const [isVerifyingMasterId, setIsVerifyingMasterId] = useState(false);
+
   // Sign Up Form Fields
-  const [regRole, setRegRole] = useState<'client' | 'technician' | 'company_admin'>('client');
+  const [regRole, setRegRole] = useState<'client' | 'technician'>('client');
   const [regFullName, setRegFullName] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regMobile, setRegMobile] = useState('');
@@ -107,10 +111,92 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   // Google OAuth Modal
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
 
-  // Role tab switch
-  const handleRoleChange = (role: 'admin' | 'technician' | 'client') => {
+  // Role tab switch (Client | Technician only)
+  const handleRoleChange = (role: 'technician' | 'client') => {
     setSelectedRole(role);
     setErrorMessage(null);
+  };
+
+  // Technician Master ID Submission
+  const handleTechnicianMasterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!masterId.trim()) {
+      setErrorMessage('Please enter your Master ID.');
+      return;
+    }
+
+    setIsVerifyingMasterId(true);
+    setErrorMessage(null);
+
+    try {
+      const res = await apiService.verifyMasterId({
+        masterId: masterId.trim(),
+        rememberMe,
+      });
+
+      if (res && res.success && res.data) {
+        const authData = res.data as any;
+        if (authData.tokens?.accessToken) {
+          setTokens(authData.tokens.accessToken, authData.tokens.refreshToken);
+        }
+
+        const userObj = authData.user || {
+          id: 'usr-master-1',
+          name: 'Master Technical Administrator',
+          email: 'master.admin@wepsun.engineering',
+          role: 'master_admin',
+          companyId: 'comp-1',
+          branchId: 'br-mum-1',
+          isActive: true,
+        };
+
+        loginAsUser({
+          ...userObj,
+          role: 'master_admin',
+        });
+        setCurrentRole('master_admin');
+
+        // Store authenticated session markers for route protection
+        sessionStorage.setItem('wepsun_master_authenticated', 'true');
+        if (rememberMe) {
+          localStorage.setItem('wepsun_master_authenticated', 'true');
+        }
+
+        showToast('success', 'Master Authentication Verified', 'Opening Admin Dashboard...');
+        try {
+          confetti({
+            particleCount: 50,
+            spread: 60,
+            origin: { y: 0.6 },
+          });
+        } catch {
+          // ignore
+        }
+
+        // Open Admin Dashboard directly
+        window.location.hash = 'dashboard';
+
+        if (onClose) {
+          onClose();
+        }
+      } else {
+        if (res?.code === 'NETWORK_ERROR' || res?.code === 'OFFLINE') {
+          setErrorMessage('Unable to verify Master ID. Please check your internet connection and try again.');
+        } else if (res?.status && res.status >= 500) {
+          setErrorMessage('Something went wrong. Please try again later.');
+        } else {
+          setErrorMessage(res?.message || 'Invalid Master ID. Please try again.');
+        }
+      }
+    } catch (err: any) {
+      if (err?.message?.includes('network') || err?.message?.includes('fetch') || err?.name === 'TypeError') {
+        setErrorMessage('Unable to verify Master ID. Please check your internet connection and try again.');
+      } else {
+        setErrorMessage('Invalid Master ID. Please try again.');
+      }
+    } finally {
+      setIsVerifyingMasterId(false);
+    }
   };
 
   const handleSignInSubmit = async (e: React.FormEvent) => {
@@ -216,14 +302,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         sessionStorage.setItem('wepsun_open_quote_after_login', 'true');
       }
 
-      window.location.hash =
-        targetRole === 'client'
-          ? 'home'
-          : targetRole === 'technician'
-          ? 'jobs'
-          : 'dashboard';
+      window.location.hash = 'home';
 
-      showToast('success', 'Login Successful', 'Welcome to WEPSUN!');
+      showToast('success', 'Login Successful', 'Welcome to WEPSUN Client Portal!');
 
       if (onClose) {
         onClose();
@@ -687,20 +768,59 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       {/* Main Centered Floating Card */}
       <div className="relative z-10 flex-1 flex items-center justify-center px-4 py-6">
         <div className="w-full max-w-[440px] bg-white/95 backdrop-blur-md rounded-[28px] shadow-2xl border border-white/60 p-6 sm:p-8 animate-in fade-in zoom-in-95 duration-200">
+          {/* Header: Sign In & Sign Up options beside each other */}
+          <div className="mb-6">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setView('signin');
+                  window.location.hash = 'login';
+                }}
+                className={`text-2xl sm:text-[28px] font-black tracking-tight transition-all cursor-pointer relative pb-1 ${
+                  view === 'signin'
+                    ? 'text-[#0b2545]'
+                    : 'text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                Sign In
+                {view === 'signin' && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0066FF] rounded-full" />
+                )}
+              </button>
+
+              <span className="text-slate-300 text-xl font-light select-none pb-1">|</span>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setView('signup');
+                  window.location.hash = 'signup';
+                }}
+                className={`text-2xl sm:text-[28px] font-black tracking-tight transition-all cursor-pointer relative pb-1 ${
+                  view === 'signup'
+                    ? 'text-[#0b2545]'
+                    : 'text-slate-400 hover:text-[#0066FF]'
+                }`}
+              >
+                Sign Up
+                {view === 'signup' && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0066FF] rounded-full" />
+                )}
+              </button>
+            </div>
+            <p className="text-xs sm:text-[13px] text-slate-500 mt-1 leading-relaxed">
+              {view === 'signin'
+                ? 'Welcome back! Please sign in to your Wepsun Engineering Solution account.'
+                : 'Get started with Wepsun Engineering Solution'}
+            </p>
+          </div>
+
           {/* ========================================================================= */}
           {/* VIEW 1: SIGN IN SCREEN */}
           {/* ========================================================================= */}
           {view === 'signin' ? (
             <div>
-              {/* Header */}
-              <div className="mb-6">
-                <h1 className="text-2xl sm:text-[28px] font-black text-[#0b2545] tracking-tight">
-                  Sign In
-                </h1>
-                <p className="text-xs sm:text-[13px] text-slate-500 mt-1 leading-relaxed">
-                  Welcome back! Please sign in to your Wepsun Engineering Solution account.
-                </p>
-              </div>
 
               {/* Pending Quote Service Notice */}
               {pendingQuoteService && (
@@ -745,13 +865,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 </div>
               )}
 
-              {/* Role Selection Tabs */}
+              {/* Role Selection Tabs — Only Client | Technician */}
               <div className="mb-4">
-                <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100/90 rounded-2xl">
+                <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100/90 rounded-2xl">
                   <button
                     type="button"
                     onClick={() => handleRoleChange('client')}
-                    className={`py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                       selectedRole === 'client'
                         ? 'bg-white text-[#0066FF] shadow-sm'
                         : 'text-slate-600 hover:text-slate-900'
@@ -762,7 +882,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   <button
                     type="button"
                     onClick={() => handleRoleChange('technician')}
-                    className={`py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                       selectedRole === 'technician'
                         ? 'bg-white text-[#0066FF] shadow-sm'
                         : 'text-slate-600 hover:text-slate-900'
@@ -770,157 +890,191 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   >
                     Technician
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleRoleChange('admin')}
-                    className={`py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      selectedRole === 'admin'
-                        ? 'bg-white text-[#0066FF] shadow-sm'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Admin
-                  </button>
                 </div>
               </div>
 
-              {/* Sign In Form */}
-              <form onSubmit={handleSignInSubmit} className="space-y-3.5">
-                {/* Email Address Field */}
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Mail className="w-4 h-4" />
-                  </div>
-                  <input
-                    type="text"
-                    value={identifier}
-                    onChange={(e) => setIdentifier(e.target.value)}
-                    placeholder="Email Address"
-                    required
-                    className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
-                  />
-                </div>
-
-                {/* Password Field */}
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Lock className="w-4 h-4" />
-                  </div>
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Password"
-                    required
-                    className="w-full pl-10 pr-10 py-3 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-
-                {/* Remember Me & Forgot Password */}
-                <div className="flex items-center justify-between pt-0.5">
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
+              {/* Conditional Form: Technician Master ID vs Client Authentication */}
+              {selectedRole === 'technician' ? (
+                /* ========================================================================= */
+                /* TECHNICIAN MASTER ID AUTHENTICATION FLOW */
+                /* ========================================================================= */
+                <form onSubmit={handleTechnicianMasterSubmit} className="space-y-4">
+                  {/* Master ID Field */}
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                      <KeyRound className="w-4 h-4 text-[#0066FF]" />
+                    </div>
                     <input
-                      type="checkbox"
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
-                      className="w-4 h-4 rounded text-[#0066FF] focus:ring-[#0066FF] border-slate-300"
+                      type="text"
+                      value={masterId}
+                      onChange={(e) => {
+                        setMasterId(e.target.value);
+                        if (errorMessage) setErrorMessage(null);
+                      }}
+                      placeholder="Enter Master ID"
+                      autoFocus
+                      autoComplete="off"
+                      spellCheck={false}
+                      className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all tracking-wide"
                     />
-                    <span className="text-xs text-slate-600 font-medium">Remember me</span>
-                  </label>
+                  </div>
 
+                  {/* Remember Me Option */}
+                  <div className="flex items-center justify-between pt-0.5">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={rememberMe}
+                        onChange={(e) => setRememberMe(e.target.checked)}
+                        className="w-4 h-4 rounded text-[#0066FF] focus:ring-[#0066FF] border-slate-300"
+                      />
+                      <span className="text-xs text-slate-600 font-medium">Remember me</span>
+                    </label>
+                  </div>
+
+                  {/* Sign In Button */}
+                  <button
+                    type="submit"
+                    disabled={isVerifyingMasterId}
+                    className="w-full py-3.5 rounded-2xl bg-[#0066FF] hover:bg-[#0052cc] text-white font-bold text-sm shadow-lg shadow-blue-500/25 active:scale-98 transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer mt-2"
+                  >
+                    {isVerifyingMasterId ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin text-white" />
+                        <span>Verifying Master ID...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Sign In</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
+                  </button>
+
+                  {/* Technician Designation Badge matching diagram in spec */}
+                  <div className="pt-2 text-center">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50/80 border border-blue-100 text-[#0066FF] text-[11px] font-semibold tracking-wide">
+                      <Wrench className="w-3 h-3 text-[#0066FF]" />
+                      <span>Technician Access</span>
+                    </span>
+                  </div>
+                </form>
+              ) : (
+                /* ========================================================================= */
+                /* NORMAL CLIENT AUTHENTICATION FLOW */
+                /* ========================================================================= */
+                <div>
+                  <form onSubmit={handleSignInSubmit} className="space-y-3.5">
+                    {/* Email Address Field */}
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                        <Mail className="w-4 h-4" />
+                      </div>
+                      <input
+                        type="text"
+                        value={identifier}
+                        onChange={(e) => setIdentifier(e.target.value)}
+                        placeholder="Email Address"
+                        required
+                        className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
+                      />
+                    </div>
+
+                    {/* Password Field */}
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                        <Lock className="w-4 h-4" />
+                      </div>
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Password"
+                        required
+                        className="w-full pl-10 pr-10 py-3 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+
+                    {/* Remember Me & Forgot Password */}
+                    <div className="flex items-center justify-between pt-0.5">
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={rememberMe}
+                          onChange={(e) => setRememberMe(e.target.checked)}
+                          className="w-4 h-4 rounded text-[#0066FF] focus:ring-[#0066FF] border-slate-300"
+                        />
+                        <span className="text-xs text-slate-600 font-medium">Remember me</span>
+                      </label>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setForgotIdentifier(identifier);
+                          setIsForgotPasswordOpen(true);
+                        }}
+                        className="text-xs font-semibold text-[#0066FF] hover:underline cursor-pointer"
+                      >
+                        Forgot Password?
+                      </button>
+                    </div>
+
+                    {/* Submit Button */}
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="w-full py-3.5 rounded-2xl bg-[#0066FF] hover:bg-[#0052cc] text-white font-bold text-sm shadow-lg shadow-blue-500/25 active:scale-98 transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer mt-2"
+                    >
+                      {isSubmitting ? (
+                        <span>Signing In...</span>
+                      ) : (
+                        <>
+                          <span>Sign In</span>
+                          <ArrowRight className="w-4 h-4" />
+                        </>
+                      )}
+                    </button>
+                  </form>
+
+                  {/* OR Divider */}
+                  <div className="relative flex items-center justify-center my-4">
+                    <div className="border-t border-slate-200 w-full" />
+                    <span className="bg-white px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                      OR
+                    </span>
+                    <div className="border-t border-slate-200 w-full" />
+                  </div>
+
+                  {/* Continue with Google */}
                   <button
                     type="button"
-                    onClick={() => {
-                      setForgotIdentifier(identifier);
-                      setIsForgotPasswordOpen(true);
-                    }}
-                    className="text-xs font-semibold text-[#0066FF] hover:underline"
+                    onClick={handleGoogleAuth}
+                    disabled={isGoogleSubmitting}
+                    aria-label="Continue with Google"
+                    className="w-full py-2.5 px-4 rounded-2xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2.5 shadow-sm transition-all cursor-pointer active:scale-98 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    Forgot Password?
+                    {isGoogleSubmitting ? (
+                      <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin shrink-0" />
+                    ) : (
+                      <GoogleGIcon />
+                    )}
+                    <span>{isGoogleSubmitting ? 'Connecting with Google...' : 'Continue with Google'}</span>
                   </button>
                 </div>
-
-                {/* Submit Button */}
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full py-3.5 rounded-2xl bg-[#0066FF] hover:bg-[#0052cc] text-white font-bold text-sm shadow-lg shadow-blue-500/25 active:scale-98 transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer mt-2"
-                >
-                  {isSubmitting ? (
-                    <span>Signing In...</span>
-                  ) : (
-                    <>
-                      <span>Sign In</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
-              </form>
-
-              {/* OR Divider */}
-              <div className="relative flex items-center justify-center my-4">
-                <div className="border-t border-slate-200 w-full" />
-                <span className="bg-white px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                  OR
-                </span>
-                <div className="border-t border-slate-200 w-full" />
-              </div>
-
-              {/* Continue with Google */}
-              <button
-                type="button"
-                onClick={handleGoogleAuth}
-                disabled={isGoogleSubmitting}
-                aria-label="Continue with Google"
-                className="w-full py-2.5 px-4 rounded-2xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2.5 shadow-sm transition-all cursor-pointer active:scale-98 disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {isGoogleSubmitting ? (
-                  <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin shrink-0" />
-                ) : (
-                  <GoogleGIcon />
-                )}
-                <span>{isGoogleSubmitting ? 'Connecting with Google...' : 'Continue with Google'}</span>
-              </button>
-
-              {/* Footer Switch to Sign Up */}
-              <div className="mt-4 text-center">
-                <p className="text-xs text-slate-500">
-                  Don't have an account?{' '}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setView('signup');
-                      window.location.hash = 'signup';
-                    }}
-                    className="font-bold text-[#0066FF] hover:underline cursor-pointer"
-                  >
-                    Sign Up
-                  </button>
-                </p>
-              </div>
+              )}
             </div>
           ) : (
             /* ========================================================================= */
             /* VIEW 2: CREATE ACCOUNT / SIGN UP SCREEN */
             /* ========================================================================= */
             <div>
-              {/* Header */}
-              <div className="mb-5">
-                <h1 className="text-2xl sm:text-[28px] font-black text-[#0b2545] tracking-tight">
-                  Create Account
-                </h1>
-                <p className="text-xs sm:text-[13px] text-slate-500 mt-1 leading-relaxed">
-                  Get started with Wepsun Engineering Solution
-                </p>
-              </div>
-
               {/* Pending Quote Service Notice */}
               {pendingQuoteService && (
                 <div className="mb-4 p-3.5 rounded-2xl bg-gradient-to-r from-blue-50 via-sky-50 to-indigo-50 border border-blue-200/90 text-[#0b2545] shadow-xs flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
@@ -941,13 +1095,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 </div>
               )}
 
-              {/* Role Picker */}
+              {/* Role Picker in Sign Up — Only Client | Technician */}
               <div className="mb-3">
-                <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100/90 rounded-2xl">
+                <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100/90 rounded-2xl">
                   <button
                     type="button"
                     onClick={() => setRegRole('client')}
-                    className={`py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                       regRole === 'client'
                         ? 'bg-white text-[#0066FF] shadow-sm'
                         : 'text-slate-600 hover:text-slate-900'
@@ -958,24 +1112,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   <button
                     type="button"
                     onClick={() => setRegRole('technician')}
-                    className={`py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                       regRole === 'technician'
                         ? 'bg-white text-[#0066FF] shadow-sm'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     Technician
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRegRole('company_admin')}
-                    className={`py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      regRole === 'company_admin'
-                        ? 'bg-white text-[#0066FF] shadow-sm'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Admin
                   </button>
                 </div>
               </div>
@@ -1235,11 +1378,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         </div>
       )}
 
-      {/* Interactive Google OAuth 2.0 Identity Modal */}
+      {/* Interactive Google OAuth 2.0 Identity Modal (Clients only) */}
       <GoogleAuthModal
         isOpen={isGoogleModalOpen}
         onClose={() => setIsGoogleModalOpen(false)}
-        targetRoleHint={view === 'signup' ? regRole : (selectedRole === 'admin' ? 'company_admin' : selectedRole)}
+        targetRoleHint={view === 'signup' ? regRole : 'client'}
         onSuccess={() => {
           if (onClose) onClose();
         }}

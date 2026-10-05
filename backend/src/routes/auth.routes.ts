@@ -21,6 +21,7 @@ import {
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
 import { authLimiter } from '../middleware/rateLimiter.js';
 import { verifyGoogleIdToken, verifyGoogleAccessToken } from '../lib/googleAuth.js';
+import { validateMasterId, getMasterAdminUser } from '../lib/masterAuth.js';
 
 const router = Router();
 
@@ -464,6 +465,119 @@ router.get('/google/callback', (_req, res: Response): void => {
   </script>
 </body>
 </html>`);
+});
+
+// POST /api/auth/master-id — Cryptographic Master ID Authentication (Technician Entry Point)
+router.post('/master-id', authLimiter, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  const { masterId, rememberMe } = req.body;
+  const userAgent = req.headers['user-agent'];
+  const ipAddress = req.ip || req.socket.remoteAddress;
+
+  if (!masterId || typeof masterId !== 'string' || !masterId.trim()) {
+    res.status(400).json({
+      success: false,
+      message: 'Please enter your Master ID.',
+      code: 'EMPTY_MASTER_ID',
+    });
+    return;
+  }
+
+  try {
+    const validation = validateMasterId(masterId.trim());
+
+    if (!validation.isValid || !validation.masterSlot) {
+      // Record failed authentication in audit log
+      try {
+        await prisma.auditLog.create({
+          data: {
+            companyId: 'comp-1',
+            entityType: 'MasterAuth',
+            entityId: 'technician-master-portal',
+            action: 'LOGIN_FAILURE',
+            performedBy: 'Technician Access',
+            userRole: 'ANONYMOUS',
+            details: 'Invalid Master ID attempt received at Technician portal',
+          },
+        });
+      } catch {
+        // Non-blocking
+      }
+
+      res.status(401).json({
+        success: false,
+        message: 'Invalid Master ID. Please try again.',
+        code: 'INVALID_MASTER_ID',
+      });
+      return;
+    }
+
+    const slot = validation.masterSlot;
+    const masterUser = getMasterAdminUser(slot);
+
+    const jwtPayload: JwtUserPayload = {
+      sub: masterUser.id,
+      userId: masterUser.id,
+      email: masterUser.email,
+      role: 'MASTER_ADMIN',
+      companyId: masterUser.companyId,
+      branchId: masterUser.branchId,
+      tokenVersion: 0,
+    };
+
+    const accessToken = generateAccessToken(jwtPayload);
+    const session = await createSession(masterUser.id, masterUser.companyId, userAgent, ipAddress);
+
+    // Set HTTP-only refresh cookie
+    res.cookie('refreshToken', session.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: (rememberMe ? 30 : 7) * 24 * 60 * 60 * 1000,
+      path: '/api/auth',
+    });
+
+    // Record successful Master ID authentication in audit log (non-blocking)
+    prisma.auditLog.create({
+      data: {
+        companyId: masterUser.companyId,
+        entityType: 'MasterAuth',
+        entityId: masterUser.id,
+        action: 'LOGIN_SUCCESS',
+        performedBy: masterUser.name,
+        userRole: 'MASTER_ADMIN',
+        details: `Authorized Master ID #${slot} authenticated from Technician option. Granted full Admin Dashboard access.`,
+      },
+    }).catch(() => {});
+
+    res.json({
+      success: true,
+      message: 'Master ID verified successfully. Access granted to Admin Dashboard.',
+      data: {
+        user: sanitizeUser(masterUser),
+        accessToken,
+        refreshToken: session.refreshToken,
+        expiresIn: 900,
+        tokens: {
+          accessToken,
+          refreshToken: session.refreshToken,
+          expiresIn: 900,
+        },
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      success: false,
+      message: 'Something went wrong. Please try again later.',
+      code: 'SERVER_ERROR',
+      error: err?.message,
+    });
+  }
+});
+
+// Alias: POST /api/auth/master-login
+router.post('/master-login', authLimiter, (req, res, next) => {
+  req.url = '/master-id';
+  router.handle(req, res, next);
 });
 
 // POST /api/auth/login — Production Cryptographic Login

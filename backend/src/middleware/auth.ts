@@ -131,14 +131,15 @@ export function requireRole(...allowedRoles: (string | string[])[]) {
       .flat(Infinity)
       .map((r) => (typeof r === 'string' ? r.toUpperCase() : String(r).toUpperCase()));
 
-    // Super Admin has global bypass for all company operations
-    if (userRole === 'SUPER_ADMIN' || normalizedAllowed.includes(userRole)) {
+    // Super Admin & Master Admin have global bypass for all administrative company operations
+    if (userRole === 'SUPER_ADMIN' || userRole === 'MASTER_ADMIN' || normalizedAllowed.includes(userRole)) {
       next();
       return;
     }
 
     // Map common role aliases
     const aliasMap: Record<string, string> = {
+      MASTER_ADMIN: 'ADMIN',
       COMPANY_ADMIN: 'ADMIN',
       CLIENT: 'CUSTOMER',
       ACCOUNTS: 'ACCOUNTANT',

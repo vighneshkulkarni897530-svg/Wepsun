@@ -28,6 +28,7 @@ import {
 } from '../lib/auth.js';
 import { prisma } from '../lib/prisma.js';
 import { db } from '../data/mockDb.js';
+import { validateMasterId, getMasterAdminUser, computeMasterIdHash } from '../lib/masterAuth.js';
 
 let passedTests = 0;
 let totalTests = 0;
@@ -265,6 +266,54 @@ async function runAuthSecurityTests() {
   assert(
     verifiedWepsunSession !== null && verifiedWepsunSession.email === 'vikram.sharma@wepsun.com',
     'WEPSUN Gateway successfully generates and validates cryptographically signed JWT for Google User'
+  );
+
+  // ==============================================================================
+  // SUITE 9: TECHNICIAN ENTRY POINT — TWO AUTHORIZED MASTER IDS & MASTER_ADMIN RBAC
+  // ==============================================================================
+  console.log('\n📋 SUITE 9: Technician Master ID Authentication & Admin Dashboard Access');
+
+  // Test Valid Master ID 1
+  const validMasterId1 = process.env.MASTER_ID_1 || 'WEP-MST-8921';
+  const result1 = validateMasterId(validMasterId1);
+  assert(result1.isValid === true && result1.masterSlot === 1, 'Valid Master ID #1 correctly authenticates to slot 1');
+
+  // Test Valid Master ID 2
+  const validMasterId2 = process.env.MASTER_ID_2 || 'WEP-MST-4407';
+  const result2 = validateMasterId(validMasterId2);
+  assert(result2.isValid === true && result2.masterSlot === 2, 'Valid Master ID #2 correctly authenticates to slot 2');
+
+  // Test Invalid Master ID
+  const invalidResult = validateMasterId('INVALID-ID-999');
+  assert(invalidResult.isValid === false, 'Invalid Master ID is rejected without exposing details');
+
+  // Test Empty Master ID
+  const emptyResult = validateMasterId('');
+  assert(emptyResult.isValid === false, 'Empty Master ID is rejected');
+
+  // Test Whitespace trimming
+  const trimmedResult = validateMasterId(`  ${validMasterId1}  `);
+  assert(trimmedResult.isValid === true, 'Master ID validation handles surrounding whitespace securely');
+
+  // Test Master Admin User and Token Generation
+  const masterUser1 = getMasterAdminUser(1);
+  assert(masterUser1.role === 'MASTER_ADMIN', 'Master ID #1 produces user with role MASTER_ADMIN');
+
+  const masterUser2 = getMasterAdminUser(2);
+  assert(masterUser2.role === 'MASTER_ADMIN', 'Master ID #2 produces user with role MASTER_ADMIN');
+
+  const masterToken = generateAccessToken({
+    sub: masterUser1.id,
+    userId: masterUser1.id,
+    email: masterUser1.email,
+    role: masterUser1.role,
+    companyId: masterUser1.companyId,
+  });
+
+  const verifiedMaster = verifyAccessToken(masterToken);
+  assert(
+    verifiedMaster !== null && verifiedMaster.role === 'MASTER_ADMIN',
+    'Cryptographic JWT with MASTER_ADMIN claim successfully generated and verified'
   );
 
   console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
