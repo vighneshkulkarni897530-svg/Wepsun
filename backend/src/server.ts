@@ -154,6 +154,66 @@ app.get('/api/health', async (_req, res) => {
   });
 });
 
+// OAuth Deep Link Callback Handler for Android Mobile & Web Popup Handshakes
+const sendOAuthCallbackHtml = (_req: express.Request, res: express.Response) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>WEPSUN Authentication</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #0b2545; color: white; text-align: center; }
+    .card { background: rgba(255, 255, 255, 0.08); padding: 32px; border-radius: 24px; max-width: 360px; box-shadow: 0 8px 32px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); }
+    .spinner { width: 44px; height: 44px; border: 4px solid rgba(255,255,255,0.2); border-top-color: #0066FF; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .btn { display: inline-block; margin-top: 16px; padding: 12px 24px; background: #0066FF; color: white; border-radius: 12px; text-decoration: none; font-weight: bold; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="spinner"></div>
+    <h2 style="margin: 0 0 8px; font-size: 18px;">Authenticating with Google...</h2>
+    <p style="margin: 0; font-size: 13px; color: #93c5fd;">Returning you securely to WEPSUN</p>
+    <div id="btn-container" style="display: block; margin-top: 20px;">
+      <a id="deepLinkBtn" href="wepsun://auth-callback" class="btn">Tap to Return to WEPSUN App</a>
+    </div>
+  </div>
+  <script>
+    (function() {
+      var hash = window.location.hash ? window.location.hash.substring(1) : '';
+      var search = window.location.search ? window.location.search.substring(1) : '';
+      var query = hash || search;
+
+      var deepLink = 'wepsun://auth-callback' + (query ? '?' + query : '');
+      var btn = document.getElementById('deepLinkBtn');
+      if (btn) btn.href = deepLink;
+
+      // 1. Immediate deep link redirect to native Android app
+      try {
+        window.location.href = deepLink;
+      } catch (e) {}
+
+      // 2. Broadcast for web popup windows
+      if (window.opener) {
+        try {
+          window.opener.postMessage({ type: 'WEPSUN_GOOGLE_AUTH_CALLBACK', query: query }, '*');
+        } catch (e) {}
+        setTimeout(function() { window.close(); }, 800);
+      }
+    })();
+  </script>
+</body>
+</html>`);
+};
+
+app.get('/api/auth/google/callback', sendOAuthCallbackHtml);
+app.get('/auth/google/callback', sendOAuthCallbackHtml);
+app.get('/api/auth-callback', sendOAuthCallbackHtml);
+app.get('/auth-callback', sendOAuthCallbackHtml);
+app.get('/callback', sendOAuthCallbackHtml);
+
 // Register API Routes
 app.use('/api', apiRouter);
 

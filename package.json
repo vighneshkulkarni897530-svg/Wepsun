@@ -8,6 +8,7 @@
     "dev:frontend": "vite",
     "dev:backend": "tsx backend/src/server.ts",
     "dev:fullstack": "concurrently -n \"frontend,backend\" -c \"blue,green\" \"npm run dev\" \"npm run dev:backend\"",
+    "start": "tsx backend/src/server.ts",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
