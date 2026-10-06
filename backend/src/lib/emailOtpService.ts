@@ -284,11 +284,14 @@ export async function sendEmailOtp(params: {
     expiryMinutes: 10,
   });
 
-  const emailResult = await dispatchEmail({
+  // Dispatch email in background without blocking the HTTP response
+  dispatchEmail({
     toEmail: cleanEmail,
     subject,
     htmlContent,
     otp,
+  }).catch((err) => {
+    console.warn('⚠️ [Email Dispatch Background Notice]:', err?.message);
   });
 
   return {
