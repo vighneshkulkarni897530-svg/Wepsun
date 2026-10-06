@@ -105,9 +105,13 @@ export async function sendSignupEmailOtp(
         expiresIn: (res as any).expiresIn || res.data?.expiresIn || 600,
       };
     } else {
+      let friendlyMessage = res.message || res.error || 'Failed to send OTP code.';
+      if (friendlyMessage.includes('404')) {
+        friendlyMessage = 'Cloud server is updating latest OTP endpoints. Please ensure latest deployment on Render or check network configuration.';
+      }
       return {
         success: false,
-        message: res.message || res.error || 'Failed to send OTP code.',
+        message: friendlyMessage,
         code: res.code,
       };
     }
