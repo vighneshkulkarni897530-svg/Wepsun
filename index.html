@@ -147,6 +147,29 @@
     <script>
       (function() {
         var v = document.getElementById('wepsun-splash-video');
+        var wrap = document.getElementById('wepsun-splash-wrapper');
+        
+        function dismissSplash() {
+          if (wrap && wrap.parentNode) {
+            wrap.style.transition = 'opacity 0.35s ease-out';
+            wrap.style.opacity = '0';
+            wrap.style.pointerEvents = 'none';
+            setTimeout(function() {
+              if (wrap && wrap.parentNode) {
+                wrap.parentNode.removeChild(wrap);
+              }
+            }, 360);
+          }
+        }
+
+        if (wrap) {
+          wrap.addEventListener('click', dismissSplash);
+          wrap.addEventListener('touchstart', dismissSplash, { passive: true });
+        }
+
+        // Safety timeout: Never block user if video hangs or takes > 5s
+        var splashTimer = setTimeout(dismissSplash, 5000);
+
         if (v) {
           v.muted = true;
           v.defaultMuted = true;
@@ -165,7 +188,15 @@
             if (v.currentTime > 0.01) {
               reveal();
             }
+            if (v.duration > 2 && v.currentTime >= v.duration - 0.1) {
+              dismissSplash();
+            }
           });
+          v.addEventListener('ended', function() {
+            setTimeout(dismissSplash, 600);
+          });
+          v.addEventListener('error', dismissSplash);
+
           v.addEventListener('loadeddata', function() {
             if (v.readyState >= 2) {
               var p = v.play();
@@ -180,7 +211,8 @@
             p.then(reveal).catch(function() {});
           }
           window.__WEPSUN_SPLASH_VIDEO = v;
-          window.__WEPSUN_SPLASH_WRAPPER = document.getElementById('wepsun-splash-wrapper');
+          window.__WEPSUN_SPLASH_WRAPPER = wrap;
+          window.__WEPSUN_DISMISS_SPLASH = dismissSplash;
         }
       })();
     </script>

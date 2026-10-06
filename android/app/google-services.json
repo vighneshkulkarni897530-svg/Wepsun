@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "425617890861",
+    "project_id": "wepsun-engineering-solut-d3a69",
+    "storage_bucket": "wepsun-engineering-solut-d3a69.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:425617890861:android:ce41f1a35e3dc6bc2e62a4",
+        "android_client_info": {
+          "package_name": "com.wepsun.engineering"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDE035LwRxozxSF7Ntq1pd6LCnJ_e9OBsc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

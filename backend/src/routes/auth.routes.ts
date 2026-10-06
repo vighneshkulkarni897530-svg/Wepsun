@@ -22,6 +22,7 @@ import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
 import { authLimiter } from '../middleware/rateLimiter.js';
 import { verifyGoogleIdToken, verifyGoogleAccessToken } from '../lib/googleAuth.js';
 import { validateMasterId, getMasterAdminUser } from '../lib/masterAuth.js';
+import { sendEmailOtp, verifyEmailOtp } from '../lib/emailOtpService.js';
 
 const router = Router();
 
@@ -1311,6 +1312,432 @@ router.get('/me', requireAuth, async (req: AuthenticatedRequest, res: Response):
     });
   } catch {
     res.status(500).json({ authenticated: false, success: false, message: 'Failed to retrieve user profile', code: 'USER_FETCH_ERROR' });
+  }
+});
+
+// ============================================================================
+// FIREBASE & EMAIL OTP AUTHENTICATION ENDPOINTS
+// ============================================================================
+
+// POST /api/auth/send-otp — Dispatch 6-digit OTP code to email
+router.post('/send-otp', authLimiter, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  const { email, name, type = 'signup', role, phone } = req.body;
+  const cleanEmail = String(email || '').toLowerCase().trim();
+
+  if (!cleanEmail || !cleanEmail.includes('@')) {
+    res.status(400).json({ success: false, message: 'A valid email address is required.', code: 'INVALID_EMAIL' });
+    return;
+  }
+
+  try {
+    // If sign-up, verify if active account already exists
+    if (type === 'signup') {
+      let existingUser: any = null;
+      try {
+        existingUser = await prisma.user.findFirst({
+          where: { email: { equals: cleanEmail, mode: 'insensitive' as const } },
+        });
+      } catch {
+        existingUser = null;
+      }
+
+      if (!existingUser) {
+        existingUser = db.users.find((u) => u.email.toLowerCase() === cleanEmail);
+      }
+
+      if (existingUser) {
+        res.status(409).json({
+          success: false,
+          message: 'An account with this email address already exists. Please sign in instead.',
+          code: 'USER_ALREADY_EXISTS',
+        });
+        return;
+      }
+    } else if (type === 'forgot_password') {
+      // If forgot password, check if account exists
+      let existingUser: any = null;
+      try {
+        existingUser = await prisma.user.findFirst({
+          where: { email: { equals: cleanEmail, mode: 'insensitive' as const } },
+        });
+      } catch {
+        existingUser = null;
+      }
+
+      if (!existingUser) {
+        existingUser = db.users.find((u) => u.email.toLowerCase() === cleanEmail);
+      }
+
+      if (!existingUser) {
+        res.status(404).json({
+          success: false,
+          message: 'No registered WEPSUN account was found with this email address.',
+          code: 'USER_NOT_FOUND',
+        });
+        return;
+      }
+    }
+
+    const otpResult = await sendEmailOtp({
+      email: cleanEmail,
+      name,
+      type: type as 'signup' | 'forgot_password',
+      userData: { name, role, phone },
+    });
+
+    if (!otpResult.success) {
+      res.status(429).json(otpResult);
+      return;
+    }
+
+    res.json(otpResult);
+  } catch (err: any) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send verification code. Please try again.',
+      code: 'OTP_SEND_ERROR',
+    });
+  }
+});
+
+// POST /api/auth/verify-otp — Verify sign-up OTP and complete registration
+router.post('/verify-otp', authLimiter, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  const { email, otp, name, fullName, phone, role = 'CLIENT', password, companyId = 'comp-1' } = req.body;
+  const cleanEmail = String(email || '').toLowerCase().trim();
+  const cleanOtp = String(otp || '').trim();
+  const displayName = String(name || fullName || '').trim();
+
+  if (!cleanEmail || !cleanOtp) {
+    res.status(400).json({
+      success: false,
+      message: 'Email and 6-digit verification code are required.',
+      code: 'MISSING_FIELDS',
+    });
+    return;
+  }
+
+  const userAgent = req.headers['user-agent'];
+  const ipAddress = req.ip || req.socket.remoteAddress;
+
+  try {
+    const verifyResult = verifyEmailOtp({
+      email: cleanEmail,
+      otp: cleanOtp,
+      type: 'signup',
+    });
+
+    if (!verifyResult.success) {
+      res.status(400).json(verifyResult);
+      return;
+    }
+
+    // OTP Verified! Create account in Database
+    const assignedRole = (role || 'CLIENT').toUpperCase();
+    const newUserId = 'usr-' + (assignedRole.toLowerCase() === 'client' ? 'client-' : assignedRole.toLowerCase() === 'technician' ? 'tech-' : 'admin-') + Date.now();
+    const passwordHash = password ? await hashPassword(password) : await hashPassword('Wepsun@' + Date.now());
+
+    let user: any = null;
+    let clientId: string | undefined = undefined;
+    let technicianId: string | undefined = undefined;
+
+    try {
+      if (assignedRole === 'CLIENT') {
+        try {
+          const clientRec = await prisma.client.create({
+            data: {
+              companyId,
+              name: displayName || cleanEmail.split('@')[0],
+              contactPerson: displayName || cleanEmail.split('@')[0],
+              phone: phone || '+91 98200 00000',
+              email: cleanEmail,
+              billingAddress: 'Main Office',
+            },
+          });
+          clientId = clientRec.id;
+        } catch {
+          clientId = undefined;
+        }
+      } else if (assignedRole === 'TECHNICIAN') {
+        try {
+          const techRec = await prisma.technician.create({
+            data: {
+              companyId,
+              name: displayName || cleanEmail.split('@')[0],
+              phone: phone || '+91 98200 00000',
+              email: cleanEmail,
+            },
+          });
+          technicianId = techRec.id;
+        } catch {
+          technicianId = undefined;
+        }
+      }
+
+      user = await prisma.user.create({
+        data: {
+          id: newUserId,
+          name: displayName || cleanEmail.split('@')[0],
+          email: cleanEmail,
+          phone: phone || '+91 98200 00000',
+          role: assignedRole as any,
+          companyId: companyId,
+          passwordHash,
+          isActive: true,
+          authProvider: 'email_otp',
+          clientId,
+          technicianId,
+        },
+        include: { company: true, branch: true },
+      });
+    } catch {
+      // In-memory fallback
+      user = {
+        id: newUserId,
+        name: displayName || cleanEmail.split('@')[0],
+        email: cleanEmail,
+        phone: phone || '+91 98200 00000',
+        role: assignedRole,
+        companyId: companyId,
+        branchId: null,
+        clientId,
+        technicianId,
+        isActive: true,
+        authProvider: 'email_otp',
+        tokenVersion: 0,
+      };
+      db.users.push(user);
+    }
+
+    // Generate JWT Access Token & Refresh Session
+    const jwtPayload: JwtUserPayload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      companyId: user.companyId,
+      branchId: user.branchId,
+      clientId: user.clientId,
+      technicianId: user.technicianId,
+      tokenVersion: 0,
+    };
+    const accessToken = generateAccessToken(jwtPayload);
+    const session = await createSession(user.id, user.companyId, userAgent, ipAddress);
+
+    res.cookie('refreshToken', session.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/api/auth',
+    });
+
+    // Record Audit Log
+    try {
+      await prisma.auditLog.create({
+        data: {
+          companyId: user.companyId,
+          entityType: 'User',
+          entityId: user.id,
+          action: 'SIGNUP_OTP_VERIFIED',
+          performedBy: user.name,
+          userRole: String(user.role),
+          details: `New account created and verified via Email OTP for ${user.email} (${user.role})`,
+        },
+      });
+    } catch {}
+
+    res.json({
+      success: true,
+      message: 'Account successfully registered and verified!',
+      data: {
+        user: sanitizeUser(user),
+        accessToken,
+        refreshToken: session.refreshToken,
+        expiresIn: 900,
+        tokens: {
+          accessToken,
+          refreshToken: session.refreshToken,
+          expiresIn: 900,
+        },
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      success: false,
+      message: 'Account creation encountered an error.',
+      code: 'SERVER_ERROR',
+    });
+  }
+});
+
+// POST /api/auth/forgot-password-otp — Dispatch 6-digit OTP for password recovery
+router.post('/forgot-password-otp', authLimiter, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  const { email } = req.body;
+  const cleanEmail = String(email || '').toLowerCase().trim();
+
+  if (!cleanEmail || !cleanEmail.includes('@')) {
+    res.status(400).json({ success: false, message: 'Valid email address is required.', code: 'INVALID_EMAIL' });
+    return;
+  }
+
+  try {
+    let user: any = null;
+    try {
+      user = await prisma.user.findFirst({
+        where: { email: { equals: cleanEmail, mode: 'insensitive' as const } },
+      });
+    } catch {
+      user = null;
+    }
+
+    if (!user) {
+      user = db.users.find((u) => u.email.toLowerCase() === cleanEmail);
+    }
+
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        message: 'No registered WEPSUN account was found with this email address.',
+        code: 'USER_NOT_FOUND',
+      });
+      return;
+    }
+
+    const otpResult = await sendEmailOtp({
+      email: cleanEmail,
+      name: user.name,
+      type: 'forgot_password',
+      userData: { userId: user.id, name: user.name },
+    });
+
+    if (!otpResult.success) {
+      res.status(429).json(otpResult);
+      return;
+    }
+
+    res.json(otpResult);
+  } catch {
+    res.status(500).json({ success: false, message: 'Failed to send reset code.', code: 'SERVER_ERROR' });
+  }
+});
+
+// POST /api/auth/verify-forgot-password-otp — Verify OTP and set new password
+router.post('/verify-forgot-password-otp', authLimiter, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  const { email, otp, newPassword } = req.body;
+  const cleanEmail = String(email || '').toLowerCase().trim();
+  const cleanOtp = String(otp || '').trim();
+
+  if (!cleanEmail || !cleanOtp || !newPassword) {
+    res.status(400).json({
+      success: false,
+      message: 'Email, verification code, and new password are required.',
+      code: 'MISSING_FIELDS',
+    });
+    return;
+  }
+
+  if (newPassword.length < 6) {
+    res.status(400).json({
+      success: false,
+      message: 'Password must be at least 6 characters long.',
+      code: 'PASSWORD_TOO_SHORT',
+    });
+    return;
+  }
+
+  try {
+    const verifyResult = verifyEmailOtp({
+      email: cleanEmail,
+      otp: cleanOtp,
+      type: 'forgot_password',
+    });
+
+    if (!verifyResult.success) {
+      res.status(400).json(verifyResult);
+      return;
+    }
+
+    // OTP is valid! Update user password in Database
+    const newHash = await hashPassword(newPassword);
+
+    let user: any = null;
+    try {
+      user = await prisma.user.findFirst({
+        where: { email: { equals: cleanEmail, mode: 'insensitive' as const } },
+      });
+      if (user) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            passwordHash: newHash,
+            tokenVersion: { increment: 1 },
+          },
+        });
+        await revokeAllUserSessions(user.id);
+      }
+    } catch {
+      // Mock fallback
+      const mock = db.users.find((u) => u.email.toLowerCase() === cleanEmail);
+      if (mock) {
+        mock.passwordHash = newHash;
+        user = mock;
+      }
+    }
+
+    // Record Audit Log
+    try {
+      if (user) {
+        await prisma.auditLog.create({
+          data: {
+            companyId: user.companyId || 'comp-1',
+            entityType: 'User',
+            entityId: user.id,
+            action: 'PASSWORD_RESET_OTP_COMPLETED',
+            performedBy: user.name || cleanEmail,
+            userRole: String(user.role || 'CLIENT'),
+            details: `Password reset successfully via verified Email OTP for ${cleanEmail}`,
+          },
+        });
+      }
+    } catch {}
+
+    res.json({
+      success: true,
+      message: 'Password reset successfully! You can now log in with your new password.',
+    });
+  } catch {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to reset password.',
+      code: 'RESET_COMPLETION_ERROR',
+    });
+  }
+});
+
+// POST /api/auth/resend-otp — Resend OTP code with cooldown verification
+router.post('/resend-otp', authLimiter, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  const { email, type = 'signup', name } = req.body;
+  const cleanEmail = String(email || '').toLowerCase().trim();
+
+  if (!cleanEmail || !cleanEmail.includes('@')) {
+    res.status(400).json({ success: false, message: 'Valid email address is required.', code: 'INVALID_EMAIL' });
+    return;
+  }
+
+  try {
+    const result = await sendEmailOtp({
+      email: cleanEmail,
+      name,
+      type: type as 'signup' | 'forgot_password',
+    });
+
+    if (!result.success) {
+      res.status(429).json(result);
+      return;
+    }
+
+    res.json(result);
+  } catch {
+    res.status(500).json({ success: false, message: 'Unable to resend verification code.', code: 'SERVER_ERROR' });
   }
 });
 

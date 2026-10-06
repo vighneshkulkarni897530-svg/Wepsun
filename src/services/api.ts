@@ -327,6 +327,26 @@ export const apiService = {
   resetPassword: (payload: { token: string; newPassword: string }) =>
     apiFetch('/auth/reset-password', { method: 'POST', body: JSON.stringify(payload), skipAuth: true }),
 
+  // Firebase Email OTP Authentication
+  sendOtp: (payload: { email: string; name?: string; type: 'signup' | 'forgot_password' }) =>
+    apiFetch('/auth/send-otp', { method: 'POST', body: JSON.stringify(payload), skipAuth: true }),
+  verifySignupOtp: (payload: {
+    email: string;
+    otp: string;
+    name: string;
+    phone?: string;
+    role: string;
+    password?: string;
+    companyId?: string;
+  }) =>
+    apiFetch('/auth/verify-otp', { method: 'POST', body: JSON.stringify(payload), skipAuth: true }),
+  sendForgotPasswordOtp: (payload: { email: string }) =>
+    apiFetch('/auth/forgot-password-otp', { method: 'POST', body: JSON.stringify(payload), skipAuth: true }),
+  verifyForgotPasswordOtp: (payload: { email: string; otp: string; newPassword: string }) =>
+    apiFetch('/auth/verify-forgot-password-otp', { method: 'POST', body: JSON.stringify(payload), skipAuth: true }),
+  resendOtp: (payload: { email: string; type: 'signup' | 'forgot_password'; name?: string }) =>
+    apiFetch('/auth/resend-otp', { method: 'POST', body: JSON.stringify(payload), skipAuth: true }),
+
   // Companies & Branches
   getCompanies: (options?: ApiRequestOptions) => apiFetch('/companies', options),
   getBranches: (options?: ApiRequestOptions) => apiFetch('/companies/branches', options),

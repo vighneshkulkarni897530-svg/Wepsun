@@ -999,11 +999,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setCurrentRoleState('client');
       setActiveUserId(clientUser.id);
 
-      window.history.replaceState(null, '', '#login');
-      window.location.hash = 'login';
+      window.history.replaceState(null, '', '#landing');
+      window.location.hash = 'landing';
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
     }
 
-    showToast('info', 'Logged Out', 'You have been signed out. Please enter your Master ID via Technician sign in to access the Admin Dashboard.');
+    showToast('info', 'Logged Out', 'You have been signed out successfully.');
   }, [showToast]);
 
   // Audit Log Mutator

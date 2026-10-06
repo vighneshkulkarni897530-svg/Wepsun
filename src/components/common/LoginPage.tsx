@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import {
   User,
@@ -15,11 +15,16 @@ import {
   X,
   Sparkles,
   ArrowRight,
+  ArrowLeft,
   ChevronRight,
   Settings,
   Wifi,
   KeyRound,
   Loader2,
+  MailCheck,
+  RefreshCw,
+  Shield,
+  Key,
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { useApp } from '../../context/AppContext';
@@ -29,6 +34,13 @@ import type { User as UserRecord, UserRole } from '../../types';
 import { DEMO_ACCOUNTS } from '../../data/initialData';
 import { GoogleAuthModal } from './GoogleAuthModal';
 import { loadGoogleGisScript, triggerGoogleSignIn, triggerGoogleOAuth2Popup, parseGoogleJwt } from '../../services/googleAuth';
+import {
+  sendSignupEmailOtp,
+  verifySignupEmailOtp,
+  sendForgotPasswordEmail,
+  verifyForgotPasswordOtpAndReset,
+  resendOtp,
+} from '../../services/firebaseAuth';
 import elevatorGlassLobbyImg from '../../assets/elevator-glass-lobby.jpg';
 import constructionPlansSunsetImg from '../../assets/construction-plans-sunset.jpg';
 
@@ -103,10 +115,32 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [regShowConfirmPassword, setRegShowConfirmPassword] = useState(false);
   const [regIsSubmitting, setRegIsSubmitting] = useState(false);
 
-  // Forgot Password Modal
+  // Email OTP Verification State for Sign Up
+  const [signUpStep, setSignUpStep] = useState<'form' | 'otp'>('form');
+  const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
+  const [otpTimer, setOtpTimer] = useState<number>(60);
+  const [canResendOtp, setCanResendOtp] = useState<boolean>(false);
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState<boolean>(false);
+  const [isSendingOtp, setIsSendingOtp] = useState<boolean>(false);
+  const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  // Forgot Password Modal (Step 1: Request, Step 2: OTP & Reset, Step 3: Success)
   const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
+  const [forgotStep, setForgotStep] = useState<'email' | 'otp_reset' | 'success'>('email');
   const [forgotIdentifier, setForgotIdentifier] = useState('');
-  const [forgotSuccess, setForgotSuccess] = useState(false);
+  const [forgotOtpDigits, setForgotOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
+  const [forgotNewPassword, setForgotNewPassword] = useState('');
+  const [forgotConfirmPassword, setForgotConfirmPassword] = useState('');
+  const [forgotShowPassword, setForgotShowPassword] = useState(false);
+  const [forgotShowConfirmPassword, setForgotShowConfirmPassword] = useState(false);
+  const [forgotTimer, setForgotTimer] = useState<number>(60);
+  const [canResendForgotOtp, setCanResendForgotOtp] = useState<boolean>(false);
+  const [forgotError, setForgotError] = useState<string | null>(null);
+  const [isSendingForgot, setIsSendingForgot] = useState<boolean>(false);
+  const [isResettingPassword, setIsResettingPassword] = useState<boolean>(false);
+  const [firebaseResetSent, setFirebaseResetSent] = useState<boolean>(false);
+  const forgotOtpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // Google OAuth Modal
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
@@ -316,10 +350,80 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     }
   };
 
+  // =========================================================================
+  // EMAIL OTP TIMERS & LIFECYCLE
+  // =========================================================================
+
+  // Sign Up OTP Countdown Timer
+  useEffect(() => {
+    let interval: any;
+    if (signUpStep === 'otp' && otpTimer > 0) {
+      interval = setInterval(() => {
+        setOtpTimer((prev) => {
+          if (prev <= 1) {
+            setCanResendOtp(true);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [signUpStep, otpTimer]);
+
+  // Forgot Password OTP Countdown Timer
+  useEffect(() => {
+    let interval: any;
+    if (isForgotPasswordOpen && forgotStep === 'otp_reset' && forgotTimer > 0) {
+      interval = setInterval(() => {
+        setForgotTimer((prev) => {
+          if (prev <= 1) {
+            setCanResendForgotOtp(true);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isForgotPasswordOpen, forgotStep, forgotTimer]);
+
+  // Focus first OTP box on step change
+  useEffect(() => {
+    if (signUpStep === 'otp') {
+      setTimeout(() => {
+        otpInputRefs.current[0]?.focus();
+      }, 100);
+    }
+  }, [signUpStep]);
+
+  useEffect(() => {
+    if (forgotStep === 'otp_reset') {
+      setTimeout(() => {
+        forgotOtpInputRefs.current[0]?.focus();
+      }, 100);
+    }
+  }, [forgotStep]);
+
+  // =========================================================================
+  // SIGN UP VIA EMAIL OTP FLOW
+  // =========================================================================
+
+  // Step 1: Validate input and send 6-digit Email OTP
   const handleSignUpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!regFullName.trim() || !regEmail.trim() || !regPassword.trim()) {
-      showToast('error', 'Incomplete Form', 'Please fill in all mandatory fields.');
+    setOtpError(null);
+
+    if (!regFullName.trim()) {
+      showToast('error', 'Incomplete Form', 'Please enter your full name.');
+      return;
+    }
+    if (!regEmail.trim() || !regEmail.includes('@')) {
+      showToast('error', 'Invalid Email', 'Please enter a valid email address.');
+      return;
+    }
+    if (!regPassword.trim() || regPassword.length < 6) {
+      showToast('error', 'Password Too Short', 'Password must be at least 6 characters long.');
       return;
     }
     if (regPassword !== regConfirmPassword) {
@@ -327,57 +431,317 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       return;
     }
 
+    setIsSendingOtp(true);
     setRegIsSubmitting(true);
+
     try {
-      await new Promise((r) => setTimeout(r, 600));
+      const res = await sendSignupEmailOtp(regEmail.trim(), regFullName.trim());
 
-      const targetRole: UserRole = regRole;
-      const newUserId = 'usr-' + (regRole === 'client' ? 'client-' : regRole === 'technician' ? 'tech-' : 'admin-') + Date.now();
-      const newUser: UserRecord = {
-        id: newUserId,
-        name: regFullName.trim(),
-        email: regEmail.trim(),
-        phone: regMobile.trim() || '+91 98200 00000',
-        role: targetRole,
-        companyId: 'comp-1',
-        clientId: targetRole === 'client' ? 'client-' + Date.now() : undefined,
-        technicianId: targetRole === 'technician' ? 'tech-' + Date.now() : undefined,
-        avatar: targetRole === 'client'
-          ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
-          : targetRole === 'technician'
-          ? 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80'
-          : 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
-        companyName: `${regFullName.trim()}'s Organisation`,
-        isActive: true,
-        createdAt: new Date().toISOString(),
-      };
-
-      loginAsUser(newUser);
-
-      if (pendingQuoteService || (typeof window !== 'undefined' && sessionStorage.getItem('wepsun_pending_quote_service'))) {
-        sessionStorage.setItem('wepsun_open_quote_after_login', 'true');
+      if (res.success) {
+        setSignUpStep('otp');
+        setOtpDigits(['', '', '', '', '', '']);
+        setOtpTimer(60);
+        setCanResendOtp(false);
+        showToast(
+          'success',
+          'Verification Code Sent',
+          `We sent a 6-digit verification code to ${regEmail.trim()}. Please check your email inbox.`
+        );
+      } else {
+        showToast('error', 'Registration Notice', res.message || 'Unable to send verification OTP.');
       }
+    } catch (err: any) {
+      showToast('error', 'Registration Error', err.message || 'Could not dispatch verification email.');
+    } finally {
+      setIsSendingOtp(false);
+      setRegIsSubmitting(false);
+    }
+  };
 
-      window.location.hash =
-        targetRole === 'client'
-          ? 'home'
-          : targetRole === 'technician'
-          ? 'jobs'
-          : 'dashboard';
+  // Step 2: Handle 6-digit OTP input box interactions
+  const handleOtpDigitChange = (index: number, value: string) => {
+    const sanitized = value.replace(/[^0-9]/g, '');
+    const newDigits = [...otpDigits];
 
-      showToast(
-        'success',
-        'Account Created Successfully',
-        `Welcome to WEPSUN, ${regFullName}! Your separate profile has been set up.`
+    if (sanitized.length > 1) {
+      // Multiple digits entered (e.g. pasted or fast typed)
+      const splitDigits = sanitized.slice(0, 6).split('');
+      for (let i = 0; i < 6; i++) {
+        newDigits[i] = splitDigits[i] || '';
+      }
+      setOtpDigits(newDigits);
+      const nextIdx = Math.min(splitDigits.length, 5);
+      otpInputRefs.current[nextIdx]?.focus();
+      return;
+    }
+
+    newDigits[index] = sanitized;
+    setOtpDigits(newDigits);
+
+    if (sanitized && index < 5) {
+      otpInputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
+      otpInputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData('text').replace(/[^0-9]/g, '').slice(0, 6);
+    if (!pasted) return;
+
+    const newDigits = ['', '', '', '', '', ''];
+    pasted.split('').forEach((char, idx) => {
+      newDigits[idx] = char;
+    });
+    setOtpDigits(newDigits);
+    const focusIndex = Math.min(pasted.length, 5);
+    otpInputRefs.current[focusIndex]?.focus();
+  };
+
+  // Step 3: Verify OTP and activate account
+  const handleVerifySignupOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const fullOtp = otpDigits.join('').trim();
+
+    if (fullOtp.length !== 6) {
+      setOtpError('Please enter the full 6-digit OTP code.');
+      return;
+    }
+
+    setIsVerifyingOtp(true);
+    setOtpError(null);
+
+    try {
+      const res = await verifySignupEmailOtp({
+        email: regEmail.trim(),
+        otp: fullOtp,
+        fullName: regFullName.trim(),
+        phone: regMobile.trim() || '+91 98200 00000',
+        role: regRole,
+        password: regPassword,
+        companyId: 'comp-1',
+      });
+
+      if (res.success && res.user) {
+        loginAsUser(res.user);
+        setCurrentRole(res.user.role);
+
+        confetti({
+          particleCount: 85,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ['#0066FF', '#34A853', '#4285F4', '#FBBC05', '#10B981'],
+        });
+
+        showToast(
+          'success',
+          'Email Verified Successfully',
+          `Welcome to WEPSUN, ${res.user.name}! Your account is now active.`
+        );
+
+        if (pendingQuoteService || (typeof window !== 'undefined' && sessionStorage.getItem('wepsun_pending_quote_service'))) {
+          sessionStorage.setItem('wepsun_open_quote_after_login', 'true');
+        }
+
+        window.location.hash =
+          res.user.role === 'client'
+            ? 'home'
+            : res.user.role === 'technician'
+            ? 'jobs'
+            : 'dashboard';
+
+        if (onClose) {
+          onClose();
+        }
+      } else {
+        setOtpError(res.message || 'Invalid verification code. Please check and try again.');
+      }
+    } catch (err: any) {
+      setOtpError(err.message || 'Verification could not be completed.');
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
+
+  const handleResendSignupOtp = async () => {
+    if (!canResendOtp) return;
+    setOtpError(null);
+    setIsSendingOtp(true);
+
+    try {
+      const res = await resendOtp(regEmail.trim(), 'signup');
+      if (res.success) {
+        setOtpDigits(['', '', '', '', '', '']);
+        setOtpTimer(60);
+        setCanResendOtp(false);
+        showToast(
+          'success',
+          'New Code Sent',
+          `A fresh 6-digit verification code was sent to ${regEmail.trim()}.`
+        );
+      } else {
+        setOtpError(res.message || 'Could not resend OTP.');
+      }
+    } catch (err: any) {
+      setOtpError(err.message || 'Failed to resend code.');
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  // =========================================================================
+  // FORGOT PASSWORD VIA FIREBASE + OTP FLOW
+  // =========================================================================
+
+  const handleSendForgotEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotIdentifier.trim() || !forgotIdentifier.includes('@')) {
+      setForgotError('Please enter a valid registered email address.');
+      return;
+    }
+
+    setIsSendingForgot(true);
+    setForgotError(null);
+
+    try {
+      const res = await sendForgotPasswordEmail(forgotIdentifier.trim());
+      if (res.success) {
+        setForgotStep('otp_reset');
+        setForgotOtpDigits(['', '', '', '', '', '']);
+        setForgotTimer(60);
+        setCanResendForgotOtp(false);
+        setFirebaseResetSent(Boolean(res.firebaseEmailSent));
+        showToast(
+          'success',
+          'Password Reset Code Sent',
+          `6-digit reset code sent to ${forgotIdentifier.trim()}. Please check your email inbox.`
+        );
+      } else {
+        setForgotError(res.message || 'Could not dispatch password reset OTP.');
+      }
+    } catch (err: any) {
+      setForgotError(err.message || 'Unable to request password reset.');
+    } finally {
+      setIsSendingForgot(false);
+    }
+  };
+
+  const handleForgotOtpDigitChange = (index: number, value: string) => {
+    const sanitized = value.replace(/[^0-9]/g, '');
+    const newDigits = [...forgotOtpDigits];
+
+    if (sanitized.length > 1) {
+      const splitDigits = sanitized.slice(0, 6).split('');
+      for (let i = 0; i < 6; i++) {
+        newDigits[i] = splitDigits[i] || '';
+      }
+      setForgotOtpDigits(newDigits);
+      const nextIdx = Math.min(splitDigits.length, 5);
+      forgotOtpInputRefs.current[nextIdx]?.focus();
+      return;
+    }
+
+    newDigits[index] = sanitized;
+    setForgotOtpDigits(newDigits);
+
+    if (sanitized && index < 5) {
+      forgotOtpInputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleForgotOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !forgotOtpDigits[index] && index > 0) {
+      forgotOtpInputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleForgotOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData('text').replace(/[^0-9]/g, '').slice(0, 6);
+    if (!pasted) return;
+
+    const newDigits = ['', '', '', '', '', ''];
+    pasted.split('').forEach((char, idx) => {
+      newDigits[idx] = char;
+    });
+    setForgotOtpDigits(newDigits);
+    const focusIndex = Math.min(pasted.length, 5);
+    forgotOtpInputRefs.current[focusIndex]?.focus();
+  };
+
+  const handleVerifyForgotOtpAndReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const enteredOtp = forgotOtpDigits.join('').trim();
+
+    if (enteredOtp.length !== 6) {
+      setForgotError('Please enter the 6-digit verification code.');
+      return;
+    }
+    if (!forgotNewPassword.trim() || forgotNewPassword.length < 6) {
+      setForgotError('New password must be at least 6 characters long.');
+      return;
+    }
+    if (forgotNewPassword !== forgotConfirmPassword) {
+      setForgotError('Passwords do not match. Please re-enter.');
+      return;
+    }
+
+    setIsResettingPassword(true);
+    setForgotError(null);
+
+    try {
+      const res = await verifyForgotPasswordOtpAndReset(
+        forgotIdentifier.trim(),
+        enteredOtp,
+        forgotNewPassword
       );
 
-      if (onClose) {
-        onClose();
+      if (res.success) {
+        setForgotStep('success');
+        setIdentifier(forgotIdentifier.trim());
+        setPassword('');
+        showToast('success', 'Password Reset Successful', 'You can now sign in with your new password.');
+        try {
+          confetti({
+            particleCount: 50,
+            spread: 60,
+            origin: { y: 0.6 },
+          });
+        } catch {}
+      } else {
+        setForgotError(res.message || 'Invalid verification code or expired token.');
       }
-    } catch {
-      showToast('error', 'Registration Failed', 'Could not complete registration.');
+    } catch (err: any) {
+      setForgotError(err.message || 'Failed to complete password reset.');
     } finally {
-      setRegIsSubmitting(false);
+      setIsResettingPassword(false);
+    }
+  };
+
+  const handleResendForgotOtp = async () => {
+    if (!canResendForgotOtp) return;
+    setForgotError(null);
+    setIsSendingForgot(true);
+
+    try {
+      const res = await resendOtp(forgotIdentifier.trim(), 'forgot_password');
+      if (res.success) {
+        setForgotOtpDigits(['', '', '', '', '', '']);
+        setForgotTimer(60);
+        setCanResendForgotOtp(false);
+        showToast('success', 'New Code Sent', `A fresh 6-digit OTP was sent to ${forgotIdentifier.trim()}`);
+      } else {
+        setForgotError(res.message || 'Failed to resend code.');
+      }
+    } catch (err: any) {
+      setForgotError(err.message || 'Failed to resend code.');
+    } finally {
+      setIsSendingForgot(false);
     }
   };
 
@@ -1092,7 +1456,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             </div>
           ) : (
             /* ========================================================================= */
-            /* VIEW 2: CREATE ACCOUNT / SIGN UP SCREEN */
+            /* VIEW 2: CREATE ACCOUNT / SIGN UP SCREEN (WITH EMAIL OTP VERIFICATION) */
             /* ========================================================================= */
             <div>
               {/* Pending Quote Service Notice */}
@@ -1115,170 +1479,283 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 </div>
               )}
 
-              {/* Role Picker in Sign Up — Only Client | Technician */}
-              <div className="mb-3">
-                <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100/90 rounded-2xl">
+              {/* STEP 1: Registration Details Form */}
+              {signUpStep === 'form' ? (
+                <div>
+                  {/* Role Picker in Sign Up — Only Client | Technician */}
+                  <div className="mb-3">
+                    <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100/90 rounded-2xl">
+                      <button
+                        type="button"
+                        onClick={() => setRegRole('client')}
+                        className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          regRole === 'client'
+                            ? 'bg-white text-[#0066FF] shadow-sm'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Client
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRegRole('technician')}
+                        className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          regRole === 'technician'
+                            ? 'bg-white text-[#0066FF] shadow-sm'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Technician
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Sign Up Form */}
+                  <form onSubmit={handleSignUpSubmit} className="space-y-3">
+                    {/* Full Name */}
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                        <User className="w-4 h-4" />
+                      </div>
+                      <input
+                        type="text"
+                        value={regFullName}
+                        onChange={(e) => setRegFullName(e.target.value)}
+                        placeholder="Full Name"
+                        required
+                        className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
+                      />
+                    </div>
+
+                    {/* Email Address */}
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                        <Mail className="w-4 h-4" />
+                      </div>
+                      <input
+                        type="email"
+                        value={regEmail}
+                        onChange={(e) => setRegEmail(e.target.value)}
+                        placeholder="Email Address"
+                        required
+                        className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
+                      />
+                    </div>
+
+                    {/* Mobile Number */}
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                        <Phone className="w-4 h-4" />
+                      </div>
+                      <input
+                        type="tel"
+                        value={regMobile}
+                        onChange={(e) => setRegMobile(e.target.value)}
+                        placeholder="Mobile Number"
+                        className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
+                      />
+                    </div>
+
+                    {/* Password */}
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                        <Lock className="w-4 h-4" />
+                      </div>
+                      <input
+                        type={regShowPassword ? 'text' : 'password'}
+                        value={regPassword}
+                        onChange={(e) => setRegPassword(e.target.value)}
+                        placeholder="Create Password (min 6 characters)"
+                        required
+                        minLength={6}
+                        className="w-full pl-10 pr-10 py-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setRegShowPassword(!regShowPassword)}
+                        className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                      >
+                        {regShowPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+
+                    {/* Confirm Password */}
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                        <Lock className="w-4 h-4" />
+                      </div>
+                      <input
+                        type={regShowConfirmPassword ? 'text' : 'password'}
+                        value={regConfirmPassword}
+                        onChange={(e) => setRegConfirmPassword(e.target.value)}
+                        placeholder="Confirm Password"
+                        required
+                        className="w-full pl-10 pr-10 py-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setRegShowConfirmPassword(!regShowConfirmPassword)}
+                        className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                      >
+                        {regShowConfirmPassword ? (
+                          <EyeOff className="w-4 h-4" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Sign Up Submit */}
+                    <button
+                      type="submit"
+                      disabled={regIsSubmitting || isSendingOtp}
+                      className="w-full py-3.5 rounded-2xl bg-[#0066FF] hover:bg-[#0052cc] text-white font-bold text-sm shadow-lg shadow-blue-500/25 active:scale-98 transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer mt-1"
+                    >
+                      {isSendingOtp ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin text-white" />
+                          <span>Sending Verification OTP...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>Verify Email & Sign Up</span>
+                          <ArrowRight className="w-4 h-4" />
+                        </>
+                      )}
+                    </button>
+                  </form>
+
+                  {/* OR Divider */}
+                  <div className="relative flex items-center justify-center my-3.5">
+                    <div className="border-t border-slate-200 w-full" />
+                    <span className="bg-white px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                      OR
+                    </span>
+                    <div className="border-t border-slate-200 w-full" />
+                  </div>
+
+                  {/* Continue with Google */}
                   <button
                     type="button"
-                    onClick={() => setRegRole('client')}
-                    className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      regRole === 'client'
-                        ? 'bg-white text-[#0066FF] shadow-sm'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
+                    onClick={handleGoogleAuth}
+                    disabled={isGoogleSubmitting}
+                    aria-label="Continue with Google"
+                    className="w-full py-2.5 px-4 rounded-2xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2.5 shadow-sm transition-all cursor-pointer active:scale-98 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    Client
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRegRole('technician')}
-                    className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      regRole === 'technician'
-                        ? 'bg-white text-[#0066FF] shadow-sm'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Technician
-                  </button>
-                </div>
-              </div>
-
-              {/* Sign Up Form */}
-              <form onSubmit={handleSignUpSubmit} className="space-y-3">
-                {/* Full Name */}
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <User className="w-4 h-4" />
-                  </div>
-                  <input
-                    type="text"
-                    value={regFullName}
-                    onChange={(e) => setRegFullName(e.target.value)}
-                    placeholder="Full Name"
-                    required
-                    className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
-                  />
-                </div>
-
-                {/* Email Address */}
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Mail className="w-4 h-4" />
-                  </div>
-                  <input
-                    type="email"
-                    value={regEmail}
-                    onChange={(e) => setRegEmail(e.target.value)}
-                    placeholder="Email Address"
-                    required
-                    className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
-                  />
-                </div>
-
-                {/* Mobile Number */}
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Phone className="w-4 h-4" />
-                  </div>
-                  <input
-                    type="tel"
-                    value={regMobile}
-                    onChange={(e) => setRegMobile(e.target.value)}
-                    placeholder="Mobile Number"
-                    required
-                    className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
-                  />
-                </div>
-
-                {/* Password */}
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Lock className="w-4 h-4" />
-                  </div>
-                  <input
-                    type={regShowPassword ? 'text' : 'password'}
-                    value={regPassword}
-                    onChange={(e) => setRegPassword(e.target.value)}
-                    placeholder="Password"
-                    required
-                    className="w-full pl-10 pr-10 py-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setRegShowPassword(!regShowPassword)}
-                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
-                  >
-                    {regShowPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-
-                {/* Confirm Password */}
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Lock className="w-4 h-4" />
-                  </div>
-                  <input
-                    type={regShowConfirmPassword ? 'text' : 'password'}
-                    value={regConfirmPassword}
-                    onChange={(e) => setRegConfirmPassword(e.target.value)}
-                    placeholder="Confirm Password"
-                    required
-                    className="w-full pl-10 pr-10 py-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setRegShowConfirmPassword(!regShowConfirmPassword)}
-                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
-                  >
-                    {regShowConfirmPassword ? (
-                      <EyeOff className="w-4 h-4" />
+                    {isGoogleSubmitting ? (
+                      <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin shrink-0" />
                     ) : (
-                      <Eye className="w-4 h-4" />
+                      <GoogleGIcon />
+                    )}
+                    <span>{isGoogleSubmitting ? 'Connecting with Google...' : 'Continue with Google'}</span>
+                  </button>
+                </div>
+              ) : (
+                /* STEP 2: Interactive 6-Digit Email OTP Verification Screen */
+                <div className="animate-in fade-in slide-in-from-right-3 duration-200">
+                  {/* Back to Edit Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSignUpStep('form');
+                      setOtpError(null);
+                    }}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-[#0066FF] transition-colors mb-3 cursor-pointer"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Change Details / Email</span>
+                  </button>
+
+                  {/* Top Badge & Mail Highlight */}
+                  <div className="text-center mb-4">
+                    <div className="w-12 h-12 rounded-2xl bg-blue-50 text-[#0066FF] flex items-center justify-center mx-auto mb-2 border border-blue-100 shadow-xs">
+                      <MailCheck className="w-6 h-6" />
+                    </div>
+                    <h4 className="text-base sm:text-lg font-bold text-[#0b2545]">
+                      Verify Your Email
+                    </h4>
+                    <p className="text-xs text-slate-500 mt-1">
+                      We sent a 6-digit code to{' '}
+                      <span className="font-semibold text-slate-800 break-all">{regEmail}</span>
+                    </p>
+                  </div>
+
+                  {/* OTP Error Message */}
+                  {otpError && (
+                    <div className="mb-3.5 p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>{otpError}</span>
+                    </div>
+                  )}
+
+
+
+                  {/* 6-Box OTP Input */}
+                  <div className="flex items-center justify-between gap-1.5 sm:gap-2 my-4">
+                    {otpDigits.map((digit, idx) => (
+                      <input
+                        key={idx}
+                        ref={(el) => {
+                          otpInputRefs.current[idx] = el;
+                        }}
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        maxLength={1}
+                        value={digit}
+                        onChange={(e) => handleOtpDigitChange(idx, e.target.value)}
+                        onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                        onPaste={handleOtpPaste}
+                        className={`w-11 h-12 sm:w-12 sm:h-14 text-center text-lg sm:text-xl font-black rounded-2xl border transition-all outline-none ${
+                          digit
+                            ? 'border-[#0066FF] bg-blue-50/40 text-[#0066FF] shadow-xs'
+                            : 'border-slate-200 bg-slate-50/50 text-slate-800 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10'
+                        }`}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Resend Cooldown Timer */}
+                  <div className="flex items-center justify-between text-xs py-1 text-slate-500">
+                    <span>Didn't receive code?</span>
+                    {canResendOtp ? (
+                      <button
+                        type="button"
+                        onClick={handleResendSignupOtp}
+                        disabled={isSendingOtp}
+                        className="font-bold text-[#0066FF] hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${isSendingOtp ? 'animate-spin' : ''}`} />
+                        <span>Resend OTP</span>
+                      </button>
+                    ) : (
+                      <span className="font-semibold text-slate-600">
+                        Resend in <strong className="text-[#0066FF] font-mono">{otpTimer}s</strong>
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Verify & Activate Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleVerifySignupOtp()}
+                    disabled={isVerifyingOtp || otpDigits.join('').length !== 6}
+                    className="w-full py-3.5 rounded-2xl bg-[#0066FF] hover:bg-[#0052cc] text-white font-bold text-sm shadow-lg shadow-blue-500/25 active:scale-98 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer mt-4"
+                  >
+                    {isVerifyingOtp ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin text-white" />
+                        <span>Verifying & Creating Account...</span>
+                      </>
+                    ) : (
+                      <>
+                        <ShieldCheck className="w-4 h-4" />
+                        <span>Verify & Create Account</span>
+                      </>
                     )}
                   </button>
                 </div>
-
-                {/* Sign Up Submit */}
-                <button
-                  type="submit"
-                  disabled={regIsSubmitting}
-                  className="w-full py-3.5 rounded-2xl bg-[#0066FF] hover:bg-[#0052cc] text-white font-bold text-sm shadow-lg shadow-blue-500/25 active:scale-98 transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer mt-1"
-                >
-                  {regIsSubmitting ? (
-                    <span>Creating Account...</span>
-                  ) : (
-                    <>
-                      <span>Sign Up</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
-              </form>
-
-              {/* OR Divider */}
-              <div className="relative flex items-center justify-center my-3.5">
-                <div className="border-t border-slate-200 w-full" />
-                <span className="bg-white px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                  OR
-                </span>
-                <div className="border-t border-slate-200 w-full" />
-              </div>
-
-              {/* Continue with Google */}
-              <button
-                type="button"
-                onClick={handleGoogleAuth}
-                disabled={isGoogleSubmitting}
-                aria-label="Continue with Google"
-                className="w-full py-2.5 px-4 rounded-2xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2.5 shadow-sm transition-all cursor-pointer active:scale-98 disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {isGoogleSubmitting ? (
-                  <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin shrink-0" />
-                ) : (
-                  <GoogleGIcon />
-                )}
-                <span>{isGoogleSubmitting ? 'Connecting with Google...' : 'Continue with Google'}</span>
-              </button>
+              )}
 
               {/* Switch to Sign In */}
               <div className="mt-4 text-center">
@@ -1288,6 +1765,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     type="button"
                     onClick={() => {
                       setView('signin');
+                      setSignUpStep('form');
                       window.location.hash = 'login';
                     }}
                     className="font-bold text-[#0066FF] hover:underline cursor-pointer"
@@ -1339,58 +1817,253 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         </div>
       </div>
 
-      {/* Forgot Password Dialog */}
+      {/* ========================================================================= */}
+      {/* FORGOT PASSWORD MODAL (FIREBASE AUTH + EMAIL OTP VERIFICATION) */}
+      {/* ========================================================================= */}
       {isForgotPasswordOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 p-6 sm:p-8 relative">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/75 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-white rounded-[28px] shadow-2xl border border-slate-100 p-6 sm:p-8 relative">
+            {/* Close Modal */}
             <button
               onClick={() => {
                 setIsForgotPasswordOpen(false);
-                setForgotSuccess(false);
+                setForgotStep('email');
+                setForgotError(null);
               }}
-              className="absolute top-5 right-5 p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+              className="absolute top-5 right-5 p-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              title="Close"
             >
               <X className="w-5 h-5" />
             </button>
 
-            <h3 className="text-xl font-bold text-[#0b2545] mb-2">Reset Your Password</h3>
-            <p className="text-xs text-slate-500 mb-4">
-              Enter your registered email address or mobile number to receive reset instructions.
-            </p>
-
-            {forgotSuccess ? (
-              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs space-y-2">
-                <div className="font-bold flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>Password Reset Instructions Sent</span>
+            {/* STEP 1: Enter Email & Request Reset Code */}
+            {forgotStep === 'email' && (
+              <div className="animate-in fade-in duration-150">
+                <div className="w-12 h-12 rounded-2xl bg-blue-50 text-[#0066FF] flex items-center justify-center mb-3 border border-blue-100 shadow-xs">
+                  <KeyRound className="w-6 h-6" />
                 </div>
-                <p>We sent a 6-digit OTP code to {forgotIdentifier || 'your email'}.</p>
+                <h3 className="text-xl font-bold text-[#0b2545]">Reset Your Password</h3>
+                <p className="text-xs text-slate-500 mt-1 mb-4 leading-relaxed">
+                  Enter your registered email address. We'll send a 6-digit OTP code and official Firebase password reset link to your inbox.
+                </p>
+
+                {/* Error Alert */}
+                {forgotError && (
+                  <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{forgotError}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleSendForgotEmail} className="space-y-4">
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                      <Mail className="w-4 h-4" />
+                    </div>
+                    <input
+                      type="email"
+                      value={forgotIdentifier}
+                      onChange={(e) => setForgotIdentifier(e.target.value)}
+                      placeholder="Enter your registered email"
+                      required
+                      autoFocus
+                      className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSendingForgot}
+                    className="w-full py-3.5 rounded-2xl bg-[#0066FF] hover:bg-[#0052cc] text-white font-bold text-sm shadow-lg shadow-blue-500/25 active:scale-98 transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
+                  >
+                    {isSendingForgot ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin text-white" />
+                        <span>Sending Instructions & OTP...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Send Reset Code & Link</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* STEP 2: Enter 6-digit OTP & New Password */}
+            {forgotStep === 'otp_reset' && (
+              <div className="animate-in fade-in slide-in-from-right-3 duration-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForgotStep('email');
+                    setForgotError(null);
+                  }}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-[#0066FF] transition-colors mb-3 cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Back to Email</span>
+                </button>
+
+                <h3 className="text-xl font-bold text-[#0b2545]">Enter Reset Code</h3>
+                <p className="text-xs text-slate-500 mt-1 mb-3">
+                  Enter the 6-digit code sent to <strong className="text-slate-800">{forgotIdentifier}</strong> and create your new password.
+                </p>
+
+                {firebaseResetSent && (
+                  <div className="mb-3 p-2.5 rounded-xl bg-blue-50 border border-blue-200 text-[#0066FF] text-[11px] flex items-center gap-2">
+                    <MailCheck className="w-4 h-4 shrink-0 text-[#0066FF]" />
+                    <span>Firebase recovery email also dispatched to your inbox.</span>
+                  </div>
+                )}
+
+                {/* Error Alert */}
+                {forgotError && (
+                  <div className="mb-3 p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{forgotError}</span>
+                  </div>
+                )}
+
+
+
+                <form onSubmit={handleVerifyForgotOtpAndReset} className="space-y-3.5">
+                  {/* 6-Digit OTP Input */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                      6-Digit Verification Code
+                    </label>
+                    <div className="flex items-center justify-between gap-1.5 sm:gap-2">
+                      {forgotOtpDigits.map((digit, idx) => (
+                        <input
+                          key={idx}
+                          ref={(el) => {
+                            forgotOtpInputRefs.current[idx] = el;
+                          }}
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          maxLength={1}
+                          value={digit}
+                          onChange={(e) => handleForgotOtpDigitChange(idx, e.target.value)}
+                          onKeyDown={(e) => handleForgotOtpKeyDown(idx, e)}
+                          onPaste={handleForgotOtpPaste}
+                          className={`w-10 h-11 sm:w-11 sm:h-12 text-center text-lg font-black rounded-xl border transition-all outline-none ${
+                            digit
+                              ? 'border-[#0066FF] bg-blue-50/40 text-[#0066FF]'
+                              : 'border-slate-200 bg-slate-50 text-slate-800 focus:border-[#0066FF]'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* New Password */}
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                      <Lock className="w-4 h-4" />
+                    </div>
+                    <input
+                      type={forgotShowPassword ? 'text' : 'password'}
+                      value={forgotNewPassword}
+                      onChange={(e) => setForgotNewPassword(e.target.value)}
+                      placeholder="New Password (min 6 characters)"
+                      required
+                      minLength={6}
+                      className="w-full pl-10 pr-10 py-2.5 rounded-2xl border border-slate-200 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setForgotShowPassword(!forgotShowPassword)}
+                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600"
+                    >
+                      {forgotShowPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+
+                  {/* Confirm New Password */}
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                      <Lock className="w-4 h-4" />
+                    </div>
+                    <input
+                      type={forgotShowConfirmPassword ? 'text' : 'password'}
+                      value={forgotConfirmPassword}
+                      onChange={(e) => setForgotConfirmPassword(e.target.value)}
+                      placeholder="Confirm New Password"
+                      required
+                      className="w-full pl-10 pr-10 py-2.5 rounded-2xl border border-slate-200 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setForgotShowConfirmPassword(!forgotShowConfirmPassword)}
+                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600"
+                    >
+                      {forgotShowConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+
+                  {/* Resend Timer */}
+                  <div className="flex items-center justify-between text-xs text-slate-500 pt-0.5">
+                    <span>Didn't get the code?</span>
+                    {canResendForgotOtp ? (
+                      <button
+                        type="button"
+                        onClick={handleResendForgotOtp}
+                        disabled={isSendingForgot}
+                        className="font-bold text-[#0066FF] hover:underline cursor-pointer"
+                      >
+                        Resend Code
+                      </button>
+                    ) : (
+                      <span>Resend in <strong className="text-[#0066FF] font-mono">{forgotTimer}s</strong></span>
+                    )}
+                  </div>
+
+                  {/* Submit Button */}
+                  <button
+                    type="submit"
+                    disabled={isResettingPassword || forgotOtpDigits.join('').length !== 6}
+                    className="w-full py-3.5 rounded-2xl bg-[#0066FF] hover:bg-[#0052cc] text-white font-bold text-sm shadow-lg shadow-blue-500/25 active:scale-98 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer mt-1"
+                  >
+                    {isResettingPassword ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin text-white" />
+                        <span>Updating Password...</span>
+                      </>
+                    ) : (
+                      <>
+                        <ShieldCheck className="w-4 h-4" />
+                        <span>Reset Password & Complete</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* STEP 3: Success Confirmation */}
+            {forgotStep === 'success' && (
+              <div className="text-center py-4 animate-in zoom-in-95 duration-200">
+                <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-3 shadow-sm">
+                  <CheckCircle2 className="w-9 h-9" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900">Password Reset Complete!</h3>
+                <p className="text-xs sm:text-sm text-slate-500 mt-2 mb-6 leading-relaxed">
+                  Your password has been successfully updated. You can now sign in to your WEPSUN account with your new credentials.
+                </p>
                 <button
                   type="button"
                   onClick={() => {
                     setIsForgotPasswordOpen(false);
-                    setForgotSuccess(false);
+                    setForgotStep('email');
+                    setView('signin');
                   }}
-                  className="mt-2 text-xs font-bold text-emerald-700 underline"
+                  className="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-lg shadow-emerald-600/20 active:scale-98 transition-all cursor-pointer"
                 >
-                  Return to Sign In
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <input
-                  type="text"
-                  value={forgotIdentifier}
-                  onChange={(e) => setForgotIdentifier(e.target.value)}
-                  placeholder="Enter email or mobile number"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm outline-none focus:border-[#0066FF]"
-                />
-                <button
-                  type="button"
-                  onClick={() => setForgotSuccess(true)}
-                  className="w-full py-2.5 rounded-xl bg-[#0066FF] text-white font-bold text-xs sm:text-sm hover:bg-[#0052cc]"
-                >
-                  Send Reset Link / OTP
+                  Proceed to Sign In
                 </button>
               </div>
             )}

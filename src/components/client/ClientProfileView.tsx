@@ -24,7 +24,7 @@ interface ClientProfileViewProps {
 }
 
 export const ClientProfileView: React.FC<ClientProfileViewProps> = ({ onLogout }) => {
-  const { clientProfile, updateClientProfile, changeClientPassword, clientScopedLifts, showToast, setCurrentRole } = useApp();
+  const { clientProfile, updateClientProfile, changeClientPassword, clientScopedLifts, showToast, setCurrentRole, logout } = useApp();
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
@@ -100,8 +100,7 @@ export const ClientProfileView: React.FC<ClientProfileViewProps> = ({ onLogout }
     if (onLogout) {
       onLogout();
     } else {
-      window.location.hash = 'login';
-      showToast('info', 'Logged Out', 'You have been logged out of the Client Portal.');
+      logout();
     }
   };
 
