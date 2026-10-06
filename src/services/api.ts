@@ -4,11 +4,18 @@
  * transparent token refresh, timeout handling, offline resiliency, and multi-tenant scoping.
  */
 
+import { Capacitor } from '@capacitor/core';
+
 const STORAGE_API_URL_KEY = 'wepsun_custom_api_url';
 const TOKEN_KEY = 'wepsun_access_token';
 const REFRESH_TOKEN_KEY = 'wepsun_refresh_token';
 
 const DEFAULT_CLOUD_API_URL = 'https://wepsun.onrender.com/api';
+
+// Guarantee window.Capacitor global availability
+if (typeof window !== 'undefined' && !(window as any).Capacitor) {
+  (window as any).Capacitor = Capacitor;
+}
 
 /**
  * Resolves the active backend API base URL automatically.
@@ -24,7 +31,13 @@ export function getApiBaseUrl(): string {
       return custom.trim().replace(/\/+$/, '');
     }
 
-    const isNative = Boolean((window as any).Capacitor?.isNativePlatform?.());
+    const isNative =
+      Capacitor.isNativePlatform() ||
+      Capacitor.getPlatform() !== 'web' ||
+      Boolean((window as any).Capacitor?.isNativePlatform?.()) ||
+      window.location.protocol === 'capacitor:' ||
+      window.location.protocol === 'ionic:';
+
     const isLocalhost =
       window.location.hostname === 'localhost' ||
       window.location.hostname === '127.0.0.1' ||

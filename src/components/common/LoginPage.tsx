@@ -115,9 +115,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [regShowConfirmPassword, setRegShowConfirmPassword] = useState(false);
   const [regIsSubmitting, setRegIsSubmitting] = useState(false);
 
-  // Email OTP Verification State for Sign Up
+  // Email OTP Verification State for Sign Up (Android & Web Unified Single Overlay)
   const [signUpStep, setSignUpStep] = useState<'form' | 'otp'>('form');
-  const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
+  const [otpValue, setOtpValue] = useState<string>('');
   const [otpTimer, setOtpTimer] = useState<number>(60);
   const [canResendOtp, setCanResendOtp] = useState<boolean>(false);
   const [otpError, setOtpError] = useState<string | null>(null);
@@ -126,13 +126,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [devSignupOtp, setDevSignupOtp] = useState<string | null>(null);
   const [signupErrorMessage, setSignupErrorMessage] = useState<string | null>(null);
   const [emailAlreadyExists, setEmailAlreadyExists] = useState<boolean>(false);
-  const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const otpInputRef = useRef<HTMLInputElement>(null);
 
   // Forgot Password Modal (Step 1: Request, Step 2: OTP & Reset, Step 3: Success)
   const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
   const [forgotStep, setForgotStep] = useState<'email' | 'otp_reset' | 'success'>('email');
   const [forgotIdentifier, setForgotIdentifier] = useState('');
-  const [forgotOtpDigits, setForgotOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
+  const [forgotOtpValue, setForgotOtpValue] = useState<string>('');
   const [forgotNewPassword, setForgotNewPassword] = useState('');
   const [forgotConfirmPassword, setForgotConfirmPassword] = useState('');
   const [forgotShowPassword, setForgotShowPassword] = useState(false);
@@ -143,7 +143,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [isSendingForgot, setIsSendingForgot] = useState<boolean>(false);
   const [isResettingPassword, setIsResettingPassword] = useState<boolean>(false);
   const [firebaseResetSent, setFirebaseResetSent] = useState<boolean>(false);
-  const forgotOtpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const forgotOtpInputRef = useRef<HTMLInputElement>(null);
 
   // Google OAuth Modal
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
@@ -391,20 +391,20 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     return () => clearInterval(interval);
   }, [isForgotPasswordOpen, forgotStep, forgotTimer]);
 
-  // Focus first OTP box on step change
+  // Focus single OTP overlay input on step change
   useEffect(() => {
     if (signUpStep === 'otp') {
       setTimeout(() => {
-        otpInputRefs.current[0]?.focus();
-      }, 100);
+        otpInputRef.current?.focus();
+      }, 150);
     }
   }, [signUpStep]);
 
   useEffect(() => {
     if (forgotStep === 'otp_reset') {
       setTimeout(() => {
-        forgotOtpInputRefs.current[0]?.focus();
-      }, 100);
+        forgotOtpInputRef.current?.focus();
+      }, 150);
     }
   }, [forgotStep]);
 
@@ -444,7 +444,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
       if (res.success) {
         setSignUpStep('otp');
-        setOtpDigits(['', '', '', '', '', '']);
+        setOtpValue('');
         setOtpTimer(60);
         setCanResendOtp(false);
         if (res.devOtp) {
@@ -474,55 +474,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     }
   };
 
-  // Step 2: Handle 6-digit OTP input box interactions
-  const handleOtpDigitChange = (index: number, value: string) => {
-    const sanitized = value.replace(/[^0-9]/g, '');
-    const newDigits = [...otpDigits];
-
-    if (sanitized.length > 1) {
-      // Multiple digits entered (e.g. pasted or fast typed)
-      const splitDigits = sanitized.slice(0, 6).split('');
-      for (let i = 0; i < 6; i++) {
-        newDigits[i] = splitDigits[i] || '';
-      }
-      setOtpDigits(newDigits);
-      const nextIdx = Math.min(splitDigits.length, 5);
-      otpInputRefs.current[nextIdx]?.focus();
-      return;
-    }
-
-    newDigits[index] = sanitized;
-    setOtpDigits(newDigits);
-
-    if (sanitized && index < 5) {
-      otpInputRefs.current[index + 1]?.focus();
-    }
-  };
-
-  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
-      otpInputRefs.current[index - 1]?.focus();
-    }
-  };
-
-  const handleOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    const pasted = e.clipboardData.getData('text').replace(/[^0-9]/g, '').slice(0, 6);
-    if (!pasted) return;
-
-    const newDigits = ['', '', '', '', '', ''];
-    pasted.split('').forEach((char, idx) => {
-      newDigits[idx] = char;
-    });
-    setOtpDigits(newDigits);
-    const focusIndex = Math.min(pasted.length, 5);
-    otpInputRefs.current[focusIndex]?.focus();
-  };
-
-  // Step 3: Verify OTP and activate account
+  // Step 2: Verify OTP and activate account
   const handleVerifySignupOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    const fullOtp = otpDigits.join('').trim();
+    const fullOtp = otpValue.replace(/\D/g, '').trim();
 
     if (fullOtp.length !== 6) {
       setOtpError('Please enter the full 6-digit OTP code.');
@@ -592,7 +547,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     try {
       const res = await resendOtp(regEmail.trim(), 'signup');
       if (res.success) {
-        setOtpDigits(['', '', '', '', '', '']);
+        setOtpValue('');
         setOtpTimer(60);
         setCanResendOtp(false);
         if (res.devOtp) {
@@ -631,7 +586,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       const res = await sendForgotPasswordEmail(forgotIdentifier.trim());
       if (res.success) {
         setForgotStep('otp_reset');
-        setForgotOtpDigits(['', '', '', '', '', '']);
+        setForgotOtpValue('');
         setForgotTimer(60);
         setCanResendForgotOtp(false);
         setFirebaseResetSent(Boolean(res.firebaseEmailSent));
@@ -650,52 +605,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     }
   };
 
-  const handleForgotOtpDigitChange = (index: number, value: string) => {
-    const sanitized = value.replace(/[^0-9]/g, '');
-    const newDigits = [...forgotOtpDigits];
-
-    if (sanitized.length > 1) {
-      const splitDigits = sanitized.slice(0, 6).split('');
-      for (let i = 0; i < 6; i++) {
-        newDigits[i] = splitDigits[i] || '';
-      }
-      setForgotOtpDigits(newDigits);
-      const nextIdx = Math.min(splitDigits.length, 5);
-      forgotOtpInputRefs.current[nextIdx]?.focus();
-      return;
-    }
-
-    newDigits[index] = sanitized;
-    setForgotOtpDigits(newDigits);
-
-    if (sanitized && index < 5) {
-      forgotOtpInputRefs.current[index + 1]?.focus();
-    }
-  };
-
-  const handleForgotOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !forgotOtpDigits[index] && index > 0) {
-      forgotOtpInputRefs.current[index - 1]?.focus();
-    }
-  };
-
-  const handleForgotOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    const pasted = e.clipboardData.getData('text').replace(/[^0-9]/g, '').slice(0, 6);
-    if (!pasted) return;
-
-    const newDigits = ['', '', '', '', '', ''];
-    pasted.split('').forEach((char, idx) => {
-      newDigits[idx] = char;
-    });
-    setForgotOtpDigits(newDigits);
-    const focusIndex = Math.min(pasted.length, 5);
-    forgotOtpInputRefs.current[focusIndex]?.focus();
-  };
-
   const handleVerifyForgotOtpAndReset = async (e: React.FormEvent) => {
     e.preventDefault();
-    const enteredOtp = forgotOtpDigits.join('').trim();
+    const enteredOtp = forgotOtpValue.replace(/\D/g, '').trim();
 
     if (enteredOtp.length !== 6) {
       setForgotError('Please enter the 6-digit verification code.');
@@ -750,7 +662,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     try {
       const res = await resendOtp(forgotIdentifier.trim(), 'forgot_password');
       if (res.success) {
-        setForgotOtpDigits(['', '', '', '', '', '']);
+        setForgotOtpValue('');
         setForgotTimer(60);
         setCanResendForgotOtp(false);
         showToast('success', 'New Code Sent', `A fresh 6-digit OTP was sent to ${forgotIdentifier.trim()}`);
@@ -1753,8 +1665,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       <button
                         type="button"
                         onClick={() => {
-                          const digits = devSignupOtp.split('').slice(0, 6);
-                          setOtpDigits(digits);
+                          setOtpValue(devSignupOtp.slice(0, 6));
                           setOtpError(null);
                         }}
                         className="px-2.5 py-1 bg-[#0066FF] text-white text-[10px] font-bold rounded-lg hover:bg-blue-700 transition-colors cursor-pointer shadow-xs"
@@ -1772,29 +1683,46 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     </div>
                   )}
 
-                  {/* 6-Box OTP Input */}
-                  <div className="flex items-center justify-between gap-1.5 sm:gap-2 my-3">
-                    {otpDigits.map((digit, idx) => (
-                      <input
-                        key={idx}
-                        ref={(el) => {
-                          otpInputRefs.current[idx] = el;
-                        }}
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        maxLength={1}
-                        value={digit}
-                        onChange={(e) => handleOtpDigitChange(idx, e.target.value)}
-                        onKeyDown={(e) => handleOtpKeyDown(idx, e)}
-                        onPaste={handleOtpPaste}
-                        className={`w-11 h-12 sm:w-12 sm:h-14 text-center text-lg sm:text-xl font-black rounded-2xl border transition-all outline-none ${
-                          digit
-                            ? 'border-[#0066FF] bg-blue-50/40 text-[#0066FF] shadow-xs'
-                            : 'border-slate-200 bg-slate-50/50 text-slate-800 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10'
-                        }`}
-                      />
-                    ))}
+                  {/* Android-Optimized Single Overlay 6-Digit OTP Input */}
+                  <div className="relative my-3">
+                    {/* Transparent Full-Width Single Input for Native Android Keyboards & SMS/Email Autofill */}
+                    <input
+                      ref={otpInputRef}
+                      type="tel"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      pattern="[0-9]*"
+                      maxLength={6}
+                      value={otpValue}
+                      onChange={(e) => {
+                        const clean = e.target.value.replace(/\D/g, '').slice(0, 6);
+                        setOtpValue(clean);
+                        setOtpError(null);
+                      }}
+                      className="absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer"
+                      autoFocus
+                    />
+                    {/* 6 Visual Stylized Digit Display Boxes */}
+                    <div className="flex items-center justify-between gap-1.5 sm:gap-2 pointer-events-none">
+                      {[0, 1, 2, 3, 4, 5].map((idx) => {
+                        const char = otpValue[idx] || '';
+                        const isCurrentActive = otpValue.length === idx;
+                        return (
+                          <div
+                            key={idx}
+                            className={`w-11 h-12 sm:w-12 sm:h-14 flex items-center justify-center text-lg sm:text-xl font-black rounded-2xl border transition-all ${
+                              char
+                                ? 'border-[#0066FF] bg-blue-50/40 text-[#0066FF] shadow-xs'
+                                : isCurrentActive
+                                ? 'border-[#0066FF] bg-white ring-4 ring-[#0066FF]/15 text-slate-800'
+                                : 'border-slate-200 bg-slate-50/50 text-slate-400'
+                            }`}
+                          >
+                            {char || (isCurrentActive ? <span className="w-0.5 h-6 bg-[#0066FF] animate-pulse rounded-full" /> : '')}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
 
                   {/* Resend Cooldown Timer */}
@@ -1821,7 +1749,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   <button
                     type="button"
                     onClick={() => handleVerifySignupOtp()}
-                    disabled={isVerifyingOtp || otpDigits.join('').length !== 6}
+                    disabled={isVerifyingOtp || otpValue.length !== 6}
                     className="w-full py-3.5 rounded-2xl bg-[#0066FF] hover:bg-[#0052cc] text-white font-bold text-sm shadow-lg shadow-blue-500/25 active:scale-98 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer mt-3"
                   >
                     {isVerifyingOtp ? (
@@ -2012,33 +1940,50 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
 
                 <form onSubmit={handleVerifyForgotOtpAndReset} className="space-y-3.5">
-                  {/* 6-Digit OTP Input */}
+                  {/* Android-Optimized Single Overlay 6-Digit OTP Input */}
                   <div>
                     <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
                       6-Digit Verification Code
                     </label>
-                    <div className="flex items-center justify-between gap-1.5 sm:gap-2">
-                      {forgotOtpDigits.map((digit, idx) => (
-                        <input
-                          key={idx}
-                          ref={(el) => {
-                            forgotOtpInputRefs.current[idx] = el;
-                          }}
-                          type="text"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          maxLength={1}
-                          value={digit}
-                          onChange={(e) => handleForgotOtpDigitChange(idx, e.target.value)}
-                          onKeyDown={(e) => handleForgotOtpKeyDown(idx, e)}
-                          onPaste={handleForgotOtpPaste}
-                          className={`w-10 h-11 sm:w-11 sm:h-12 text-center text-lg font-black rounded-xl border transition-all outline-none ${
-                            digit
-                              ? 'border-[#0066FF] bg-blue-50/40 text-[#0066FF]'
-                              : 'border-slate-200 bg-slate-50 text-slate-800 focus:border-[#0066FF]'
-                          }`}
-                        />
-                      ))}
+                    <div className="relative my-1">
+                      {/* Transparent Full-Width Single Input */}
+                      <input
+                        ref={forgotOtpInputRef}
+                        type="tel"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        pattern="[0-9]*"
+                        maxLength={6}
+                        value={forgotOtpValue}
+                        onChange={(e) => {
+                          const clean = e.target.value.replace(/\D/g, '').slice(0, 6);
+                          setForgotOtpValue(clean);
+                          setForgotError(null);
+                        }}
+                        className="absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer"
+                        autoFocus
+                      />
+                      {/* 6 Visual Stylized Digit Display Boxes */}
+                      <div className="flex items-center justify-between gap-1.5 sm:gap-2 pointer-events-none">
+                        {[0, 1, 2, 3, 4, 5].map((idx) => {
+                          const char = forgotOtpValue[idx] || '';
+                          const isCurrentActive = forgotOtpValue.length === idx;
+                          return (
+                            <div
+                              key={idx}
+                              className={`w-10 h-11 sm:w-11 sm:h-12 flex items-center justify-center text-lg font-black rounded-xl border transition-all ${
+                                char
+                                  ? 'border-[#0066FF] bg-blue-50/40 text-[#0066FF]'
+                                  : isCurrentActive
+                                  ? 'border-[#0066FF] bg-white ring-4 ring-[#0066FF]/15 text-slate-800'
+                                  : 'border-slate-200 bg-slate-50 text-slate-400'
+                              }`}
+                            >
+                              {char || (isCurrentActive ? <span className="w-0.5 h-5 bg-[#0066FF] animate-pulse rounded-full" /> : '')}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
 
@@ -2107,7 +2052,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   {/* Submit Button */}
                   <button
                     type="submit"
-                    disabled={isResettingPassword || forgotOtpDigits.join('').length !== 6}
+                    disabled={isResettingPassword || forgotOtpValue.length !== 6}
                     className="w-full py-3.5 rounded-2xl bg-[#0066FF] hover:bg-[#0052cc] text-white font-bold text-sm shadow-lg shadow-blue-500/25 active:scale-98 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer mt-1"
                   >
                     {isResettingPassword ? (
