@@ -303,15 +303,17 @@ export async function sendEmailOtp(params: {
     expiryMinutes: 10,
   });
 
-  // Dispatch email in background without blocking the HTTP response
-  dispatchEmail({
-    toEmail: cleanEmail,
-    subject,
-    htmlContent,
-    otp,
-  }).catch((err) => {
+  // Await email dispatch directly so cloud hosts don't terminate the process before SMTP completes
+  try {
+    await dispatchEmail({
+      toEmail: cleanEmail,
+      subject,
+      htmlContent,
+      otp,
+    });
+  } catch (err: any) {
     console.warn('⚠️ [Email Dispatch Background Notice]:', err?.message);
-  });
+  }
 
   return {
     success: true,
