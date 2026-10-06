@@ -179,7 +179,7 @@ export async function apiFetch<T = any>(
   options: ApiRequestOptions = {}
 ): Promise<ApiResponse<T>> {
   const isAuthRoute = endpoint.includes('/auth/');
-  const defaultTimeout = isAuthRoute ? 45000 : 25000;
+  const defaultTimeout = isAuthRoute ? 60000 : 25000;
   const {
     companyId,
     branchId,

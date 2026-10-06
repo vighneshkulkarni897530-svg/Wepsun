@@ -123,6 +123,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [otpError, setOtpError] = useState<string | null>(null);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState<boolean>(false);
   const [isSendingOtp, setIsSendingOtp] = useState<boolean>(false);
+  const [devSignupOtp, setDevSignupOtp] = useState<string | null>(null);
+  const [signupErrorMessage, setSignupErrorMessage] = useState<string | null>(null);
+  const [emailAlreadyExists, setEmailAlreadyExists] = useState<boolean>(false);
   const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // Forgot Password Modal (Step 1: Request, Step 2: OTP & Reset, Step 3: Success)
@@ -433,6 +436,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
     setIsSendingOtp(true);
     setRegIsSubmitting(true);
+    setSignupErrorMessage(null);
+    setEmailAlreadyExists(false);
 
     try {
       const res = await sendSignupEmailOtp(regEmail.trim(), regFullName.trim());
@@ -442,15 +447,26 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         setOtpDigits(['', '', '', '', '', '']);
         setOtpTimer(60);
         setCanResendOtp(false);
+        if (res.devOtp) {
+          setDevSignupOtp(res.devOtp);
+        }
         showToast(
           'success',
           'Verification Code Sent',
-          `We sent a 6-digit verification code to ${regEmail.trim()}. Please check your email inbox.`
+          `We sent a 6-digit verification code to ${regEmail.trim()}. Please check your email inbox and spam folder.`
         );
       } else {
+        const isExisting = res.code === 'USER_ALREADY_EXISTS' || (res.message && res.message.toLowerCase().includes('already exists'));
+        if (isExisting) {
+          setEmailAlreadyExists(true);
+          setSignupErrorMessage(res.message || 'An account with this email address already exists. Please sign in instead.');
+        } else {
+          setSignupErrorMessage(res.message || 'Unable to send verification OTP. Please try again.');
+        }
         showToast('error', 'Registration Notice', res.message || 'Unable to send verification OTP.');
       }
     } catch (err: any) {
+      setSignupErrorMessage(err.message || 'Could not dispatch verification email.');
       showToast('error', 'Registration Error', err.message || 'Could not dispatch verification email.');
     } finally {
       setIsSendingOtp(false);
@@ -579,10 +595,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         setOtpDigits(['', '', '', '', '', '']);
         setOtpTimer(60);
         setCanResendOtp(false);
+        if (res.devOtp) {
+          setDevSignupOtp(res.devOtp);
+        }
         showToast(
           'success',
           'New Code Sent',
-          `A fresh 6-digit verification code was sent to ${regEmail.trim()}.`
+          `A fresh 6-digit verification code was sent to ${regEmail.trim()}. Please check your inbox and spam folder.`
         );
       } else {
         setOtpError(res.message || 'Could not resend OTP.');
@@ -1510,6 +1529,32 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     </div>
                   </div>
 
+                  {/* Error Alert in Step 1 */}
+                  {signupErrorMessage && (
+                    <div className="mb-3.5 p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex flex-col gap-2 animate-in fade-in">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                        <span className="font-medium">{signupErrorMessage}</span>
+                      </div>
+                      {emailAlreadyExists && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIdentifier(regEmail);
+                            setView('signin');
+                            setSignUpStep('form');
+                            setSignupErrorMessage(null);
+                            setEmailAlreadyExists(false);
+                            window.location.hash = 'login';
+                          }}
+                          className="self-start px-3 py-1 bg-[#0066FF] hover:bg-[#0052cc] text-white font-bold rounded-xl text-[11px] transition-all shadow-xs cursor-pointer"
+                        >
+                          👉 Sign In With This Email
+                        </button>
+                      )}
+                    </div>
+                  )}
+
                   {/* Sign Up Form */}
                   <form onSubmit={handleSignUpSubmit} className="space-y-3">
                     {/* Full Name */}
@@ -1520,7 +1565,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       <input
                         type="text"
                         value={regFullName}
-                        onChange={(e) => setRegFullName(e.target.value)}
+                        onChange={(e) => {
+                          setRegFullName(e.target.value);
+                          if (signupErrorMessage) setSignupErrorMessage(null);
+                        }}
                         placeholder="Full Name"
                         required
                         className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
@@ -1535,7 +1583,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       <input
                         type="email"
                         value={regEmail}
-                        onChange={(e) => setRegEmail(e.target.value)}
+                        onChange={(e) => {
+                          setRegEmail(e.target.value);
+                          if (signupErrorMessage) setSignupErrorMessage(null);
+                        }}
                         placeholder="Email Address"
                         required
                         className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
@@ -1550,8 +1601,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       <input
                         type="tel"
                         value={regMobile}
-                        onChange={(e) => setRegMobile(e.target.value)}
-                        placeholder="Mobile Number"
+                        onChange={(e) => {
+                          setRegMobile(e.target.value);
+                          if (signupErrorMessage) setSignupErrorMessage(null);
+                        }}
+                        placeholder="Mobile Number (Optional)"
                         className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
                       />
                     </div>
@@ -1667,7 +1721,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   </button>
 
                   {/* Top Badge & Mail Highlight */}
-                  <div className="text-center mb-4">
+                  <div className="text-center mb-3">
                     <div className="w-12 h-12 rounded-2xl bg-blue-50 text-[#0066FF] flex items-center justify-center mx-auto mb-2 border border-blue-100 shadow-xs">
                       <MailCheck className="w-6 h-6" />
                     </div>
@@ -1675,10 +1729,40 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       Verify Your Email
                     </h4>
                     <p className="text-xs text-slate-500 mt-1">
-                      We sent a 6-digit code to{' '}
-                      <span className="font-semibold text-slate-800 break-all">{regEmail}</span>
+                      We sent a 6-digit verification code to:{' '}
+                      <strong className="text-slate-800 break-all block mt-0.5 font-bold">{regEmail}</strong>
                     </p>
                   </div>
+
+                  {/* Spam / Junk Helper Note */}
+                  <div className="p-3 bg-amber-50/90 border border-amber-200/90 rounded-2xl text-[11px] text-amber-900 flex items-start gap-2 text-left mb-3 shadow-xs">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <span>
+                      <strong>Didn't see the email?</strong> Please check your <strong>Spam / Junk / Promotions</strong> folder. Emails may take 15–30s to arrive.
+                    </span>
+                  </div>
+
+                  {/* Dev / Test Code Helper (if returned) */}
+                  {devSignupOtp && (
+                    <div className="mb-3 p-2.5 bg-blue-50/90 border border-blue-200 rounded-xl flex items-center justify-between text-xs text-blue-900 shadow-xs">
+                      <div className="flex items-center gap-1.5 font-medium">
+                        <Sparkles className="w-3.5 h-3.5 text-[#0066FF]" />
+                        <span>OTP Code:</span>
+                        <strong className="font-mono text-[#0066FF] text-sm tracking-wider">{devSignupOtp}</strong>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const digits = devSignupOtp.split('').slice(0, 6);
+                          setOtpDigits(digits);
+                          setOtpError(null);
+                        }}
+                        className="px-2.5 py-1 bg-[#0066FF] text-white text-[10px] font-bold rounded-lg hover:bg-blue-700 transition-colors cursor-pointer shadow-xs"
+                      >
+                        Auto-Fill
+                      </button>
+                    </div>
+                  )}
 
                   {/* OTP Error Message */}
                   {otpError && (
@@ -1688,10 +1772,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     </div>
                   )}
 
-
-
                   {/* 6-Box OTP Input */}
-                  <div className="flex items-center justify-between gap-1.5 sm:gap-2 my-4">
+                  <div className="flex items-center justify-between gap-1.5 sm:gap-2 my-3">
                     {otpDigits.map((digit, idx) => (
                       <input
                         key={idx}
@@ -1740,7 +1822,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     type="button"
                     onClick={() => handleVerifySignupOtp()}
                     disabled={isVerifyingOtp || otpDigits.join('').length !== 6}
-                    className="w-full py-3.5 rounded-2xl bg-[#0066FF] hover:bg-[#0052cc] text-white font-bold text-sm shadow-lg shadow-blue-500/25 active:scale-98 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer mt-4"
+                    className="w-full py-3.5 rounded-2xl bg-[#0066FF] hover:bg-[#0052cc] text-white font-bold text-sm shadow-lg shadow-blue-500/25 active:scale-98 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer mt-3"
                   >
                     {isVerifyingOtp ? (
                       <>

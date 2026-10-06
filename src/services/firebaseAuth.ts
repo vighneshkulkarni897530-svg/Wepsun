@@ -59,6 +59,7 @@ export interface SendOtpResponse {
   message: string;
   expiresIn?: number;
   code?: string;
+  devOtp?: string;
   firebaseEmailSent?: boolean;
 }
 
@@ -103,6 +104,7 @@ export async function sendSignupEmailOtp(
         success: true,
         message: res.message || `Verification code sent to ${email}`,
         expiresIn: (res as any).expiresIn || res.data?.expiresIn || 600,
+        devOtp: (res as any).devOtp || res.data?.devOtp,
       };
     } else {
       let friendlyMessage = res.message || res.error || 'Failed to send OTP code.';
@@ -214,6 +216,7 @@ export async function sendForgotPasswordEmail(
         success: true,
         message: res.message || `Password reset instructions and 6-digit OTP sent to ${cleanEmail}`,
         expiresIn: (res as any).expiresIn || res.data?.expiresIn || 600,
+        devOtp: (res as any).devOtp || res.data?.devOtp,
         firebaseEmailSent: firebaseSent,
       };
     } else {
@@ -288,6 +291,7 @@ export async function resendOtp(
         success: true,
         message: res.message || 'New verification code sent.',
         expiresIn: (res as any).expiresIn || res.data?.expiresIn || 600,
+        devOtp: (res as any).devOtp || res.data?.devOtp,
       };
     } else {
       return {
