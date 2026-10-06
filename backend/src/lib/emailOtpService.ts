@@ -140,19 +140,37 @@ async function dispatchEmail(params: {
   const smtpUser = process.env.SMTP_USER || 'wepsunengineering@gmail.com';
   const smtpPass = process.env.SMTP_PASS || 'fmkb jubm qyac tuwt';
 
-  if (smtpHost && smtpUser && smtpPass && !smtpPass.includes('your_')) {
+  if (smtpUser && smtpPass && !smtpPass.includes('your_')) {
     try {
-      const port = parseInt(process.env.SMTP_PORT || '587', 10);
-      const secure = process.env.SMTP_SECURE === 'true' || port === 465;
-      const transporter = nodemailer.createTransport({
-        host: smtpHost,
-        port,
-        secure,
-        auth: {
-          user: smtpUser,
-          pass: smtpPass,
-        },
-      });
+      const isGmail = (smtpHost || '').toLowerCase().includes('gmail') || smtpUser.includes('@gmail.com');
+      const port = parseInt(process.env.SMTP_PORT || (isGmail ? '465' : '587'), 10);
+      const secure = process.env.SMTP_SECURE === 'true' || port === 465 || isGmail;
+
+      const transporterConfig: any = isGmail
+        ? {
+            service: 'gmail',
+            auth: {
+              user: smtpUser,
+              pass: smtpPass,
+            },
+            connectionTimeout: 5000,
+            greetingTimeout: 5000,
+            socketTimeout: 8000,
+          }
+        : {
+            host: smtpHost,
+            port,
+            secure,
+            auth: {
+              user: smtpUser,
+              pass: smtpPass,
+            },
+            connectionTimeout: 5000,
+            greetingTimeout: 5000,
+            socketTimeout: 8000,
+          };
+
+      const transporter = nodemailer.createTransport(transporterConfig);
 
       const fromAddress = process.env.SMTP_FROM || `"WEPSUN Engineering" <${smtpUser}>`;
       const info = await transporter.sendMail({
