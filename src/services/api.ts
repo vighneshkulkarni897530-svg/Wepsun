@@ -178,6 +178,8 @@ export async function apiFetch<T = any>(
   endpoint: string,
   options: ApiRequestOptions = {}
 ): Promise<ApiResponse<T>> {
+  const isAuthRoute = endpoint.includes('/auth/');
+  const defaultTimeout = isAuthRoute ? 45000 : 25000;
   const {
     companyId,
     branchId,
@@ -185,7 +187,7 @@ export async function apiFetch<T = any>(
     userId,
     headers,
     skipAuth,
-    timeoutMs = 12000,
+    timeoutMs = defaultTimeout,
     ...rest
   } = options;
 
@@ -251,10 +253,14 @@ export async function apiFetch<T = any>(
 
     if (!response.ok) {
       const errJson = await response.json().catch(() => ({}));
+      let friendlyError = errJson.message || `HTTP ${response.status}: ${response.statusText}`;
+      if (response.status === 404 && endpoint.includes('/auth/send-otp')) {
+        friendlyError = 'Backend is updating live OTP service. Please deploy latest commit on Render or use local connection.';
+      }
       return {
         success: false,
-        error: errJson.message || `HTTP ${response.status}: ${response.statusText}`,
-        message: errJson.message,
+        error: friendlyError,
+        message: friendlyError,
         code: errJson.code,
         status: response.status,
         latencyMs,
@@ -270,17 +276,19 @@ export async function apiFetch<T = any>(
   } catch (err: any) {
     clearTimeout(timeoutId);
     const latencyMs = Date.now() - startTime;
-    const isTimeout = err.name === 'AbortError';
+    const isTimeout = err.name === 'AbortError' || String(err.message || '').toLowerCase().includes('abort');
     const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+
+    const friendlyErrorMessage = isOffline
+      ? 'Device is currently offline. Please check your internet connection.'
+      : isTimeout
+      ? 'Server connection took longer than expected. Please wait a moment and tap again.'
+      : err.message || 'Network connection to backend API failed.';
 
     return {
       success: false,
-      error: isOffline
-        ? 'Device is currently offline. Action queued locally.'
-        : isTimeout
-        ? `Request timed out after ${timeoutMs}ms.`
-        : err.message || 'Network connection to backend API failed.',
-      message: err.message,
+      error: friendlyErrorMessage,
+      message: friendlyErrorMessage,
       code: isOffline ? 'OFFLINE' : isTimeout ? 'TIMEOUT' : 'NETWORK_ERROR',
       latencyMs,
     };
