@@ -1,7 +1,7 @@
 /**
- * WEPSUN Engineering Solutions — Firebase Authentication & Email OTP Integration Service
- * Configures Firebase Web SDK with seamless fallback, supporting Email OTP sign-up,
- * Firebase Password Reset Email dispatch, and Cryptographic verification.
+ * WEPSUN Engineering Solutions — Authentication & Email OTP Service
+ * Interacts with WEPSUN Backend API for secure OTP delivery, Verification,
+ * and Password Reset workflows.
  */
 
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
@@ -45,7 +45,7 @@ try {
         analytics = getAnalytics(app);
       }
     }).catch(() => {
-      // Analytics not supported in this runtime (e.g. Node or disabled storage)
+      // Analytics not supported in this runtime
     });
   }
 } catch (err: any) {
@@ -92,9 +92,10 @@ export async function sendSignupEmailOtp(
   email: string,
   fullName: string
 ): Promise<SendOtpResponse> {
+  const cleanEmail = email.trim().toLowerCase();
   try {
     const res = await apiService.sendOtp({
-      email: email.trim().toLowerCase(),
+      email: cleanEmail,
       name: fullName.trim(),
       type: 'signup',
     });
@@ -102,25 +103,21 @@ export async function sendSignupEmailOtp(
     if (res.success) {
       return {
         success: true,
-        message: res.message || `Verification code sent to ${email}`,
-        expiresIn: (res as any).expiresIn || res.data?.expiresIn || 600,
-        devOtp: (res as any).devOtp || res.data?.devOtp,
+        message: res.message || `Verification code sent to ${cleanEmail}. Please check your inbox and spam folder.`,
+        expiresIn: (res as any).expiresIn || 600,
+        devOtp: (res as any).devOtp,
       };
     } else {
-      let friendlyMessage = res.message || res.error || 'Failed to send OTP code.';
-      if (friendlyMessage.includes('404')) {
-        friendlyMessage = 'Cloud server is updating latest OTP endpoints. Please ensure latest deployment on Render or check network configuration.';
-      }
       return {
         success: false,
-        message: friendlyMessage,
+        message: res.message || res.error || 'Unable to send OTP. Please try again in a moment.',
         code: res.code,
       };
     }
   } catch (err: any) {
     return {
       success: false,
-      message: err.message || 'Unable to connect to verification service.',
+      message: err.message || 'Unable to reach backend verification service. Please check connection.',
       code: 'NETWORK_ERROR',
     };
   }
@@ -132,10 +129,13 @@ export async function sendSignupEmailOtp(
 export async function verifySignupEmailOtp(
   payload: VerifyOtpPayload
 ): Promise<VerifyOtpResponse> {
+  const cleanEmail = payload.email.trim().toLowerCase();
+  const cleanOtp = payload.otp.trim();
+
   try {
     const res = await apiService.verifySignupOtp({
-      email: payload.email.trim().toLowerCase(),
-      otp: payload.otp.trim(),
+      email: cleanEmail,
+      otp: cleanOtp,
       name: payload.fullName.trim(),
       phone: payload.phone?.trim() || '+91 98200 00000',
       role: payload.role.toUpperCase(),
@@ -152,7 +152,7 @@ export async function verifySignupEmailOtp(
       const userRecord: UserRecord = {
         id: authData.user?.id || 'usr-' + Date.now(),
         name: authData.user?.name || payload.fullName,
-        email: authData.user?.email || payload.email,
+        email: authData.user?.email || cleanEmail,
         phone: authData.user?.phone || payload.phone || '+91 98200 00000',
         role: (authData.user?.role || payload.role).toLowerCase() as UserRole,
         companyId: authData.user?.companyId || 'comp-1',
@@ -175,21 +175,21 @@ export async function verifySignupEmailOtp(
     } else {
       return {
         success: false,
-        message: res.message || res.error || 'Invalid OTP code. Please try again.',
+        message: res.message || res.error || 'Invalid verification code. Please try again.',
         code: res.code,
       };
     }
   } catch (err: any) {
     return {
       success: false,
-      message: err.message || 'OTP verification encountered an error.',
+      message: err.message || 'OTP verification encountered a network error.',
       code: 'VERIFICATION_FAILED',
     };
   }
 }
 
 /**
- * 3. Send Password Reset OTP & Firebase Reset Link
+ * 3. Send Password Reset OTP
  */
 export async function sendForgotPasswordEmail(
   email: string
@@ -197,32 +197,31 @@ export async function sendForgotPasswordEmail(
   const cleanEmail = email.trim().toLowerCase();
   let firebaseSent = false;
 
-  // 1. Attempt official Firebase Password Reset Email
+  // Attempt optional Firebase Password Reset Link in parallel
   try {
     if (auth && !firebaseConfig.apiKey.includes('Mock')) {
       await sendPasswordResetEmail(auth, cleanEmail);
       firebaseSent = true;
     }
   } catch (fbErr: any) {
-    console.warn('[Firebase Auth] sendPasswordResetEmail notice:', fbErr?.message);
+    // Non-blocking
   }
 
-  // 2. Dispatch OTP through backend email service
   try {
     const res = await apiService.sendForgotPasswordOtp({ email: cleanEmail });
 
     if (res.success) {
       return {
         success: true,
-        message: res.message || `Password reset instructions and 6-digit OTP sent to ${cleanEmail}`,
-        expiresIn: (res as any).expiresIn || res.data?.expiresIn || 600,
-        devOtp: (res as any).devOtp || res.data?.devOtp,
+        message: res.message || `Password reset code sent to ${cleanEmail}. Check spam/junk if not in inbox.`,
+        expiresIn: (res as any).expiresIn || 600,
+        devOtp: (res as any).devOtp,
         firebaseEmailSent: firebaseSent,
       };
     } else {
       return {
         success: false,
-        message: res.message || res.error || 'Failed to send password reset code.',
+        message: res.message || res.error || 'Unable to send password reset code.',
         code: res.code,
         firebaseEmailSent: firebaseSent,
       };
@@ -230,7 +229,7 @@ export async function sendForgotPasswordEmail(
   } catch (err: any) {
     return {
       success: false,
-      message: err.message || 'Unable to connect to password reset service.',
+      message: err.message || 'Network error while requesting reset code.',
       code: 'NETWORK_ERROR',
       firebaseEmailSent: firebaseSent,
     };
@@ -245,10 +244,13 @@ export async function verifyForgotPasswordOtpAndReset(
   otp: string,
   newPassword: string
 ): Promise<{ success: boolean; message: string; code?: string }> {
+  const cleanEmail = email.trim().toLowerCase();
+  const cleanOtp = otp.trim();
+
   try {
     const res = await apiService.verifyForgotPasswordOtp({
-      email: email.trim().toLowerCase(),
-      otp: otp.trim(),
+      email: cleanEmail,
+      otp: cleanOtp,
       newPassword,
     });
 
@@ -280,18 +282,19 @@ export async function resendOtp(
   email: string,
   type: 'signup' | 'forgot_password'
 ): Promise<SendOtpResponse> {
+  const cleanEmail = email.trim().toLowerCase();
   try {
     const res = await apiService.resendOtp({
-      email: email.trim().toLowerCase(),
+      email: cleanEmail,
       type,
     });
 
     if (res.success) {
       return {
         success: true,
-        message: res.message || 'New verification code sent.',
-        expiresIn: (res as any).expiresIn || res.data?.expiresIn || 600,
-        devOtp: (res as any).devOtp || res.data?.devOtp,
+        message: res.message || 'New verification code sent. Please check inbox & spam.',
+        expiresIn: (res as any).expiresIn || 600,
+        devOtp: (res as any).devOtp,
       };
     } else {
       return {
@@ -303,7 +306,7 @@ export async function resendOtp(
   } catch (err: any) {
     return {
       success: false,
-      message: err.message || 'Unable to resend OTP code.',
+      message: err.message || 'Network error while resending OTP.',
       code: 'NETWORK_ERROR',
     };
   }

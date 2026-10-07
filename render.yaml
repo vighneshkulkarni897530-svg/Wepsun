@@ -21,15 +21,19 @@ services:
         generateValue: true
       - key: CORS_ORIGINS
         value: "*"
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM
+        sync: false
       - key: SMTP_HOST
         value: "smtp.gmail.com"
       - key: SMTP_PORT
-        value: "587"
+        value: "465"
       - key: SMTP_SECURE
-        value: "false"
+        value: "true"
       - key: SMTP_USER
-        value: "wepsunengineering@gmail.com"
+        sync: false
       - key: SMTP_PASS
-        value: "fmkb jubm qyac tuwt"
+        sync: false
       - key: SMTP_FROM
-        value: "WEPSUN Engineering <wepsunengineering@gmail.com>"
+        sync: false

@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Response } from 'express';
 import authRoutes from './auth.routes.js';
 import companiesRoutes from './companies.routes.js';
 import liftsRoutes from './lifts.routes.js';
@@ -18,11 +18,15 @@ import pmRoutes from './pm.routes.js';
 import paymentsRoutes from './payments.routes.js';
 import auditRoutes from './audit.routes.js';
 import telemetryRoutes from './telemetry.routes.js';
+import webhooksRoutes from './webhooks.routes.js';
+import { requireAuth, requireRole, AuthenticatedRequest } from '../middleware/auth.js';
+import { getEmailServiceHealth } from '../lib/emailOtpService.js';
 
 const router = Router();
 
 // Domain Routers
 router.use('/auth', authRoutes);
+router.use('/webhooks', webhooksRoutes);
 router.use('/companies', companiesRoutes);
 router.use('/lifts', liftsRoutes);
 router.use('/complaints', complaintsRoutes);
@@ -41,5 +45,23 @@ router.use('/pm', pmRoutes);
 router.use('/payments', paymentsRoutes);
 router.use('/audit', auditRoutes);
 router.use('/telemetry', telemetryRoutes);
+
+// Admin Health & System Diagnostics (Protected RBAC)
+router.get('/admin/email/health', requireAuth, requireRole('SUPER_ADMIN', 'COMPANY_ADMIN', 'MASTER_ADMIN'), async (_req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const health = getEmailServiceHealth();
+    res.json({
+      success: true,
+      smtpConfigured: health.smtpConfigured,
+      resendConfigured: health.resendConfigured,
+      primaryProvider: health.primaryProvider,
+      status: health.status,
+      fromAddress: health.fromAddress,
+      timestamp: health.timestamp,
+    });
+  } catch {
+    res.status(500).json({ success: false, message: 'Failed to retrieve email diagnostics.' });
+  }
+});
 
 export default router;

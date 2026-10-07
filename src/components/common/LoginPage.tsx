@@ -143,6 +143,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [isSendingForgot, setIsSendingForgot] = useState<boolean>(false);
   const [isResettingPassword, setIsResettingPassword] = useState<boolean>(false);
   const [firebaseResetSent, setFirebaseResetSent] = useState<boolean>(false);
+  const [devForgotOtp, setDevForgotOtp] = useState<string | null>(null);
   const forgotOtpInputRef = useRef<HTMLInputElement>(null);
 
   // Google OAuth Modal
@@ -590,10 +591,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         setForgotTimer(60);
         setCanResendForgotOtp(false);
         setFirebaseResetSent(Boolean(res.firebaseEmailSent));
+        if (res.devOtp) {
+          setDevForgotOtp(res.devOtp);
+        }
         showToast(
           'success',
           'Password Reset Code Sent',
-          `6-digit reset code sent to ${forgotIdentifier.trim()}. Please check your email inbox.`
+          `6-digit reset code sent to ${forgotIdentifier.trim()}. Please check your email inbox and spam folder.`
         );
       } else {
         setForgotError(res.message || 'Could not dispatch password reset OTP.');
@@ -665,7 +669,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         setForgotOtpValue('');
         setForgotTimer(60);
         setCanResendForgotOtp(false);
-        showToast('success', 'New Code Sent', `A fresh 6-digit OTP was sent to ${forgotIdentifier.trim()}`);
+        if (res.devOtp) {
+          setDevForgotOtp(res.devOtp);
+        }
+        showToast('success', 'New Code Sent', `A fresh 6-digit OTP was sent to ${forgotIdentifier.trim()}. Please check inbox & spam.`);
       } else {
         setForgotError(res.message || 'Failed to resend code.');
       }
@@ -1654,27 +1661,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     </span>
                   </div>
 
-                  {/* Dev / Test Code Helper (if returned) */}
-                  {devSignupOtp && (
-                    <div className="mb-3 p-2.5 bg-blue-50/90 border border-blue-200 rounded-xl flex items-center justify-between text-xs text-blue-900 shadow-xs">
-                      <div className="flex items-center gap-1.5 font-medium">
-                        <Sparkles className="w-3.5 h-3.5 text-[#0066FF]" />
-                        <span>OTP Code:</span>
-                        <strong className="font-mono text-[#0066FF] text-sm tracking-wider">{devSignupOtp}</strong>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setOtpValue(devSignupOtp.slice(0, 6));
-                          setOtpError(null);
-                        }}
-                        className="px-2.5 py-1 bg-[#0066FF] text-white text-[10px] font-bold rounded-lg hover:bg-blue-700 transition-colors cursor-pointer shadow-xs"
-                      >
-                        Auto-Fill
-                      </button>
-                    </div>
-                  )}
-
                   {/* OTP Error Message */}
                   {otpError && (
                     <div className="mb-3.5 p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
@@ -1683,8 +1669,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     </div>
                   )}
 
-                  {/* Android-Optimized Single Overlay 6-Digit OTP Input */}
-                  <div className="relative my-3">
+                  {/* Android & Mobile Touch-Optimized 6-Digit OTP Input */}
+                  <div
+                    className="relative my-3 cursor-text"
+                    onClick={() => otpInputRef.current?.focus()}
+                  >
                     {/* Transparent Full-Width Single Input for Native Android Keyboards & SMS/Email Autofill */}
                     <input
                       ref={otpInputRef}
@@ -1699,7 +1688,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                         setOtpValue(clean);
                         setOtpError(null);
                       }}
-                      className="absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer"
+                      className="absolute inset-0 w-full h-full opacity-0 z-20 cursor-text"
+                      style={{ fontSize: '16px' }}
                       autoFocus
                     />
                     {/* 6 Visual Stylized Digit Display Boxes */}
@@ -1929,6 +1919,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   </div>
                 )}
 
+                {/* Spam / Junk Helper Note */}
+                <div className="p-3 bg-amber-50/90 border border-amber-200/90 rounded-2xl text-[11px] text-amber-900 flex items-start gap-2 text-left mb-3 shadow-xs">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Didn't receive email?</strong> Check your <strong>Spam / Junk / Promotions</strong> folder. Emails may take 15–30s to arrive.
+                  </span>
+                </div>
+
                 {/* Error Alert */}
                 {forgotError && (
                   <div className="mb-3 p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
@@ -1937,15 +1935,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   </div>
                 )}
 
-
-
                 <form onSubmit={handleVerifyForgotOtpAndReset} className="space-y-3.5">
                   {/* Android-Optimized Single Overlay 6-Digit OTP Input */}
                   <div>
                     <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
                       6-Digit Verification Code
                     </label>
-                    <div className="relative my-1">
+                    <div
+                      className="relative my-1 cursor-text"
+                      onClick={() => forgotOtpInputRef.current?.focus()}
+                    >
                       {/* Transparent Full-Width Single Input */}
                       <input
                         ref={forgotOtpInputRef}
@@ -1960,7 +1959,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                           setForgotOtpValue(clean);
                           setForgotError(null);
                         }}
-                        className="absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer"
+                        className="absolute inset-0 w-full h-full opacity-0 z-20 cursor-text"
+                        style={{ fontSize: '16px' }}
                         autoFocus
                       />
                       {/* 6 Visual Stylized Digit Display Boxes */}

@@ -18,11 +18,11 @@ import {
   consumePasswordResetToken,
   JwtUserPayload,
 } from '../lib/auth.js';
-import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
+import { requireAuth, requireRole, AuthenticatedRequest } from '../middleware/auth.js';
 import { authLimiter } from '../middleware/rateLimiter.js';
 import { verifyGoogleIdToken, verifyGoogleAccessToken } from '../lib/googleAuth.js';
 import { validateMasterId, getMasterAdminUser } from '../lib/masterAuth.js';
-import { sendEmailOtp, verifyEmailOtp } from '../lib/emailOtpService.js';
+import { sendEmailOtp, verifyEmailOtp, getEmailServiceHealth } from '../lib/emailOtpService.js';
 
 const router = Router();
 
@@ -1386,7 +1386,8 @@ router.post('/send-otp', authLimiter, async (req: AuthenticatedRequest, res: Res
     });
 
     if (!otpResult.success) {
-      res.status(429).json(otpResult);
+      const statusCode = otpResult.code === 'RATE_LIMITED' ? 429 : 503;
+      res.status(statusCode).json(otpResult);
       return;
     }
 
@@ -1462,6 +1463,9 @@ router.post('/verify-otp', authLimiter, async (req: AuthenticatedRequest, res: R
           const techRec = await prisma.technician.create({
             data: {
               companyId,
+              branchId: 'branch-1',
+              employeeCode: 'EMP-' + Date.now().toString().slice(-4),
+              zone: 'Central Zone',
               name: displayName || cleanEmail.split('@')[0],
               phone: phone || '+91 98200 00000',
               email: cleanEmail,
@@ -1610,7 +1614,8 @@ router.post('/forgot-password-otp', authLimiter, async (req: AuthenticatedReques
     });
 
     if (!otpResult.success) {
-      res.status(429).json(otpResult);
+      const statusCode = otpResult.code === 'RATE_LIMITED' ? 429 : 503;
+      res.status(statusCode).json(otpResult);
       return;
     }
 
@@ -1676,7 +1681,7 @@ router.post('/verify-forgot-password-otp', authLimiter, async (req: Authenticate
       }
     } catch {
       // Mock fallback
-      const mock = db.users.find((u) => u.email.toLowerCase() === cleanEmail);
+      const mock = db.users.find((u) => u.email.toLowerCase() === cleanEmail) as any;
       if (mock) {
         mock.passwordHash = newHash;
         user = mock;
@@ -1731,13 +1736,50 @@ router.post('/resend-otp', authLimiter, async (req: AuthenticatedRequest, res: R
     });
 
     if (!result.success) {
-      res.status(429).json(result);
+      const statusCode = result.code === 'RATE_LIMITED' ? 429 : 503;
+      res.status(statusCode).json(result);
       return;
     }
 
     res.json(result);
   } catch {
     res.status(500).json({ success: false, message: 'Unable to resend verification code.', code: 'SERVER_ERROR' });
+  }
+});
+
+// GET /api/auth/admin/email/health — Protected Admin Diagnostic Health Check
+router.get('/admin/email/health', requireAuth, requireRole('SUPER_ADMIN', 'COMPANY_ADMIN', 'MASTER_ADMIN'), async (_req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const health = getEmailServiceHealth();
+    res.json({
+      success: true,
+      smtpConfigured: health.smtpConfigured,
+      resendConfigured: health.resendConfigured,
+      primaryProvider: health.primaryProvider,
+      status: health.status,
+      fromAddress: health.fromAddress,
+      timestamp: health.timestamp,
+    });
+  } catch {
+    res.status(500).json({ success: false, message: 'Failed to retrieve email diagnostics.' });
+  }
+});
+
+// GET /api/auth/email/health — Protected Admin Diagnostic Health Check Alias
+router.get('/email/health', requireAuth, requireRole('SUPER_ADMIN', 'COMPANY_ADMIN', 'MASTER_ADMIN'), async (_req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const health = getEmailServiceHealth();
+    res.json({
+      success: true,
+      smtpConfigured: health.smtpConfigured,
+      resendConfigured: health.resendConfigured,
+      primaryProvider: health.primaryProvider,
+      status: health.status,
+      fromAddress: health.fromAddress,
+      timestamp: health.timestamp,
+    });
+  } catch {
+    res.status(500).json({ success: false, message: 'Failed to retrieve email diagnostics.' });
   }
 });
 

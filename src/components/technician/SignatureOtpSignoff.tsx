@@ -395,10 +395,13 @@ export const SignatureOtpSignoff: React.FC<SignatureOtpSignoffProps> = ({
                 </label>
                 <div className="flex items-center gap-2">
                   <input
-                    type="text"
+                    type="tel"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    pattern="[0-9]*"
                     maxLength={4}
                     value={enteredOtp}
-                    onChange={(e) => setEnteredOtp(e.target.value.replace(/\D/g, ''))}
+                    onChange={(e) => setEnteredOtp(e.target.value.replace(/\D/g, '').slice(0, 4))}
                     placeholder="• • • •"
                     className="w-full text-center tracking-[1em] font-mono text-lg font-black py-2.5 px-4 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
                   />

@@ -43,11 +43,6 @@ export const OtpVerificationModal: React.FC<OtpVerificationModalProps> = ({
     }, 350);
   };
 
-  const handleAutoFill = () => {
-    setOtpValue(expectedOtp.slice(0, 4));
-    setError(null);
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
       <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 shadow-2xl relative text-slate-800">
@@ -70,25 +65,11 @@ export const OtpVerificationModal: React.FC<OtpVerificationModalProps> = ({
             </p>
           </div>
 
-          {/* Test simulation helper */}
-          <div className="bg-[#F5F8FA] border border-blue-200 rounded-2xl p-3 w-full flex items-center justify-between text-xs shadow-sm">
-            <div className="flex items-center gap-2 text-slate-700">
-              <Smartphone className="w-4 h-4 text-[#1976D2] shrink-0" />
-              <span>
-                Verification OTP: <strong className="font-mono text-[#1976D2] text-sm">{expectedOtp}</strong>
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={handleAutoFill}
-              className="px-2.5 py-1 bg-[#1976D2] hover:bg-blue-700 text-white font-bold rounded-lg text-[11px] transition-colors shadow-sm cursor-pointer"
-            >
-              Auto-Fill
-            </button>
-          </div>
-
-          {/* Android-Optimized Single Overlay 4-Digit OTP Input */}
-          <div className="relative my-3 w-full max-w-[280px]">
+          {/* Android & Mobile Touch-Optimized 4-Digit OTP Input */}
+          <div
+            className="relative my-3 w-full max-w-[280px] cursor-text"
+            onClick={() => inputRef.current?.focus()}
+          >
             {/* Transparent Full-Width Single Input */}
             <input
               ref={inputRef}
@@ -103,7 +84,8 @@ export const OtpVerificationModal: React.FC<OtpVerificationModalProps> = ({
                 setOtpValue(clean);
                 setError(null);
               }}
-              className="absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer"
+              className="absolute inset-0 w-full h-full opacity-0 z-20 cursor-text"
+              style={{ fontSize: '16px' }}
               autoFocus
             />
             {/* 4 Visual Stylized Digit Display Boxes */}
