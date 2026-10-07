@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useApp } from './context/AppContext';
+import { AppProvider, useApp } from './context/AppContext';
 import { Sidebar, NavTabId } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
 import { ToastContainer } from './components/common/ToastContainer';
@@ -37,6 +37,9 @@ import { Lift } from './types';
 import { PhoneCall } from 'lucide-react';
 import { AppInstallBanner } from './components/common/AppInstallBanner';
 import { MobileBottomNav } from './components/layout/MobileBottomNav';
+import { isMasterAdminAuthenticated } from './lib/masterAuthClient';
+import { WepsunModalContainer } from './components/common/WepsunModalContainer';
+import { EditProfilePage } from './components/common/EditProfilePage';
 
 const ADMIN_PROTECTED_TABS = [
   'dashboard',
@@ -62,16 +65,6 @@ const ADMIN_PROTECTED_TABS = [
   'settings',
   'design_system',
 ];
-
-export function isMasterAdminAuthenticated(): boolean {
-  if (typeof window === 'undefined') return false;
-  const isMasterAuth =
-    sessionStorage.getItem('wepsun_master_authenticated') === 'true' ||
-    localStorage.getItem('wepsun_master_authenticated') === 'true';
-  const role = localStorage.getItem('wepsun_role');
-  const hasAdminRole = role === 'master_admin' || role === 'company_admin' || role === 'super_admin';
-  return isMasterAuth && hasAdminRole;
-}
 
 export const AppContent: React.FC = () => {
   const { currentRole, setCurrentRole, activeCompany, branches, buildings, users, tenantInvoices, lifts, showToast } = useApp();
@@ -203,6 +196,7 @@ export const AppContent: React.FC = () => {
             'analytics',
             'notifications',
             'settings',
+            'edit_profile',
             'design_system',
             'history',
             'payments',
@@ -218,6 +212,8 @@ export const AppContent: React.FC = () => {
           ].includes(hash)
         ) {
           setActiveTab(hash as NavTabId);
+        } else if (hash === 'edit-profile' || hash === 'profile-edit') {
+          setActiveTab('edit_profile');
         }
       }
     };
@@ -464,6 +460,9 @@ export const AppContent: React.FC = () => {
       case 'settings':
         return <AdminProfileSettingsView />;
 
+      case 'edit_profile':
+        return <EditProfilePage onBack={() => setActiveTab('settings')} onSaved={() => setActiveTab('settings')} />;
+
       default:
         return <OverviewDashboard onNavigateTab={setActiveTab} />;
     }
@@ -516,7 +515,10 @@ export const AppContent: React.FC = () => {
             onClose={() => {
               setIsFullLoginPage(false);
               const rawH = window.location.hash.toLowerCase().replace('#', '').split('?')[0];
-              const savedRole = localStorage.getItem('wepsun_role') || currentRole;
+              const savedRole =
+                localStorage.getItem('wepsun_lift_saas_v2_role') ||
+                localStorage.getItem('wepsun_role') ||
+                currentRole;
               if (!rawH || rawH === 'login' || rawH === 'signin' || rawH === 'signup' || rawH === 'landing' || rawH.startsWith('login-')) {
                 const target = savedRole === 'client' ? 'home' : savedRole === 'technician' ? 'jobs' : 'dashboard';
                 if (target === 'dashboard' && !isMasterAdminAuthenticated()) {
@@ -533,6 +535,7 @@ export const AppContent: React.FC = () => {
             isModal={false}
           />
           <ToastContainer />
+          <WepsunModalContainer />
         </div>
       );
     }
@@ -546,9 +549,17 @@ export const AppContent: React.FC = () => {
           onClose={() => {
             setIsFullLoginPage(false);
             const rawH = window.location.hash.toLowerCase().replace('#', '').split('?')[0];
-            const savedRole = localStorage.getItem('wepsun_role') || currentRole;
+            const savedRole =
+              localStorage.getItem('wepsun_lift_saas_v2_role') ||
+              localStorage.getItem('wepsun_role') ||
+              currentRole;
             if (!rawH || rawH === 'login' || rawH === 'signin' || rawH === 'signup' || rawH === 'landing' || rawH.startsWith('login-')) {
               const target = savedRole === 'client' ? 'home' : savedRole === 'technician' ? 'jobs' : 'dashboard';
+              if (target === 'dashboard' && !isMasterAdminAuthenticated()) {
+                window.location.hash = 'login-technician';
+                setIsFullLoginPage(true);
+                return;
+              }
               window.location.hash = target;
               setActiveTab(target as NavTabId);
             } else {
@@ -557,6 +568,7 @@ export const AppContent: React.FC = () => {
           }}
         />
         <ToastContainer />
+        <WepsunModalContainer />
       </div>
     );
   }
@@ -572,6 +584,7 @@ export const AppContent: React.FC = () => {
           }}
         />
         <ToastContainer />
+        <WepsunModalContainer />
       </div>
     );
   }
@@ -630,6 +643,8 @@ export const AppContent: React.FC = () => {
 
       {/* Global Notifications Container */}
       <ToastContainer />
+      {/* Modern WepSun Modal & Pop-up System */}
+      <WepsunModalContainer />
 
       {/* QR Scanner Modal */}
       <QrScannerModal
@@ -675,5 +690,9 @@ export const AppContent: React.FC = () => {
 };
 
 export default function App() {
-  return <AppContent />;
+  return (
+    <AppProvider>
+      <AppContent />
+    </AppProvider>
+  );
 }

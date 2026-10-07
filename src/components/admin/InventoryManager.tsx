@@ -43,6 +43,7 @@ export const InventoryManager: React.FC = () => {
     updateInventoryItem,
     activeCompany,
     showToast,
+    showSuccessModal,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<
@@ -249,9 +250,14 @@ export const InventoryManager: React.FC = () => {
       compatibleModels: newPartCompatible.split(',').map((s) => s.trim()),
     });
 
+    const addedItemName = newPartName;
     setIsAddPartModalOpen(false);
     setNewPartName('');
     setNewPartSku('');
+    showSuccessModal(
+      'Inventory Item Added',
+      `"${addedItemName}" has been successfully added to central warehouse stock.`
+    );
   };
 
   const getMovementBadge = (type: InventoryMovementType) => {

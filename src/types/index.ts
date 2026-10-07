@@ -58,6 +58,16 @@ export interface User {
   bio?: string;
   companyName?: string;
   employeeCode?: string;
+  username?: string;
+  pincode?: string;
+  language?: string;
+  notificationPreferences?: {
+    email: boolean;
+    sms: boolean;
+    whatsapp: boolean;
+    push: boolean;
+    pmReminders: boolean;
+  };
   createdAt?: string;
 }
 

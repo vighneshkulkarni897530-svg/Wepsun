@@ -100,10 +100,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Technician Master ID State
-  const [masterId, setMasterId] = useState('');
-  const [isVerifyingMasterId, setIsVerifyingMasterId] = useState(false);
-
   // Sign Up Form Fields
   const [regRole, setRegRole] = useState<'client' | 'technician'>('client');
   const [regFullName, setRegFullName] = useState('');
@@ -155,88 +151,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     setErrorMessage(null);
   };
 
-  // Technician Master ID Submission
-  const handleTechnicianMasterSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!masterId.trim()) {
-      setErrorMessage('Please enter your Master ID.');
-      return;
-    }
-
-    setIsVerifyingMasterId(true);
-    setErrorMessage(null);
-
-    try {
-      const res = await apiService.verifyMasterId({
-        masterId: masterId.trim(),
-        rememberMe,
-      });
-
-      if (res && res.success && res.data) {
-        const authData = res.data as any;
-        if (authData.tokens?.accessToken) {
-          setTokens(authData.tokens.accessToken, authData.tokens.refreshToken);
-        }
-
-        const userObj = authData.user || {
-          id: 'usr-master-1',
-          name: 'Master Technical Administrator',
-          email: 'master.admin@wepsun.engineering',
-          role: 'master_admin',
-          companyId: 'comp-1',
-          branchId: 'br-mum-1',
-          isActive: true,
-        };
-
-        loginAsUser({
-          ...userObj,
-          role: 'master_admin',
-        });
-        setCurrentRole('master_admin');
-
-        // Store authenticated session markers for route protection
-        sessionStorage.setItem('wepsun_master_authenticated', 'true');
-        if (rememberMe) {
-          localStorage.setItem('wepsun_master_authenticated', 'true');
-        }
-
-        showToast('success', 'Master Authentication Verified', 'Opening Admin Dashboard...');
-        try {
-          confetti({
-            particleCount: 50,
-            spread: 60,
-            origin: { y: 0.6 },
-          });
-        } catch {
-          // ignore
-        }
-
-        // Open Admin Dashboard directly
-        window.location.hash = 'dashboard';
-
-        if (onClose) {
-          onClose();
-        }
-      } else {
-        if (res?.code === 'NETWORK_ERROR' || res?.code === 'OFFLINE') {
-          setErrorMessage('Unable to verify Master ID. Please check your internet connection and try again.');
-        } else if (res?.status && res.status >= 500) {
-          setErrorMessage('Something went wrong. Please try again later.');
-        } else {
-          setErrorMessage(res?.message || 'Invalid Master ID. Please try again.');
-        }
-      }
-    } catch (err: any) {
-      if (err?.message?.includes('network') || err?.message?.includes('fetch') || err?.name === 'TypeError') {
-        setErrorMessage('Unable to verify Master ID. Please check your internet connection and try again.');
-      } else {
-        setErrorMessage('Invalid Master ID. Please try again.');
-      }
-    } finally {
-      setIsVerifyingMasterId(false);
-    }
-  };
-
   const handleSignInSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!identifier.trim()) {
@@ -250,6 +164,72 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
     setIsSubmitting(true);
     setErrorMessage(null);
+
+    const cleanIdent = identifier.trim().toLowerCase();
+    const cleanPass = password.trim();
+
+    // 1. MASTER ID CREDENTIAL CHECK:
+    // Master ID 1: jaiswalsumit2812@gmail.com | Password: Wepsun@928
+    // Master ID 2: gauravsaini0004@gmail.com   | Password: Wepsun@2025
+    const isMaster1 = cleanIdent === 'jaiswalsumit2812@gmail.com' && cleanPass === 'Wepsun@928';
+    const isMaster2 = cleanIdent === 'gauravsaini0004@gmail.com' && cleanPass === 'Wepsun@2025';
+    const isMasterEmail = cleanIdent === 'jaiswalsumit2812@gmail.com' || cleanIdent === 'gauravsaini0004@gmail.com';
+
+    if (isMasterEmail && !isMaster1 && !isMaster2) {
+      setErrorMessage('Invalid ID or Password. Please try again.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (isMaster1 || isMaster2) {
+      const masterAdminUser: UserRecord = {
+        id: isMaster1 ? 'usr-master-sumit' : 'usr-master-gaurav',
+        name: isMaster1 ? 'Sumit Jaiswal (Master Admin)' : 'Gaurav Saini (Master Admin)',
+        email: isMaster1 ? 'jaiswalsumit2812@gmail.com' : 'gauravsaini0004@gmail.com',
+        phone: isMaster1 ? '+91 98201 99928' : '+91 98201 92025',
+        role: 'master_admin',
+        companyId: 'comp-1',
+        branchId: 'br-mum-1',
+        avatar: isMaster1
+          ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
+          : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+        isActive: true,
+        createdAt: new Date().toISOString(),
+      };
+
+      // Set Master Admin session flags for route guards immediately
+      sessionStorage.setItem('wepsun_master_authenticated', 'true');
+      sessionStorage.setItem('wepsun_role', 'master_admin');
+      sessionStorage.setItem('wepsun_lift_saas_v2_role', 'master_admin');
+      sessionStorage.setItem('wepsun_userId', masterAdminUser.id);
+      sessionStorage.setItem('wepsun_lift_saas_v2_userId', masterAdminUser.id);
+
+      localStorage.setItem('wepsun_master_authenticated', 'true');
+      localStorage.setItem('wepsun_role', 'master_admin');
+      localStorage.setItem('wepsun_lift_saas_v2_role', 'master_admin');
+      localStorage.setItem('wepsun_userId', masterAdminUser.id);
+      localStorage.setItem('wepsun_lift_saas_v2_userId', masterAdminUser.id);
+      localStorage.setItem('wepsun_lift_saas_v2_currentUser', JSON.stringify(masterAdminUser));
+
+      loginAsUser(masterAdminUser);
+      setCurrentRole('master_admin');
+
+      showToast('success', 'Master Authentication Verified', `Welcome to Admin Dashboard, ${isMaster1 ? 'Sumit Jaiswal' : 'Gaurav Saini'}!`);
+      try {
+        confetti({
+          particleCount: 80,
+          spread: 70,
+          origin: { y: 0.6 },
+        });
+      } catch {}
+
+      window.location.hash = 'dashboard';
+      if (onClose) {
+        onClose();
+      }
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
       const payload = {
@@ -272,20 +252,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           setTokens(authData.tokens.accessToken, authData.tokens.refreshToken);
         }
         if (authData.user) {
+          const userRole = (authData.user.role || targetRole).toLowerCase() as UserRole;
           loginAsUser({
             id: authData.user.id,
             name: authData.user.name,
             email: authData.user.email,
             phone: authData.user.phone || '',
-            role: (authData.user.role || targetRole).toLowerCase() as UserRole,
+            role: userRole,
             companyId: authData.user.companyId || 'comp-1',
             branchId: authData.user.branchId,
-            clientId: authData.user.clientId,
-            technicianId: authData.user.technicianId,
+            clientId: authData.user.clientId || (userRole === 'client' ? 'client-' + Date.now() : undefined),
+            technicianId: authData.user.technicianId || (userRole === 'technician' ? 'tech-' + Date.now() : undefined),
             avatar: authData.user.avatarUrl,
             isActive: true,
           });
-          setCurrentRole((authData.user.role || targetRole).toLowerCase() as UserRole);
+          setCurrentRole(userRole);
         }
       } else {
         // Find existing user in stored state or demo accounts
@@ -297,7 +278,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         );
 
         if (existingUser) {
+          const userRole = (existingUser.role || targetRole).toLowerCase() as UserRole;
           loginAsUser(existingUser);
+          setCurrentRole(userRole);
         } else {
           // Check if demo user
           const demoUser = DEMO_ACCOUNTS.find(
@@ -307,6 +290,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           );
           if (demoUser) {
             loginAsUser(demoUser.id);
+            const userRole = (demoUser.role || targetRole).toLowerCase() as UserRole;
+            setCurrentRole(userRole);
           } else {
             // Direct authentication fallback with dedicated user record
             const rawName = identifier.includes('@') ? identifier.split('@')[0].replace(/[._-]/g, ' ') : 'WEPSUN User';
@@ -340,9 +325,22 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         sessionStorage.setItem('wepsun_open_quote_after_login', 'true');
       }
 
-      window.location.hash = 'home';
+      const activeDest =
+        targetRole === 'client'
+          ? 'home'
+          : targetRole === 'technician'
+          ? 'jobs'
+          : 'dashboard';
 
-      showToast('success', 'Login Successful', 'Welcome to WEPSUN Client Portal!');
+      window.location.hash = activeDest;
+
+      showToast(
+        'success',
+        'Login Successful',
+        targetRole === 'technician'
+          ? 'Welcome to WEPSUN Technician Portal!'
+          : 'Welcome to WEPSUN Client Portal!'
+      );
 
       if (onClose) {
         onClose();
@@ -1215,33 +1213,47 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 </div>
               </div>
 
-              {/* Conditional Form: Technician Master ID vs Client Authentication */}
-              {selectedRole === 'technician' ? (
-                /* ========================================================================= */
-                /* TECHNICIAN MASTER ID AUTHENTICATION FLOW */
-                /* ========================================================================= */
-                <form onSubmit={handleTechnicianMasterSubmit} className="space-y-4">
-                  {/* Master ID Field */}
+              {/* Sign In Form with Email and Password for both Client and Technician */}
+              <div>
+                <form onSubmit={handleSignInSubmit} className="space-y-3.5">
+                  {/* Email Address Field */}
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                      <KeyRound className="w-4 h-4 text-[#0066FF]" />
+                      <Mail className="w-4 h-4" />
                     </div>
                     <input
                       type="text"
-                      value={masterId}
-                      onChange={(e) => {
-                        setMasterId(e.target.value);
-                        if (errorMessage) setErrorMessage(null);
-                      }}
-                      placeholder="Enter Master ID"
-                      autoFocus
-                      autoComplete="off"
-                      spellCheck={false}
-                      className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all tracking-wide"
+                      value={identifier}
+                      onChange={(e) => setIdentifier(e.target.value)}
+                      placeholder="Email Address"
+                      required
+                      className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
                     />
                   </div>
 
-                  {/* Remember Me Option */}
+                  {/* Password Field */}
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                      <Lock className="w-4 h-4" />
+                    </div>
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Password"
+                      required
+                      className="w-full pl-10 pr-10 py-3 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+
+                  {/* Remember Me & Forgot Password */}
                   <div className="flex items-center justify-between pt-0.5">
                     <label className="flex items-center gap-2 cursor-pointer select-none">
                       <input
@@ -1252,19 +1264,27 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       />
                       <span className="text-xs text-slate-600 font-medium">Remember me</span>
                     </label>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForgotIdentifier(identifier);
+                        setIsForgotPasswordOpen(true);
+                      }}
+                      className="text-xs font-semibold text-[#0066FF] hover:underline cursor-pointer"
+                    >
+                      Forgot Password?
+                    </button>
                   </div>
 
-                  {/* Sign In Button */}
+                  {/* Submit Button */}
                   <button
                     type="submit"
-                    disabled={isVerifyingMasterId}
+                    disabled={isSubmitting}
                     className="w-full py-3.5 rounded-2xl bg-[#0066FF] hover:bg-[#0052cc] text-white font-bold text-sm shadow-lg shadow-blue-500/25 active:scale-98 transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer mt-2"
                   >
-                    {isVerifyingMasterId ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin text-white" />
-                        <span>Verifying Master ID...</span>
-                      </>
+                    {isSubmitting ? (
+                      <span>Signing In...</span>
                     ) : (
                       <>
                         <span>Sign In</span>
@@ -1272,125 +1292,33 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       </>
                     )}
                   </button>
-
-                  {/* Technician Designation Badge matching diagram in spec */}
-                  <div className="pt-2 text-center">
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50/80 border border-blue-100 text-[#0066FF] text-[11px] font-semibold tracking-wide">
-                      <Wrench className="w-3 h-3 text-[#0066FF]" />
-                      <span>Technician Access</span>
-                    </span>
-                  </div>
                 </form>
-              ) : (
-                /* ========================================================================= */
-                /* NORMAL CLIENT AUTHENTICATION FLOW */
-                /* ========================================================================= */
-                <div>
-                  <form onSubmit={handleSignInSubmit} className="space-y-3.5">
-                    {/* Email Address Field */}
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                        <Mail className="w-4 h-4" />
-                      </div>
-                      <input
-                        type="text"
-                        value={identifier}
-                        onChange={(e) => setIdentifier(e.target.value)}
-                        placeholder="Email Address"
-                        required
-                        className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
-                      />
-                    </div>
 
-                    {/* Password Field */}
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                        <Lock className="w-4 h-4" />
-                      </div>
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="Password"
-                        required
-                        className="w-full pl-10 pr-10 py-3 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
-                      >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-
-                    {/* Remember Me & Forgot Password */}
-                    <div className="flex items-center justify-between pt-0.5">
-                      <label className="flex items-center gap-2 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={rememberMe}
-                          onChange={(e) => setRememberMe(e.target.checked)}
-                          className="w-4 h-4 rounded text-[#0066FF] focus:ring-[#0066FF] border-slate-300"
-                        />
-                        <span className="text-xs text-slate-600 font-medium">Remember me</span>
-                      </label>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setForgotIdentifier(identifier);
-                          setIsForgotPasswordOpen(true);
-                        }}
-                        className="text-xs font-semibold text-[#0066FF] hover:underline cursor-pointer"
-                      >
-                        Forgot Password?
-                      </button>
-                    </div>
-
-                    {/* Submit Button */}
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="w-full py-3.5 rounded-2xl bg-[#0066FF] hover:bg-[#0052cc] text-white font-bold text-sm shadow-lg shadow-blue-500/25 active:scale-98 transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer mt-2"
-                    >
-                      {isSubmitting ? (
-                        <span>Signing In...</span>
-                      ) : (
-                        <>
-                          <span>Sign In</span>
-                          <ArrowRight className="w-4 h-4" />
-                        </>
-                      )}
-                    </button>
-                  </form>
-
-                  {/* OR Divider */}
-                  <div className="relative flex items-center justify-center my-4">
-                    <div className="border-t border-slate-200 w-full" />
-                    <span className="bg-white px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                      OR
-                    </span>
-                    <div className="border-t border-slate-200 w-full" />
-                  </div>
-
-                  {/* Continue with Google */}
-                  <button
-                    type="button"
-                    onClick={handleGoogleAuth}
-                    disabled={isGoogleSubmitting}
-                    aria-label="Continue with Google"
-                    className="w-full py-2.5 px-4 rounded-2xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2.5 shadow-sm transition-all cursor-pointer active:scale-98 disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    {isGoogleSubmitting ? (
-                      <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin shrink-0" />
-                    ) : (
-                      <GoogleGIcon />
-                    )}
-                    <span>{isGoogleSubmitting ? 'Connecting with Google...' : 'Continue with Google'}</span>
-                  </button>
+                {/* OR Divider */}
+                <div className="relative flex items-center justify-center my-4">
+                  <div className="border-t border-slate-200 w-full" />
+                  <span className="bg-white px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                    OR
+                  </span>
+                  <div className="border-t border-slate-200 w-full" />
                 </div>
-              )}
+
+                {/* Continue with Google */}
+                <button
+                  type="button"
+                  onClick={handleGoogleAuth}
+                  disabled={isGoogleSubmitting}
+                  aria-label="Continue with Google"
+                  className="w-full py-2.5 px-4 rounded-2xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2.5 shadow-sm transition-all cursor-pointer active:scale-98 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {isGoogleSubmitting ? (
+                    <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin shrink-0" />
+                  ) : (
+                    <GoogleGIcon />
+                  )}
+                  <span>{isGoogleSubmitting ? 'Connecting with Google...' : 'Continue with Google'}</span>
+                </button>
+              </div>
             </div>
           ) : (
             /* ========================================================================= */

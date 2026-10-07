@@ -18,6 +18,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { EditProfilePage } from '../common/EditProfilePage';
 
 interface ClientProfileViewProps {
   onLogout?: () => void;
@@ -26,6 +27,7 @@ interface ClientProfileViewProps {
 export const ClientProfileView: React.FC<ClientProfileViewProps> = ({ onLogout }) => {
   const { clientProfile, updateClientProfile, changeClientPassword, clientScopedLifts, showToast, setCurrentRole, logout } = useApp();
 
+  const [isEditing, setIsEditing] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
@@ -104,6 +106,10 @@ export const ClientProfileView: React.FC<ClientProfileViewProps> = ({ onLogout }
     }
   };
 
+  if (isEditing) {
+    return <EditProfilePage onBack={() => setIsEditing(false)} onSaved={() => setIsEditing(false)} />;
+  }
+
   return (
     <div className="space-y-6 text-slate-800 animate-fade-in">
       {/* Top Banner Card */}
@@ -124,8 +130,8 @@ export const ClientProfileView: React.FC<ClientProfileViewProps> = ({ onLogout }
               )}
             </div>
             <button
-              onClick={handleOpenEdit}
-              className="absolute -bottom-1 -right-1 p-1.5 bg-[#1976D2] hover:bg-blue-700 text-white rounded-xl shadow-md border-2 border-white transition-transform hover:scale-110"
+              onClick={() => setIsEditing(true)}
+              className="absolute -bottom-1 -right-1 p-1.5 bg-[#1976D2] hover:bg-blue-700 text-white rounded-xl shadow-md border-2 border-white transition-transform hover:scale-110 cursor-pointer"
               title="Change Logo / Photo"
             >
               <Camera className="w-3.5 h-3.5" />
@@ -153,8 +159,8 @@ export const ClientProfileView: React.FC<ClientProfileViewProps> = ({ onLogout }
         {/* Action CTAs */}
         <div className="flex items-center gap-2.5 w-full md:w-auto flex-wrap">
           <button
-            onClick={handleOpenEdit}
-            className="flex-1 md:flex-none px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-800 text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm"
+            onClick={() => setIsEditing(true)}
+            className="flex-1 md:flex-none px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-800 text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer"
           >
             <Edit3 className="w-4 h-4 text-[#1976D2]" />
             <span>Edit Profile</span>

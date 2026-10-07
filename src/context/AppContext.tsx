@@ -33,6 +33,7 @@ import {
   NotificationPriority,
   NotificationCategory,
 } from '../types';
+import type { WepsunModalOptions, WepsunModalType } from '../components/common/WepsunModal';
 import {
   INITIAL_COMPANIES,
   INITIAL_BRANCHES,
@@ -222,6 +223,31 @@ interface AppContextType {
   toasts: ToastNotification[];
   showToast: (type: ToastNotification['type'], title: string, message: string) => void;
   removeToast: (id: string) => void;
+
+  // Modern WepSun Modal & Pop-up System
+  modal: WepsunModalOptions | null;
+  openModal: (options: WepsunModalOptions) => void;
+  closeModal: () => void;
+  showConfirmModal: (options: {
+    title?: string;
+    message: string | React.ReactNode;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    type?: WepsunModalType;
+    onConfirm: () => void | Promise<void>;
+    onCancel?: () => void;
+  }) => void;
+  showSuccessModal: (title?: string, message?: string | React.ReactNode, onContinue?: () => void) => void;
+  showErrorModal: (title?: string, message?: string | React.ReactNode, onRetry?: () => void) => void;
+  showWarningModal: (title?: string, message?: string | React.ReactNode, onConfirm?: () => void) => void;
+  showDeleteModal: (title?: string, message?: string | React.ReactNode, onDelete?: () => void | Promise<void>) => void;
+  showLogoutModal: (onLogout?: () => void) => void;
+  showLoginErrorModal: (message?: string, onRetry?: () => void) => void;
+  showAccessDeniedModal: (message?: string, onOk?: () => void) => void;
+  showNetworkModal: (onRetry?: () => void) => void;
+  showUpdateModal: (title?: string, message?: string, onViewDetails?: () => void) => void;
+  showLoadingModal: (title?: string, message?: string) => void;
+  hideLoadingModal: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -956,28 +982,216 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('info', 'Role Switched', `Active Mode: ${role.replace('_', ' ').toUpperCase()}`);
   };
 
-  // Toast Helpers
-  const showToast = (type: ToastNotification['type'], title: string, message: string) => {
-    const id = 'toast-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6);
-    setToasts((prev) => [...prev, { id, type, title, message }]);
-    setTimeout(() => {
-      removeToast(id);
-    }, 6000);
+  // Toast Helpers (Bottom-right notifications disabled per user preference)
+  const showToast = (_type: ToastNotification['type'], _title: string, _message: string) => {
+    // Disabled bottom-right notifications
   };
 
-  const removeToast = (id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
+  const removeToast = (_id: string) => {
+    setToasts([]);
   };
+
+  // Modern WepSun Modal & Pop-up System
+  const [modalState, setModalState] = useState<WepsunModalOptions | null>(null);
+
+  const openModal = useCallback((options: WepsunModalOptions) => {
+    setModalState(options);
+  }, []);
+
+  const closeModal = useCallback(() => {
+    setModalState(null);
+  }, []);
+
+  const showConfirmModal = useCallback((options: {
+    title?: string;
+    message: string | React.ReactNode;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    type?: WepsunModalType;
+    onConfirm: () => void | Promise<void>;
+    onCancel?: () => void;
+  }) => {
+    openModal({
+      type: options.type || 'warning',
+      title: options.title || 'Are you sure?',
+      message: options.message,
+      primaryAction: {
+        label: options.confirmLabel || 'Confirm',
+        variant: options.type === 'delete' ? 'danger' : 'primary',
+        onClick: options.onConfirm,
+      },
+      secondaryAction: {
+        label: options.cancelLabel || 'Cancel',
+        variant: 'secondary',
+        onClick: options.onCancel,
+      },
+    });
+  }, [openModal]);
+
+  const showSuccessModal = useCallback((title?: string, message?: string | React.ReactNode, onContinue?: () => void) => {
+    openModal({
+      type: 'success',
+      title: title || 'Successfully Saved!',
+      message: message || 'Your changes have been saved successfully.',
+      primaryAction: {
+        label: 'Continue',
+        variant: 'primary',
+        onClick: onContinue,
+      },
+    });
+  }, [openModal]);
+
+  const showErrorModal = useCallback((title?: string, message?: string | React.ReactNode, onRetry?: () => void) => {
+    openModal({
+      type: 'error',
+      title: title || 'Something Went Wrong',
+      message: message || "We couldn't complete your request. Please try again.",
+      primaryAction: {
+        label: 'Try Again',
+        variant: 'primary',
+        onClick: onRetry,
+      },
+      secondaryAction: {
+        label: 'Cancel',
+        variant: 'secondary',
+      },
+    });
+  }, [openModal]);
+
+  const showWarningModal = useCallback((title?: string, message?: string | React.ReactNode, onConfirm?: () => void) => {
+    openModal({
+      type: 'warning',
+      title: title || 'Are You Sure?',
+      message: message || 'This action may affect your existing data.',
+      primaryAction: {
+        label: 'Continue',
+        variant: 'warning',
+        onClick: onConfirm,
+      },
+      secondaryAction: {
+        label: 'Cancel',
+        variant: 'secondary',
+      },
+    });
+  }, [openModal]);
+
+  const showDeleteModal = useCallback((title?: string, message?: string | React.ReactNode, onDelete?: () => void | Promise<void>) => {
+    openModal({
+      type: 'delete',
+      title: title || 'Delete This Item?',
+      message: message || 'This action cannot be undone.',
+      primaryAction: {
+        label: 'Delete',
+        variant: 'danger',
+        onClick: onDelete,
+      },
+      secondaryAction: {
+        label: 'Cancel',
+        variant: 'secondary',
+      },
+    });
+  }, [openModal]);
+
+  const showLogoutModal = useCallback((onLogoutConfirm?: () => void) => {
+    openModal({
+      type: 'logout',
+      title: 'Logout?',
+      message: 'Are you sure you want to logout from WepSun Engineering Solution?',
+      primaryAction: {
+        label: 'Logout',
+        variant: 'warning',
+        onClick: () => {
+          if (onLogoutConfirm) {
+            onLogoutConfirm();
+          } else {
+            logout();
+          }
+        },
+      },
+      secondaryAction: {
+        label: 'Cancel',
+        variant: 'secondary',
+      },
+    });
+  }, [openModal]);
+
+  const showLoginErrorModal = useCallback((message?: string, onRetry?: () => void) => {
+    openModal({
+      type: 'login_error',
+      title: 'Invalid Credentials',
+      message: message || 'Please check your ID and password and try again.',
+      primaryAction: {
+        label: 'Try Again',
+        variant: 'primary',
+        onClick: onRetry,
+      },
+    });
+  }, [openModal]);
+
+  const showAccessDeniedModal = useCallback((message?: string, onOk?: () => void) => {
+    openModal({
+      type: 'access_denied',
+      title: 'Access Denied',
+      message: message || "You don't have permission to access this section.",
+      primaryAction: {
+        label: 'OK',
+        variant: 'primary',
+        onClick: onOk,
+      },
+    });
+  }, [openModal]);
+
+  const showNetworkModal = useCallback((onRetry?: () => void) => {
+    openModal({
+      type: 'network_error',
+      title: 'No Internet Connection',
+      message: 'Please check your internet connection and try again.',
+      primaryAction: {
+        label: 'Retry',
+        variant: 'primary',
+        onClick: onRetry,
+      },
+    });
+  }, [openModal]);
+
+  const showUpdateModal = useCallback((title?: string, message?: string, onViewDetails?: () => void) => {
+    openModal({
+      type: 'update',
+      title: title || 'New Update Available',
+      message: message || 'A new feature or service update is available for WepSun Engineering Solution.',
+      primaryAction: {
+        label: 'View Details',
+        variant: 'primary',
+        onClick: onViewDetails,
+      },
+      secondaryAction: {
+        label: 'Later',
+        variant: 'secondary',
+      },
+    });
+  }, [openModal]);
+
+  const showLoadingModal = useCallback((title?: string, message?: string) => {
+    openModal({
+      type: 'loading',
+      title: title || 'Please wait…',
+      message: message || 'Processing your request securely with WepSun Cloud Services.',
+      showCloseButton: false,
+      closeOnBackdropClick: false,
+    });
+  }, [openModal]);
+
+  const hideLoadingModal = useCallback(() => {
+    setModalState((prev) => (prev?.type === 'loading' ? null : prev));
+  }, []);
 
   const isMasterAuthenticated = useMemo(() => {
     if (typeof window === 'undefined') return false;
     const isMasterAuth =
       sessionStorage.getItem('wepsun_master_authenticated') === 'true' ||
       localStorage.getItem('wepsun_master_authenticated') === 'true';
-    const hasAdminRole =
-      currentRole === 'master_admin' || currentRole === 'company_admin' || currentRole === 'super_admin';
-    return isMasterAuth && hasAdminRole;
-  }, [currentRole]);
+    return Boolean(isMasterAuth);
+  }, []);
 
   const logout = useCallback(async () => {
     try {
@@ -989,7 +1203,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     clearTokens();
     if (typeof window !== 'undefined') {
       sessionStorage.removeItem('wepsun_master_authenticated');
+      sessionStorage.removeItem('wepsun_role');
+      sessionStorage.removeItem('wepsun_lift_saas_v2_role');
+      sessionStorage.removeItem('wepsun_userId');
+      sessionStorage.removeItem('wepsun_lift_saas_v2_userId');
+
       localStorage.removeItem('wepsun_master_authenticated');
+      localStorage.removeItem('wepsun_role');
+      localStorage.removeItem('wepsun_userId');
       localStorage.removeItem(STORAGE_PREFIX + 'role');
       localStorage.removeItem(STORAGE_PREFIX + 'userId');
       localStorage.removeItem(STORAGE_PREFIX + 'currentUser');
@@ -1004,8 +1225,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       window.dispatchEvent(new HashChangeEvent('hashchange'));
     }
 
-    showToast('info', 'Logged Out', 'You have been signed out successfully.');
-  }, [showToast]);
+    // Clear all existing toasts so no notifications pop up on logout
+    setToasts([]);
+  }, []);
 
   // Audit Log Mutator
   const addAuditLog = (entry: Omit<AuditLog, 'id' | 'timestamp'>) => {
@@ -3034,6 +3256,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         toasts,
         showToast,
         removeToast,
+
+        // Modern WepSun Modal & Pop-up System
+        modal: modalState,
+        openModal,
+        closeModal,
+        showConfirmModal,
+        showSuccessModal,
+        showErrorModal,
+        showWarningModal,
+        showDeleteModal,
+        showLogoutModal,
+        showLoginErrorModal,
+        showAccessDeniedModal,
+        showNetworkModal,
+        showUpdateModal,
+        showLoadingModal,
+        hideLoadingModal,
       }}
     >
       {children}

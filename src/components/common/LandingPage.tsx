@@ -203,6 +203,21 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     </svg>
   );
 
+  if (authScreen) {
+    return (
+      <LoginPage
+        isOpen={true}
+        initialView={authScreen}
+        defaultRole={defaultRole}
+        onClose={() => {
+          setAuthScreen(null);
+          if (onClose) onClose();
+        }}
+        isModal={false}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans selection:bg-[#0066FF] selection:text-white flex flex-col justify-between">
       {/* ========================================================================= */}

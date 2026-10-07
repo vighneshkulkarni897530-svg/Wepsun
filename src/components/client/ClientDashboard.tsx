@@ -105,7 +105,7 @@ export const ClientDashboard: React.FC = () => {
       else if (hash === 'client-reports' || hash === 'reports') setActiveTab('reports');
       else if (hash === 'client-pm' || hash === 'preventive-maintenance' || hash === 'pm') setActiveTab('pm');
       else if (hash === 'notifications' || hash === 'client-notifications' || hash === 'alerts') setActiveTab('notifications');
-      else if (hash === 'profile' || hash === 'my-profile' || hash === 'client-profile' || hash === 'settings') setActiveTab('profile');
+      else if (hash === 'profile' || hash === 'my-profile' || hash === 'client-profile' || hash === 'settings' || hash === 'edit-profile' || hash === 'profile-edit') setActiveTab('profile');
       else if (hash === 'feedback' || hash === 'rate-service') setIsFeedbackModalOpen(true);
       else if (hash === 'amc-renewal') setIsRenewalModalOpen(true);
       else if (hash === 'new-lift-quote' || hash === 'enquiry' || hash === 'new-quotation') setIsEnquiryModalOpen(true);

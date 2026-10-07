@@ -25,11 +25,10 @@ export const WepsunSplashAnimation: React.FC<WepsunSplashAnimationProps> = ({
   const [isFadingOut, setIsFadingOut] = useState(false);
   const [hasEnded, setHasEnded] = useState(false);
   const [isStartedPlaying, setIsStartedPlaying] = useState(false);
-  const [videoDuration, setVideoDuration] = useState(10);
   const [isControlledByEarlySplash, setIsControlledByEarlySplash] = useState(false);
   const [videoSrc, setVideoSrc] = useState<string>(() => animationVideo || '/animation.mp4');
 
-  // Transition into app after 1-second brand hold
+  // Transition into app after 5-second complete animation
   const triggerTransition = useCallback(() => {
     if (isFadingOut) return;
     setIsFadingOut(true);
@@ -44,7 +43,7 @@ export const WepsunSplashAnimation: React.FC<WepsunSplashAnimationProps> = ({
         try {
           earlyWrapper.remove();
         } catch (e) {}
-      }, 450);
+      }, 420);
     }
 
     setTimeout(() => {
@@ -54,7 +53,7 @@ export const WepsunSplashAnimation: React.FC<WepsunSplashAnimationProps> = ({
     }, 400);
   }, [isFadingOut, onComplete]);
 
-  // Video finished playing to the very end -> Hold final frame for 1.0 second, then cross-dissolve
+  // Video finished playing to the very end
   const handleVideoEnded = useCallback(() => {
     if (hasEnded) return;
     setHasEnded(true);
@@ -67,15 +66,15 @@ export const WepsunSplashAnimation: React.FC<WepsunSplashAnimationProps> = ({
       } catch (e) {}
     }
 
-    // Exactly 1000ms pause on the final logo lockup after video completion
-    setTimeout(() => {
-      triggerTransition();
-    }, 1000);
+    triggerTransition();
   }, [hasEnded, triggerTransition]);
 
   // Hook into 0ms early HTML video if present on initial app boot
   useEffect(() => {
     setSplashStatusBar();
+
+    // Register global bridge callback
+    (window as any).__WEPSUN_ON_SPLASH_COMPLETE = triggerTransition;
 
     const earlyVideo = document.getElementById('wepsun-splash-video') as HTMLVideoElement | null;
     const earlyWrapper = document.getElementById('wepsun-splash-wrapper');
@@ -85,6 +84,9 @@ export const WepsunSplashAnimation: React.FC<WepsunSplashAnimationProps> = ({
       earlyVideo.muted = true;
       earlyVideo.defaultMuted = true;
       earlyVideo.playsInline = true;
+      try {
+        earlyVideo.playbackRate = 2.0;
+      } catch(e) {}
 
       const p = earlyVideo.play();
       if (p !== undefined) {
@@ -92,12 +94,14 @@ export const WepsunSplashAnimation: React.FC<WepsunSplashAnimationProps> = ({
       }
 
       const handleTimeUpdate = () => {
-        const d = earlyVideo.duration;
+        try {
+          if (earlyVideo.playbackRate !== 2.0) {
+            earlyVideo.playbackRate = 2.0;
+          }
+        } catch(e) {}
         const cur = earlyVideo.currentTime;
-        if (d && !isNaN(d) && d > 2) {
-          setVideoDuration(d);
-        }
-        if (d > 2 && cur > 2 && cur >= d - 0.08) {
+        const d = earlyVideo.duration;
+        if (d && d > 2 && cur >= d - 0.08) {
           handleVideoEnded();
         }
       };
@@ -109,28 +113,14 @@ export const WepsunSplashAnimation: React.FC<WepsunSplashAnimationProps> = ({
       earlyVideo.addEventListener('timeupdate', handleTimeUpdate);
       earlyVideo.addEventListener('ended', handleEnded);
 
-      // Mobile touch trigger in case of extreme battery saver
-      const handleUserTouch = () => {
-        if (!hasEnded && earlyVideo.paused) {
-          earlyVideo.play().catch(() => {});
-        }
-      };
-
-      window.addEventListener('touchstart', handleUserTouch, { passive: true });
-      window.addEventListener('pointerdown', handleUserTouch, { passive: true });
-      window.addEventListener('click', handleUserTouch, { passive: true });
-
       return () => {
         earlyVideo.removeEventListener('timeupdate', handleTimeUpdate);
         earlyVideo.removeEventListener('ended', handleEnded);
-        window.removeEventListener('touchstart', handleUserTouch);
-        window.removeEventListener('pointerdown', handleUserTouch);
-        window.removeEventListener('click', handleUserTouch);
       };
     }
-  }, [handleVideoEnded, hasEnded]);
+  }, [handleVideoEnded, triggerTransition]);
 
-  // Reliable play trigger for React-rendered video fallback (e.g. hash navigation #splash)
+  // Reliable play trigger for React-rendered video (e.g. hash navigation #splash or fallback)
   const startPlayback = useCallback(() => {
     const video = videoRef.current;
     if (!video || hasEnded) return;
@@ -138,12 +128,18 @@ export const WepsunSplashAnimation: React.FC<WepsunSplashAnimationProps> = ({
     video.muted = true;
     video.defaultMuted = true;
     video.playsInline = true;
+    try {
+      video.playbackRate = 2.0;
+    } catch(e) {}
 
     const playPromise = video.play();
     if (playPromise !== undefined) {
       playPromise
         .then(() => {
           setIsStartedPlaying(true);
+          try {
+            video.playbackRate = 2.0;
+          } catch(e) {}
         })
         .catch(() => {});
     }
@@ -155,6 +151,9 @@ export const WepsunSplashAnimation: React.FC<WepsunSplashAnimationProps> = ({
       node.muted = true;
       node.defaultMuted = true;
       node.playsInline = true;
+      try {
+        node.playbackRate = 2.0;
+      } catch(e) {}
       node.setAttribute('muted', '');
       node.setAttribute('playsinline', '');
       node.setAttribute('webkit-playsinline', 'true');
@@ -166,7 +165,12 @@ export const WepsunSplashAnimation: React.FC<WepsunSplashAnimationProps> = ({
       
       const p = node.play();
       if (p !== undefined) {
-        p.then(() => setIsStartedPlaying(true)).catch(() => {});
+        p.then(() => {
+          setIsStartedPlaying(true);
+          try {
+            node.playbackRate = 2.0;
+          } catch(e) {}
+        }).catch(() => {});
       }
     }
   }, []);
@@ -177,17 +181,16 @@ export const WepsunSplashAnimation: React.FC<WepsunSplashAnimationProps> = ({
     }
   }, [isControlledByEarlySplash, startPlayback]);
 
-  // Safety fallback timer: if video hangs past its duration + 4s, transition gracefully
+  // Safety fallback timer: complete 5-second animation + 0.5s margin
   useEffect(() => {
-    const safetyMs = (videoDuration + 4) * 1000;
     const safetyTimer = setTimeout(() => {
       if (!hasEnded && !isFadingOut) {
         handleVideoEnded();
       }
-    }, safetyMs);
+    }, 5500);
 
     return () => clearTimeout(safetyTimer);
-  }, [videoDuration, hasEnded, isFadingOut, handleVideoEnded]);
+  }, [hasEnded, isFadingOut, handleVideoEnded]);
 
   // If early HTML splash is active on launch, let it handle playback directly at 0ms
   if (isControlledByEarlySplash) {
@@ -220,27 +223,35 @@ export const WepsunSplashAnimation: React.FC<WepsunSplashAnimationProps> = ({
         tabIndex={-1}
         controlsList="nodownload nofullscreen noremoteplayback noplaybackrate"
         onLoadedMetadata={(e) => {
-          const d = e.currentTarget.duration;
-          if (d && !isNaN(d) && d > 2) {
-            setVideoDuration(d);
-          }
+          try {
+            e.currentTarget.playbackRate = 2.0;
+          } catch(err) {}
           startPlayback();
         }}
-        onCanPlay={() => {
+        onCanPlay={(e) => {
+          try {
+            e.currentTarget.playbackRate = 2.0;
+          } catch(err) {}
           startPlayback();
         }}
-        onCanPlayThrough={() => {
+        onCanPlayThrough={(e) => {
+          try {
+            e.currentTarget.playbackRate = 2.0;
+          } catch(err) {}
           startPlayback();
         }}
-        onPlaying={() => {
+        onPlaying={(e) => {
           setIsStartedPlaying(true);
+          try {
+            e.currentTarget.playbackRate = 2.0;
+          } catch(err) {}
         }}
         onTimeUpdate={(e) => {
           const v = e.currentTarget;
           if (v.currentTime > 0.01 && !isStartedPlaying) {
             setIsStartedPlaying(true);
           }
-          if (v.duration > 2 && v.currentTime > 2 && v.currentTime >= v.duration - 0.08) {
+          if (v.duration > 2 && v.currentTime >= v.duration - 0.08) {
             handleVideoEnded();
           }
         }}

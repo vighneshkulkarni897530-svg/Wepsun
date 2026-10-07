@@ -17,7 +17,7 @@ import {
 import { useApp } from '../../context/AppContext';
 
 export const AdminClientsView: React.FC = () => {
-  const { users, buildings, amcContracts, lifts } = useApp();
+  const { users, buildings, amcContracts, lifts, showSuccessModal } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddClientModalOpen, setIsAddClientModalOpen] = useState(false);
@@ -113,13 +113,17 @@ export const AdminClientsView: React.FC = () => {
 
   const handleCreateClient = (e: React.FormEvent) => {
     e.preventDefault();
-    alert(`Client "${name}" registered successfully! Welcome email & SMS credentials sent.`);
+    const createdName = name;
     setIsAddClientModalOpen(false);
     setName('');
     setEmail('');
     setPhone('');
     setSocietyName('');
     setAddress('');
+    showSuccessModal(
+      'Client Registered Successfully!',
+      `Client "${createdName}" has been added to WepSun ERP. Welcome email & SMS credentials have been dispatched.`
+    );
   };
 
   return (

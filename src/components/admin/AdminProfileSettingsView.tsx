@@ -21,11 +21,21 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { AuditLogViewer } from './AuditLogViewer';
+import { EditProfilePage } from '../common/EditProfilePage';
 
 export const AdminProfileSettingsView: React.FC = () => {
-  const { currentUser, activeCompany, currentRole, updateUserProfile, showToast } = useApp();
+  const {
+    currentUser,
+    activeCompany,
+    currentRole,
+    updateUserProfile,
+    showToast,
+    showWarningModal,
+    showSuccessModal,
+  } = useApp();
 
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'audit'>('profile');
+  const [isEditingFull, setIsEditingFull] = useState(false);
 
   // Profile Information Fields synced from currentUser
   const [name, setName] = useState(currentUser.name || 'WEPSUN Administrator');
@@ -97,6 +107,10 @@ export const AdminProfileSettingsView: React.FC = () => {
     setConfirmPassword('');
   };
 
+  if (isEditingFull) {
+    return <EditProfilePage onBack={() => setIsEditingFull(false)} onSaved={() => setIsEditingFull(false)} />;
+  }
+
   return (
     <div className="space-y-6 text-slate-800">
       {/* Header */}
@@ -110,6 +124,15 @@ export const AdminProfileSettingsView: React.FC = () => {
             Account settings, role permissions, multi-factor authentication, active sessions, and audit log trail.
           </p>
         </div>
+
+        <button
+          type="button"
+          onClick={() => setIsEditingFull(true)}
+          className="px-4 py-2.5 rounded-2xl bg-[#0066FF] hover:bg-[#0052cc] text-white text-xs font-bold transition-all shadow-sm flex items-center gap-2 cursor-pointer self-start sm:self-center"
+        >
+          <Camera className="w-4 h-4" />
+          <span>Edit Full Profile & Photo</span>
+        </button>
       </div>
 
       {/* Tabs */}
@@ -151,11 +174,21 @@ export const AdminProfileSettingsView: React.FC = () => {
         <form onSubmit={handleSaveProfile} className="space-y-6">
           <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm space-y-5">
             <div className="flex items-center gap-4 pb-5 border-b border-slate-100">
-              <img
-                src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80"
-                alt="Profile Avatar"
-                className="w-16 h-16 rounded-2xl object-cover ring-4 ring-blue-50 shadow-sm"
-              />
+              <div className="relative group shrink-0">
+                <img
+                  src={currentUser.avatar || avatar}
+                  alt={name}
+                  className="w-16 h-16 rounded-2xl object-cover ring-4 ring-blue-50 shadow-sm border border-slate-200"
+                />
+                <button
+                  type="button"
+                  onClick={() => setIsEditingFull(true)}
+                  className="absolute -bottom-1 -right-1 w-6 h-6 rounded-lg bg-[#0066FF] hover:bg-[#0052cc] text-white flex items-center justify-center shadow-md border-2 border-white transition-transform hover:scale-110 cursor-pointer"
+                  title="Update Photo"
+                >
+                  <Camera className="w-3 h-3" />
+                </button>
+              </div>
               <div>
                 <h3 className="font-bold text-base text-slate-900">{name}</h3>
                 <span className="inline-block mt-0.5 px-2.5 py-0.5 rounded-full bg-blue-50 text-[#1976D2] font-bold text-[11px] uppercase">
@@ -407,8 +440,16 @@ export const AdminProfileSettingsView: React.FC = () => {
                   </div>
                 </div>
                 <button
-                  onClick={() => alert('Session logged out successfully.')}
-                  className="px-2.5 py-1 rounded-lg bg-slate-200 hover:bg-red-50 hover:text-red-600 font-bold text-[11px] transition-colors"
+                  onClick={() => {
+                    showWarningModal(
+                      'Revoke Mobile Session?',
+                      'This will immediately log out the active Android PWA session on IP 103.22.14.90.',
+                      () => {
+                        showSuccessModal('Session Terminated', 'Remote Android session was successfully revoked.');
+                      }
+                    );
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-slate-200 hover:bg-red-50 hover:text-red-600 font-bold text-[11px] transition-colors cursor-pointer"
                 >
                   Revoke
                 </button>

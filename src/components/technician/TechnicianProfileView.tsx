@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { Technician, TechnicianJob, InventoryItem } from '../../types';
 import { useApp } from '../../context/AppContext';
+import { EditProfilePage } from '../common/EditProfilePage';
 
 interface TechnicianProfileViewProps {
   technician: Technician;
@@ -39,8 +40,9 @@ export const TechnicianProfileView: React.FC<TechnicianProfileViewProps> = ({
   inventory,
   showToast,
 }) => {
-  const { updateTechnicianProfile } = useApp();
+  const { currentUser, updateTechnicianProfile } = useApp();
 
+  const [isEditing, setIsEditing] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState('Just now (Online)');
   const [isOfflineMode, setIsOfflineMode] = useState(false);
@@ -104,14 +106,32 @@ export const TechnicianProfileView: React.FC<TechnicianProfileViewProps> = ({
     }
   };
 
+  if (isEditing) {
+    return <EditProfilePage onBack={() => setIsEditing(false)} onSaved={() => setIsEditing(false)} />;
+  }
+
   return (
     <div className="space-y-6">
       {/* Header Banner */}
       <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#123B5D] to-[#1976D2] text-white flex items-center justify-center font-black text-xl shadow-md shrink-0">
-              {technician.name.split(' ').map((n) => n[0]).join('')}
+          <div className="flex items-center gap-3.5">
+            <div className="relative group shrink-0">
+              <div className="w-16 h-16 rounded-2xl overflow-hidden bg-gradient-to-br from-[#123B5D] to-[#1976D2] text-white flex items-center justify-center font-black text-xl shadow-md border-2 border-white">
+                {currentUser?.avatar ? (
+                  <img src={currentUser.avatar} alt={technician.name} className="w-full h-full object-cover" />
+                ) : (
+                  <span>{technician.name.split(' ').map((n) => n[0]).join('')}</span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditing(true)}
+                className="absolute -bottom-1 -right-1 w-6 h-6 rounded-lg bg-[#0066FF] hover:bg-[#0052cc] text-white flex items-center justify-center shadow-md border-2 border-white transition-transform hover:scale-110 cursor-pointer"
+                title="Update Profile Photo"
+              >
+                <Camera className="w-3 h-3" />
+              </button>
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
@@ -133,7 +153,7 @@ export const TechnicianProfileView: React.FC<TechnicianProfileViewProps> = ({
           {/* Sync & Actions Controls */}
           <div className="flex items-center gap-2 flex-wrap">
             <button
-              onClick={handleOpenEdit}
+              onClick={() => setIsEditing(true)}
               className="px-3.5 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-800 text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
             >
               <Edit3 className="w-3.5 h-3.5 text-[#1976D2]" />

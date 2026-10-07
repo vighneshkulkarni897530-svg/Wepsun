@@ -31,7 +31,7 @@ export type ReportCategory =
   | 'lift_history';
 
 export const AdminReportsView: React.FC = () => {
-  const { lifts, branches, technicians, users, buildings } = useApp();
+  const { lifts, branches, technicians, users, buildings, showSuccessModal } = useApp();
 
   const [activeReport, setActiveReport] = useState<ReportCategory>('complaints');
 
@@ -56,7 +56,10 @@ export const AdminReportsView: React.FC = () => {
   ];
 
   const handleExport = (format: 'pdf' | 'csv') => {
-    alert(`Exporting ${activeReport.toUpperCase()} Report in ${format.toUpperCase()} format with active filters...`);
+    showSuccessModal(
+      'Report Export Ready',
+      `Exporting ${activeReport.toUpperCase()} Report in ${format.toUpperCase()} format with all active filters applied.`
+    );
   };
 
   return (

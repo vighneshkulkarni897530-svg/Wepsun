@@ -26,6 +26,7 @@ export const RoleSwitcher: React.FC = () => {
     setCurrentRole,
     currentUser,
     resetDemoData,
+    showWarningModal,
   } = useApp();
 
   const roles: { role: UserRole; label: string; icon: React.ReactNode }[] = [
@@ -118,11 +119,15 @@ export const RoleSwitcher: React.FC = () => {
 
           <button
             onClick={() => {
-              if (window.confirm('Reset local application cache and state?')) {
-                resetDemoData();
-              }
+              showWarningModal(
+                'Reset Application Cache?',
+                'This will restore default demo data and clear local overrides.',
+                () => {
+                  resetDemoData();
+                }
+              );
             }}
-            className="ml-2 inline-flex items-center gap-1 px-2 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 border border-slate-200 text-xs font-semibold"
+            className="ml-2 inline-flex items-center gap-1 px-2 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 border border-slate-200 text-xs font-semibold cursor-pointer"
             title="Reset cached state"
           >
             <RotateCcw className="w-3 h-3" />

@@ -16,6 +16,7 @@ import {
   Boxes,
 } from 'lucide-react';
 import { TechnicianJob, TechnicianPartItem, InventoryItem, PartCondition } from '../../types';
+import { useApp } from '../../context/AppContext';
 
 interface PartsManagerViewProps {
   job: TechnicianJob;
@@ -45,6 +46,7 @@ export const PartsManagerView: React.FC<PartsManagerViewProps> = ({
   onNavigateToTab,
   showToast,
 }) => {
+  const { showDeleteModal } = useApp();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedInventoryId, setSelectedInventoryId] = useState<string>(inventory[0]?.id || '');
   const [customPartName, setCustomPartName] = useState('');
@@ -139,11 +141,15 @@ export const PartsManagerView: React.FC<PartsManagerViewProps> = ({
   };
 
   const handleRemovePart = (partId: string) => {
-    if (confirm('Remove this part from the job consumption record?')) {
-      const updatedParts = jobParts.filter((p) => p.id !== partId);
-      onUpdateJobParts(updatedParts);
-      showToast('info', 'Part Removed', 'Item removed from job parts ledger.');
-    }
+    showDeleteModal(
+      'Remove Part Record?',
+      'Are you sure you want to remove this part from the job consumption record?',
+      () => {
+        const updatedParts = jobParts.filter((p) => p.id !== partId);
+        onUpdateJobParts(updatedParts);
+        showToast('info', 'Part Removed', 'Item removed from job parts ledger.');
+      }
+    );
   };
 
   const totalPartsCost = jobParts.reduce((acc, p) => acc + p.totalCost, 0);

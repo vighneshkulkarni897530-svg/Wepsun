@@ -29,6 +29,7 @@ export const QuotationManager: React.FC = () => {
     approveQuotation,
     convertQuotationToWorkOrder,
     activeCompany,
+    showSuccessModal,
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -127,6 +128,10 @@ export const QuotationManager: React.FC = () => {
     });
 
     setIsAddModalOpen(false);
+    showSuccessModal(
+      'Quotation Generated Successfully!',
+      `Official quotation for ${targetLift.liftNumber} (${targetLift.buildingName}) has been generated and queued for approval.`
+    );
   };
 
   const handleConvertSubmit = (e: React.FormEvent) => {
@@ -134,6 +139,10 @@ export const QuotationManager: React.FC = () => {
     if (!convertingQuote) return;
     convertQuotationToWorkOrder(convertingQuote.id, selectedTechId, scheduledDate);
     setConvertingQuote(null);
+    showSuccessModal(
+      'Converted to Active Work Order!',
+      `Quotation ${convertingQuote.quotationNumber} has been scheduled as an active field service task.`
+    );
   };
 
   return (

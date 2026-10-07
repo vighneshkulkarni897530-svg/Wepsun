@@ -149,31 +149,35 @@
         var v = document.getElementById('wepsun-splash-video');
         var wrap = document.getElementById('wepsun-splash-wrapper');
         
+        var hasDismissed = false;
         function dismissSplash() {
+          if (hasDismissed) return;
+          hasDismissed = true;
           if (wrap && wrap.parentNode) {
-            wrap.style.transition = 'opacity 0.35s ease-out';
+            wrap.style.transition = 'opacity 0.4s ease-out';
             wrap.style.opacity = '0';
             wrap.style.pointerEvents = 'none';
             setTimeout(function() {
               if (wrap && wrap.parentNode) {
                 wrap.parentNode.removeChild(wrap);
               }
-            }, 360);
+            }, 420);
+          }
+          if (window.__WEPSUN_ON_SPLASH_COMPLETE) {
+            try {
+              window.__WEPSUN_ON_SPLASH_COMPLETE();
+            } catch(e) {}
           }
         }
 
-        if (wrap) {
-          wrap.addEventListener('click', dismissSplash);
-          wrap.addEventListener('touchstart', dismissSplash, { passive: true });
-        }
-
-        // Safety timeout: Never block user if video hangs or takes > 5s
-        var splashTimer = setTimeout(dismissSplash, 5000);
+        // Safety fallback timer: 5.5s to ensure complete 5-second animation finishes gracefully
+        var splashTimer = setTimeout(dismissSplash, 5500);
 
         if (v) {
           v.muted = true;
           v.defaultMuted = true;
           v.playsInline = true;
+          v.playbackRate = 2.0; // Complete 10s animation plays in exactly 5.0s
           
           var hasRevealed = false;
           function reveal() {
@@ -183,32 +187,51 @@
             }
           }
 
-          v.addEventListener('playing', reveal);
+          function configureRate() {
+            try {
+              v.playbackRate = 2.0;
+            } catch(e) {}
+          }
+
+          v.addEventListener('playing', function() {
+            configureRate();
+            reveal();
+          });
+          v.addEventListener('loadedmetadata', function() {
+            configureRate();
+          });
           v.addEventListener('timeupdate', function() {
             if (v.currentTime > 0.01) {
               reveal();
             }
-            if (v.duration > 2 && v.currentTime >= v.duration - 0.1) {
+            if (v.duration > 2 && v.currentTime >= v.duration - 0.08) {
               dismissSplash();
             }
           });
           v.addEventListener('ended', function() {
-            setTimeout(dismissSplash, 600);
+            dismissSplash();
           });
           v.addEventListener('error', dismissSplash);
 
           v.addEventListener('loadeddata', function() {
+            configureRate();
             if (v.readyState >= 2) {
               var p = v.play();
               if (p !== undefined) {
-                p.then(reveal).catch(function() {});
+                p.then(function() {
+                  configureRate();
+                  reveal();
+                }).catch(function() {});
               }
             }
           });
 
           var p = v.play();
           if (p !== undefined) {
-            p.then(reveal).catch(function() {});
+            p.then(function() {
+              configureRate();
+              reveal();
+            }).catch(function() {});
           }
           window.__WEPSUN_SPLASH_VIDEO = v;
           window.__WEPSUN_SPLASH_WRAPPER = wrap;

@@ -38,6 +38,7 @@ export const ClientNotificationsView: React.FC<ClientNotificationsViewProps> = (
     clearAllNotifications,
     isSoundEnabled,
     toggleSound,
+    showDeleteModal,
   } = useApp();
 
   const [filterCategory, setFilterCategory] = useState<string>('all');
@@ -184,9 +185,13 @@ export const ClientNotificationsView: React.FC<ClientNotificationsViewProps> = (
           {roleNotifications.length > 0 && (
             <button
               onClick={() => {
-                if (window.confirm('Clear all alerts?')) {
-                  clearAllNotifications();
-                }
+                showDeleteModal(
+                  'Clear All Alerts?',
+                  'This will remove all notification records for your account.',
+                  () => {
+                    clearAllNotifications();
+                  }
+                );
               }}
               className="px-3 py-2 rounded-xl bg-white/10 hover:bg-rose-500/30 text-slate-300 hover:text-rose-200 font-bold text-xs border border-white/10 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
             >

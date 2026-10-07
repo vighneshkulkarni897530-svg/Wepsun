@@ -12,9 +12,7 @@ initNativeApp();
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ErrorBoundary fallbackTitle="WEPSUN SaaS Application Error">
-      <AppProvider>
-        <App />
-      </AppProvider>
+      <App />
     </ErrorBoundary>
   </React.StrictMode>
 );

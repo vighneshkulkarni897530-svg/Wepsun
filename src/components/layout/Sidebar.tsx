@@ -62,6 +62,7 @@ export type NavTabId =
   | 'flowchart'
   | 'design_system'
   | 'settings'
+  | 'edit_profile'
   // Client Tabs
   | 'home'
   | 'history'
@@ -101,6 +102,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     currentUser,
     currentRole,
     logout,
+    showLogoutModal,
     clientScopedNotifications,
     clientScopedComplaints,
     clientScopedQuotations,
@@ -308,8 +310,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
           <button
             onClick={() => {
-              logout();
-              onCloseMobile();
+              showLogoutModal(() => {
+                logout();
+                onCloseMobile();
+              });
             }}
             className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
           >

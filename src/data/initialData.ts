@@ -114,6 +114,28 @@ export const INITIAL_BRANCHES: Branch[] = [
 
 export const INITIAL_USERS: User[] = [
   {
+    id: 'usr-master-sumit',
+    companyId: 'comp-1',
+    branchId: 'br-mum-1',
+    name: 'Sumit Jaiswal (Master Admin)',
+    email: 'jaiswalsumit2812@gmail.com',
+    phone: '+91 98201 99928',
+    role: 'master_admin',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+    isActive: true,
+  },
+  {
+    id: 'usr-master-gaurav',
+    companyId: 'comp-1',
+    branchId: 'br-mum-1',
+    name: 'Gaurav Saini (Master Admin)',
+    email: 'gauravsaini0004@gmail.com',
+    phone: '+91 98201 92025',
+    role: 'master_admin',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+    isActive: true,
+  },
+  {
     id: 'usr-super-1',
     companyId: 'comp-1',
     name: 'System Super Admin',
@@ -253,6 +275,46 @@ export const INITIAL_USERS: User[] = [
 ];
 
 export const DEMO_ACCOUNTS: DemoAccount[] = [
+  {
+    id: 'usr-master-sumit',
+    name: 'Sumit Jaiswal',
+    title: 'Master Technical Controller & Admin',
+    role: 'master_admin',
+    category: 'executive',
+    categoryLabel: 'Executive & Admin',
+    email: 'jaiswalsumit2812@gmail.com',
+    phone: '+91 98201 99928',
+    password: 'Wepsun@928',
+    otp: '123456',
+    companyId: 'comp-1',
+    companyName: 'WEPSUN Engineering Solution',
+    branchId: 'br-mum-1',
+    branchName: 'Mumbai Central & Western Branch',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+    badgeColor: 'bg-blue-600 text-white',
+    description: 'Master Administrator with unrestricted dashboard, technical operations, and infrastructure governance access.',
+    keyFeatures: ['Full Executive & Operations Dashboard', 'AMC Tender & Invoice Approvals', 'Technician Dispatch Radar', 'Master System Configuration']
+  },
+  {
+    id: 'usr-master-gaurav',
+    name: 'Gaurav Saini',
+    title: 'Master Technical Controller & Admin',
+    role: 'master_admin',
+    category: 'executive',
+    categoryLabel: 'Executive & Admin',
+    email: 'gauravsaini0004@gmail.com',
+    phone: '+91 98201 92025',
+    password: 'Wepsun@2025',
+    otp: '123456',
+    companyId: 'comp-1',
+    companyName: 'WEPSUN Engineering Solution',
+    branchId: 'br-mum-1',
+    branchName: 'Mumbai Central & Western Branch',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+    badgeColor: 'bg-indigo-600 text-white',
+    description: 'Master Administrator with unrestricted dashboard, technical operations, and infrastructure governance access.',
+    keyFeatures: ['Full Executive & Operations Dashboard', 'AMC Tender & Invoice Approvals', 'Technician Dispatch Radar', 'Master System Configuration']
+  },
   {
     id: 'usr-admin-1',
     name: 'Sunil Mehta',

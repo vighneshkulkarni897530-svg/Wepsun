@@ -81,6 +81,8 @@ export const Header: React.FC<HeaderProps> = ({
     markAllNotificationsRead,
     isSoundEnabled,
     toggleSound,
+    showLogoutModal,
+    showWarningModal,
   } = useApp();
 
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -707,7 +709,9 @@ export const Header: React.FC<HeaderProps> = ({
                   <button
                     onClick={() => {
                       setIsProfileDropdownOpen(false);
-                      logout();
+                      showLogoutModal(() => {
+                        logout();
+                      });
                     }}
                     className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs transition-colors cursor-pointer"
                     title="Log out and return to Login Landing Page"
@@ -718,10 +722,14 @@ export const Header: React.FC<HeaderProps> = ({
 
                   <button
                     onClick={() => {
-                      if (window.confirm('Reset local application cache and state?')) {
-                        resetDemoData();
-                        setIsProfileDropdownOpen(false);
-                      }
+                      setIsProfileDropdownOpen(false);
+                      showWarningModal(
+                        'Reset Application Cache?',
+                        'This will restore default demo data and clear local overrides.',
+                        () => {
+                          resetDemoData();
+                        }
+                      );
                     }}
                     className="flex items-center justify-center gap-1 px-2.5 py-2 rounded-xl text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-100 font-medium transition-colors"
                     title="Reset cached data"
