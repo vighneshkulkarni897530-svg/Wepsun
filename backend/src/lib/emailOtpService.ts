@@ -35,8 +35,9 @@ export interface EmailDispatchResult {
 
 export interface EmailServiceHealth {
   status: 'healthy' | 'degraded' | 'unconfigured';
-  primaryProvider: 'resend' | 'smtp' | 'none';
+  primaryProvider: 'resend' | 'brevo' | 'smtp' | 'none';
   resendConfigured: boolean;
+  brevoConfigured: boolean;
   smtpConfigured: boolean;
   fromAddress: string;
   timestamp: string;
@@ -260,6 +261,83 @@ async function dispatchViaResend(params: {
 }
 
 /**
+ * Dispatch email via Brevo HTTPS REST API (Port 443 — Firewall Resilient)
+ */
+async function dispatchViaBrevo(params: {
+  toEmail: string;
+  subject: string;
+  htmlContent: string;
+  textContent: string;
+}): Promise<EmailDispatchResult> {
+  const apiKey = (process.env.BREVO_API_KEY || '').trim();
+  if (!apiKey || apiKey.includes('your_') || apiKey.length < 10) {
+    return {
+      accepted: false,
+      provider: 'brevo',
+      error: 'BREVO_NOT_CONFIGURED',
+    };
+  }
+
+  const senderEmail = (process.env.BREVO_SENDER_EMAIL || process.env.SMTP_USER || 'wepsunengineering@gmail.com').trim();
+  const senderName = (process.env.BREVO_SENDER_NAME || 'WEPSUN Engineering').trim();
+  const maskedTo = maskEmail(params.toEmail);
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'api-key': apiKey,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        sender: { name: senderName, email: senderEmail },
+        to: [{ email: params.toEmail }],
+        subject: params.subject,
+        htmlContent: params.htmlContent,
+        textContent: params.textContent,
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    const resJson = (await response.json().catch(() => ({}))) as any;
+
+    if (response.ok && resJson?.messageId) {
+      console.log(`[OTP_EMAIL] provider=brevo recipient=${maskedTo} status=accepted messageId=${resJson.messageId}`);
+      return {
+        accepted: true,
+        messageId: resJson.messageId,
+        provider: 'brevo',
+      };
+    }
+
+    const errorMsg = resJson?.message || resJson?.error || `HTTP_${response.status}`;
+    console.warn(`[OTP_EMAIL] provider=brevo recipient=${maskedTo} status=failed errorCode=${response.status} error="${errorMsg}"`);
+    return {
+      accepted: false,
+      provider: 'brevo',
+      errorCode: response.status,
+      error: errorMsg,
+    };
+  } catch (err: any) {
+    const isTimeout = err.name === 'AbortError' || String(err.message).toLowerCase().includes('abort');
+    const errCode = isTimeout ? 'TIMEOUT' : err.code || 'NETWORK_ERROR';
+    console.warn(`[OTP_EMAIL] provider=brevo recipient=${maskedTo} status=failed errorCode=${errCode} error="${err.message || 'Fetch failed'}"`);
+    return {
+      accepted: false,
+      provider: 'brevo',
+      errorCode: errCode,
+      error: err.message,
+    };
+  }
+}
+
+/**
  * Dispatch email via Nodemailer SMTP (Gmail / Custom SMTP)
  */
 async function dispatchViaSmtp(params: {
@@ -359,10 +437,11 @@ async function dispatchViaSmtp(params: {
 
 /**
  * Sequential Failover Dispatch:
- * 1. Resend (HTTPS 443 — firewall-resilient)
- * 2. Gmail SMTP SSL 465
- * 3. Gmail SMTP STARTTLS 587
- * 4. Controlled failure (Never fake success)
+ * 1. Resend HTTPS API (Port 443 — firewall-resilient)
+ * 2. Brevo HTTPS API (Port 443 — firewall-resilient)
+ * 3. Gmail SMTP SSL 465
+ * 4. Gmail SMTP STARTTLS 587
+ * 5. Controlled failure (Never fake success)
  */
 export async function dispatchEmailWithFailover(params: {
   toEmail: string;
@@ -378,7 +457,13 @@ export async function dispatchEmailWithFailover(params: {
     return resendResult;
   }
 
-  // Step 2: Try Secondary Fallback — Gmail SMTP Port 465 (SSL)
+  // Step 2: Try Secondary HTTPS Provider — Brevo REST API (Only if BREVO_API_KEY is configured)
+  const brevoResult = await dispatchViaBrevo({ toEmail, subject, htmlContent, textContent });
+  if (brevoResult.accepted) {
+    return brevoResult;
+  }
+
+  // Step 3: Try Tertiary Fallback — Gmail SMTP Port 465 (SSL)
   const smtp465Result = await dispatchViaSmtp({
     toEmail,
     subject,
@@ -391,7 +476,7 @@ export async function dispatchEmailWithFailover(params: {
     return smtp465Result;
   }
 
-  // Step 3: Try Tertiary Fallback — Gmail SMTP Port 587 (STARTTLS)
+  // Step 4: Try Quaternary Fallback — Gmail SMTP Port 587 (STARTTLS)
   const smtp587Result = await dispatchViaSmtp({
     toEmail,
     subject,
@@ -405,7 +490,7 @@ export async function dispatchEmailWithFailover(params: {
   }
 
   // All providers failed or unconfigured
-  const lastError = resendResult.error || smtp465Result.error || smtp587Result.error || 'ALL_PROVIDERS_FAILED';
+  const lastError = resendResult.error || brevoResult.error || smtp465Result.error || smtp587Result.error || 'ALL_PROVIDERS_FAILED';
   return {
     accepted: false,
     provider: 'none',
@@ -606,28 +691,36 @@ export function getEmailServiceHealth(): EmailServiceHealth {
   const resendKey = (process.env.RESEND_API_KEY || '').trim();
   const resendConfigured = Boolean(resendKey && !resendKey.includes('your_') && resendKey.length > 10);
 
+  const brevoKey = (process.env.BREVO_API_KEY || '').trim();
+  const brevoConfigured = Boolean(brevoKey && !brevoKey.includes('your_') && brevoKey.length > 10);
+
   const smtpUser = (process.env.SMTP_USER || '').trim();
   const smtpPass = (process.env.SMTP_PASS || '').trim();
   const smtpConfigured = Boolean(smtpUser && smtpPass && !smtpPass.includes('your_'));
 
-  let primaryProvider: 'resend' | 'smtp' | 'none' = 'none';
+  let primaryProvider: 'resend' | 'brevo' | 'smtp' | 'none' = 'none';
   let fromAddress = 'Unconfigured';
 
   if (resendConfigured) {
     primaryProvider = 'resend';
     fromAddress = (process.env.RESEND_FROM || 'WEPSUN Engineering <no-reply@wepsunengineering.com>').trim();
+  } else if (brevoConfigured) {
+    primaryProvider = 'brevo';
+    const brevoEmail = (process.env.BREVO_SENDER_EMAIL || process.env.SMTP_USER || 'wepsunengineering@gmail.com').trim();
+    fromAddress = (process.env.BREVO_SENDER_NAME || 'WEPSUN Engineering') + ` <${brevoEmail}>`;
   } else if (smtpConfigured) {
     primaryProvider = 'smtp';
     fromAddress = (process.env.SMTP_FROM || `"WEPSUN Engineering" <${smtpUser}>`).trim();
   }
 
   const status: 'healthy' | 'degraded' | 'unconfigured' =
-    resendConfigured || smtpConfigured ? 'healthy' : 'unconfigured';
+    resendConfigured || brevoConfigured || smtpConfigured ? 'healthy' : 'unconfigured';
 
   return {
     status,
     primaryProvider,
     resendConfigured,
+    brevoConfigured,
     smtpConfigured,
     fromAddress,
     timestamp: new Date().toISOString(),
