@@ -21,6 +21,12 @@ import {
   LogOut,
   Loader2,
   ShieldAlert,
+  Type,
+  Hash,
+  Binary,
+  Cpu,
+  Info,
+  Check,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { WepsunLogo } from '../common/WepsunLogo';
@@ -119,6 +125,350 @@ export const DesignSystemShowcase: React.FC = () => {
               </div>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 3. WEPSUN CORPORATE TYPOGRAPHY SYSTEM */}
+      {/* ========================================================================= */}
+      <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 shadow-sm space-y-7">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="w-8 h-8 rounded-xl bg-blue-50 text-[#1976D2] flex items-center justify-center font-bold">
+                <Type className="w-4 h-4" />
+              </span>
+              <h2 className="text-lg font-bold text-slate-900 tracking-tight">
+                Corporate Typography System
+              </h2>
+            </div>
+            <p className="text-xs text-slate-500 mt-1 max-w-2xl font-normal leading-relaxed">
+              Clean, high-precision corporate sans-serif typography built for engineering, elevator IoT telemetry, field service management, and client dashboards.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="px-3 py-1 bg-slate-900 text-white text-[11px] font-mono font-semibold rounded-xl">
+              Inter Primary
+            </span>
+            <span className="px-3 py-1 bg-blue-50 text-[#1976D2] text-[11px] font-semibold rounded-xl border border-blue-100">
+              ISO 9001 Identity
+            </span>
+          </div>
+        </div>
+
+        {/* Brand Typography Identity Banner */}
+        <div className="bg-gradient-to-r from-[#0E2238] via-[#123B5D] to-[#0A1828] text-white rounded-2xl p-5 sm:p-6 shadow-inner relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <span className="text-[10px] uppercase font-mono tracking-widest text-sky-300 font-semibold">
+              Corporate Identity Principle
+            </span>
+            <h3 className="text-base sm:text-lg font-bold tracking-tight text-white">
+              WEPSUN = Professional • Engineering • Technology • Reliability • Precision
+            </h3>
+            <p className="text-xs text-slate-300 font-normal">
+              Consistent letterforms, tabular technical metrics, disciplined optical spacing, and clean sentence case structure across every screen.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 font-mono text-xs bg-white/10 px-3.5 py-2 rounded-xl border border-white/15 shrink-0">
+            <span className="text-emerald-400">●</span>
+            <span className="text-slate-200">OpenType: tnum, cv02, cv03, cv11</span>
+          </div>
+        </div>
+
+        {/* 3 Font Family Cards (Primary, Corporate Fallback, Technical Monospace) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Card 1: Primary Font - Inter */}
+          <div className="border border-blue-200 bg-blue-50/30 rounded-2xl p-4.5 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 bg-blue-100 px-2 py-0.5 rounded">
+                Primary Brand Font
+              </span>
+              <span className="text-xs font-mono font-semibold text-slate-500">Weights: 300–900</span>
+            </div>
+            <div>
+              <h4 className="text-xl font-black text-slate-900 font-sans tracking-tight">Inter</h4>
+              <p className="text-xs text-slate-600 mt-0.5">High-legibility geometric sans-serif engineered for digital interfaces and enterprise software.</p>
+            </div>
+            <div className="p-3 bg-white rounded-xl border border-blue-100 font-sans text-xs space-y-1 text-slate-800">
+              <div className="font-bold text-sm tracking-tight">Aa Bb Cc Dd Ee Ff Gg 1234567890</div>
+              <div className="text-[11px] text-slate-500 font-normal">Regular 400 • Medium 500 • Semi-Bold 600 • Bold 700</div>
+            </div>
+          </div>
+
+          {/* Card 2: Corporate Fallback - Manrope / Plus Jakarta Sans */}
+          <div className="border border-slate-200 bg-slate-50/60 rounded-2xl p-4.5 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-700 bg-slate-200 px-2 py-0.5 rounded">
+                Corporate Fallbacks
+              </span>
+              <span className="text-xs font-mono font-semibold text-slate-500">Weights: 400–800</span>
+            </div>
+            <div>
+              <h4 className="text-xl font-black text-slate-900 tracking-tight">Manrope / Plus Jakarta</h4>
+              <p className="text-xs text-slate-600 mt-0.5">Modern, clean industrial neo-grotesque fallbacks maintaining exact proportion balance.</p>
+            </div>
+            <div className="p-3 bg-white rounded-xl border border-slate-200 text-xs space-y-1 text-slate-800">
+              <div className="font-bold text-sm tracking-tight">Aa Bb Cc Dd Ee Ff Gg 1234567890</div>
+              <div className="text-[11px] text-slate-500 font-normal">Modern corporate aesthetics with open apertures</div>
+            </div>
+          </div>
+
+          {/* Card 3: Technical Monospace - JetBrains Mono */}
+          <div className="border border-teal-200 bg-teal-50/30 rounded-2xl p-4.5 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-teal-800 bg-teal-100 px-2 py-0.5 rounded">
+                Equipment & Telemetry
+              </span>
+              <span className="text-xs font-mono font-semibold text-slate-500">Weights: 400–700</span>
+            </div>
+            <div>
+              <h4 className="text-xl font-black text-slate-900 font-mono tracking-tight">JetBrains Mono</h4>
+              <p className="text-xs text-slate-600 mt-0.5">Monospaced font designed for elevator serial numbers, IoT sensor metrics, and currency.</p>
+            </div>
+            <div className="p-3 bg-white rounded-xl border border-teal-100 font-mono text-xs space-y-1 text-slate-800">
+              <div className="font-bold text-sm">SN-9820-ELEV ₹ 1,45,000 1.75m/s</div>
+              <div className="text-[11px] text-slate-500 font-medium">Tabular alignment • Zero slash disambiguation</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Typographic Hierarchy Scale & Usage Table */}
+        <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
+          <div className="bg-slate-50 border-b border-slate-200 px-4 py-3 flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+              Standardized Typographic Hierarchy & Specifications
+            </span>
+            <span className="text-[11px] text-slate-500 font-mono">6 Scale Levels</span>
+          </div>
+
+          <div className="divide-y divide-slate-100 text-xs">
+            {/* Level 1: App Major Headings */}
+            <div className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-50/50 transition-colors">
+              <div className="md:w-1/3">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-[10px] font-bold font-mono">H1 / Hero</span>
+                  <span className="font-bold text-slate-900 text-sm">Major Headings & Titles</span>
+                </div>
+                <div className="text-[11px] text-slate-500 mt-1 font-mono">
+                  Font: Inter • Bold 700 • tracking-tight (-0.028em) • leading-tight (1.15)
+                </div>
+              </div>
+              <div className="md:w-2/3">
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+                  Smart Lift Service Operations Portal
+                </h1>
+              </div>
+            </div>
+
+            {/* Level 2: Section Headings */}
+            <div className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-50/50 transition-colors">
+              <div className="md:w-1/3">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded text-[10px] font-bold font-mono">H2 / Section</span>
+                  <span className="font-bold text-slate-900 text-sm">Section Headings</span>
+                </div>
+                <div className="text-[11px] text-slate-500 mt-1 font-mono">
+                  Font: Inter • Semi-Bold 600 • tracking-tight (-0.016em) • leading-snug (1.32)
+                </div>
+              </div>
+              <div className="md:w-2/3">
+                <h2 className="text-lg sm:text-xl font-semibold tracking-tight text-slate-900">
+                  Registered Elevator Fleet & Preventive Maintenance
+                </h2>
+              </div>
+            </div>
+
+            {/* Level 3: Card / Sub-section Titles */}
+            <div className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-50/50 transition-colors">
+              <div className="md:w-1/3">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 bg-sky-100 text-sky-800 rounded text-[10px] font-bold font-mono">H3 / Card</span>
+                  <span className="font-bold text-slate-900 text-sm">Card & Component Titles</span>
+                </div>
+                <div className="text-[11px] text-slate-500 mt-1 font-mono">
+                  Font: Inter • Semi-Bold 600 • text-sm/base • leading-snug
+                </div>
+              </div>
+              <div className="md:w-2/3">
+                <h3 className="text-sm sm:text-base font-semibold text-slate-900">
+                  Elevator Passport #ELEV-001 — Passenger Unit A
+                </h3>
+              </div>
+            </div>
+
+            {/* Level 4: Body Text */}
+            <div className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-50/50 transition-colors">
+              <div className="md:w-1/3">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 bg-slate-100 text-slate-800 rounded text-[10px] font-bold font-mono">Body / Text</span>
+                  <span className="font-bold text-slate-900 text-sm">Body & Explanatory Text</span>
+                </div>
+                <div className="text-[11px] text-slate-500 mt-1 font-mono">
+                  Font: Inter • Regular 400 • leading-relaxed (1.6) • Avoid thin text
+                </div>
+              </div>
+              <div className="md:w-2/3">
+                <p className="text-xs sm:text-sm text-slate-600 font-normal leading-relaxed">
+                  Regular routine maintenance ensures consistent passenger safety and reduces long-term machine wear. Field service reports are signed digitally upon completion of each inspection.
+                </p>
+              </div>
+            </div>
+
+            {/* Level 5: Labels & Badges */}
+            <div className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-50/50 transition-colors">
+              <div className="md:w-1/3">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded text-[10px] font-bold font-mono">Labels / Tags</span>
+                  <span className="font-bold text-slate-900 text-sm">Labels, Meta & Status Tags</span>
+                </div>
+                <div className="text-[11px] text-slate-500 mt-1 font-mono">
+                  Font: Inter • Medium 500 • Compact, clean & crisp
+                </div>
+              </div>
+              <div className="md:w-2/3 flex items-center gap-2.5 flex-wrap">
+                <span className="text-xs font-medium text-slate-600">Equipment Status:</span>
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-medium">
+                  Fully Operational
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[11px] font-medium">
+                  Comprehensive AMC
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-medium">
+                  Inspection Due Soon
+                </span>
+              </div>
+            </div>
+
+            {/* Level 6: Buttons & Action Items */}
+            <div className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-50/50 transition-colors">
+              <div className="md:w-1/3">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded text-[10px] font-bold font-mono">Buttons</span>
+                  <span className="font-bold text-slate-900 text-sm">Interactive Buttons</span>
+                </div>
+                <div className="text-[11px] text-slate-500 mt-1 font-mono">
+                  Font: Inter • Semi-Bold 600 • Sentence Case (Not ALL CAPS)
+                </div>
+              </div>
+              <div className="md:w-2/3 flex items-center gap-3 flex-wrap">
+                <button className="px-4 py-2 rounded-xl bg-[#1976D2] text-white text-xs font-semibold shadow-xs">
+                  Request Service Visit
+                </button>
+                <button className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-semibold hover:bg-slate-200">
+                  Download Job Card
+                </button>
+                <button className="px-4 py-2 rounded-xl bg-[#D32F2F] text-white text-xs font-semibold shadow-xs">
+                  Emergency Breakdown SOS
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Technical Data & Elevator Telemetry Showcase */}
+        <div className="border border-slate-200 bg-slate-50/40 rounded-2xl p-5 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Binary className="w-4 h-4 text-slate-700" />
+              <h3 className="text-sm font-bold text-slate-900">
+                Technical Data & Tabular Numerics Demonstration
+              </h3>
+            </div>
+            <span className="text-[11px] font-mono text-slate-500 font-medium">
+              font-variant-numeric: tabular-nums
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-1">
+              <span className="text-[10px] text-slate-500 font-medium block">Rated Capacity</span>
+              <span className="font-mono text-sm font-bold text-slate-900 block tabular-nums">1000 kg</span>
+              <span className="text-[10px] text-slate-400 font-medium">13 Passengers</span>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-1">
+              <span className="text-[10px] text-slate-500 font-medium block">Operating Speed</span>
+              <span className="font-mono text-sm font-bold text-slate-900 block tabular-nums">1.75 m/s</span>
+              <span className="text-[10px] text-slate-400 font-medium">Gearless VVVF</span>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-1">
+              <span className="text-[10px] text-slate-500 font-medium block">Travel Height</span>
+              <span className="font-mono text-sm font-bold text-slate-900 block tabular-nums">48.50 m</span>
+              <span className="text-[10px] text-slate-400 font-medium">G + 14 Floors</span>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-1">
+              <span className="text-[10px] text-slate-500 font-medium block">Motor Output</span>
+              <span className="font-mono text-sm font-bold text-slate-900 block tabular-nums">11.50 kW</span>
+              <span className="text-[10px] text-slate-400 font-medium">415V 3-Phase</span>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-1">
+              <span className="text-[10px] text-slate-500 font-medium block">Trips Completed</span>
+              <span className="font-mono text-sm font-bold text-emerald-700 block tabular-nums">1,284,930</span>
+              <span className="text-[10px] text-slate-400 font-medium">99.98% Uptime</span>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-1">
+              <span className="text-[10px] text-slate-500 font-medium block">Serial Number</span>
+              <span className="font-mono text-xs font-bold text-blue-700 block truncate">SN-2026-IND-049</span>
+              <span className="text-[10px] text-slate-400 font-medium">Cortex-M7 IoT</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Engineering Guidelines Checklist (Dos & Don'ts) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+          <div className="border border-emerald-200 bg-emerald-50/40 rounded-2xl p-4 space-y-2">
+            <h4 className="font-bold text-emerald-900 flex items-center gap-1.5 text-xs">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <span>Recommended Typography Rules</span>
+            </h4>
+            <ul className="space-y-1.5 text-slate-700 text-[11px] leading-relaxed">
+              <li className="flex items-start gap-1.5">
+                <span className="text-emerald-600 font-bold">✓</span>
+                <span>Use <strong>Inter</strong> as primary font with Manrope / Plus Jakarta Sans fallbacks.</span>
+              </li>
+              <li className="flex items-start gap-1.5">
+                <span className="text-emerald-600 font-bold">✓</span>
+                <span>Use <strong>Sentence case</strong> for buttons and content (e.g. &quot;Submit Service Report&quot;).</span>
+              </li>
+              <li className="flex items-start gap-1.5">
+                <span className="text-emerald-600 font-bold">✓</span>
+                <span>Tighter letter spacing for headings (<code>tracking-tight</code>) and relaxed line height for body (<code>leading-relaxed</code>).</span>
+              </li>
+              <li className="flex items-start gap-1.5">
+                <span className="text-emerald-600 font-bold">✓</span>
+                <span>Use tabular monospaced numbers (<code>font-mono tabular-nums</code>) for measurements, currencies, and serial numbers.</span>
+              </li>
+            </ul>
+          </div>
+
+          <div className="border border-rose-200 bg-rose-50/40 rounded-2xl p-4 space-y-2">
+            <h4 className="font-bold text-rose-900 flex items-center gap-1.5 text-xs">
+              <AlertTriangle className="w-4 h-4 text-rose-600" />
+              <span>Typography Prohibitions & Anti-Patterns</span>
+            </h4>
+            <ul className="space-y-1.5 text-slate-700 text-[11px] leading-relaxed">
+              <li className="flex items-start gap-1.5">
+                <span className="text-rose-600 font-bold">✗</span>
+                <span><strong>No decorative, cartoon, gaming, or handwritten fonts</strong>.</span>
+              </li>
+              <li className="flex items-start gap-1.5">
+                <span className="text-rose-600 font-bold">✗</span>
+                <span><strong>Avoid excessively thin text</strong> (e.g. font-thin / font-extralight) to preserve readability.</span>
+              </li>
+              <li className="flex items-start gap-1.5">
+                <span className="text-rose-600 font-bold">✗</span>
+                <span><strong>Avoid excessive ALL CAPS</strong>; reserve uppercase only for micro badges/tags.</span>
+              </li>
+              <li className="flex items-start gap-1.5">
+                <span className="text-rose-600 font-bold">✗</span>
+                <span><strong>Avoid excessive italic text</strong>; preserve clean vertical letterforms for technical credibility.</span>
+              </li>
+            </ul>
+          </div>
         </div>
       </div>
 

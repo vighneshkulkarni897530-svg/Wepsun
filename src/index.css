@@ -4,13 +4,45 @@
 
 @layer base {
   :root {
-    --color-brand-primary: #2563eb;
+    --color-brand-primary: #123b5d;
+    --color-brand-secondary: #1976d2;
     --color-brand-dark: #0c1427;
     --color-bg-canvas: #f4f6fb;
   }
 
+  html {
+    font-family: 'Inter', 'Manrope', 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: 'cv02' on, 'cv03' on, 'cv04' on, 'cv11' on, 'tnum' on;
+  }
+
   body {
-    @apply bg-[#f4f6fb] text-slate-800 antialiased font-sans;
+    @apply bg-[#f4f6fb] text-slate-800 antialiased font-sans font-normal leading-relaxed;
+    font-size: 14px;
+    letter-spacing: -0.011em;
+  }
+
+  /* Typography Scale Defaults */
+  h1, .h1 {
+    @apply font-bold tracking-tight text-slate-900 leading-tight;
+  }
+
+  h2, .h2 {
+    @apply font-semibold tracking-tight text-slate-900 leading-snug;
+  }
+
+  h3, .h3 {
+    @apply font-semibold tracking-tight text-slate-900 leading-snug;
+  }
+
+  h4, .h4 {
+    @apply font-semibold text-slate-900 leading-snug;
+  }
+
+  p {
+    @apply leading-relaxed text-slate-600;
   }
 
   /* Custom clean scrollbar */
@@ -26,6 +58,81 @@
   }
   ::-webkit-scrollbar-thumb:hover {
     background: #94a3b8;
+  }
+}
+
+/* =========================================================================
+   WEPSUN CORPORATE TYPOGRAPHY SYSTEM UTILITIES
+   Inter (Primary) • Manrope & Plus Jakarta Sans (Fallbacks) • JetBrains Mono (Tech)
+   ========================================================================= */
+
+@layer utilities {
+  /* Major Headings / Page Titles (700 Bold, Clean & Confident, Comfortable Spacing) */
+  .font-heading-hero {
+    font-family: 'Inter', 'Manrope', 'Plus Jakarta Sans', sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.028em;
+    line-height: 1.15;
+  }
+
+  .font-heading-major {
+    font-family: 'Inter', 'Manrope', 'Plus Jakarta Sans', sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.022em;
+    line-height: 1.22;
+  }
+
+  /* Section Headings (600 Semi-Bold, Clear & Professional) */
+  .font-heading-section {
+    font-family: 'Inter', 'Manrope', 'Plus Jakarta Sans', sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.016em;
+    line-height: 1.32;
+  }
+
+  /* Subheadings & Card Titles (600 Semi-Bold) */
+  .font-heading-card {
+    font-family: 'Inter', 'Manrope', 'Plus Jakarta Sans', sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.012em;
+    line-height: 1.38;
+  }
+
+  /* Body Text (400 Regular, Highly Readable, Comfortable Spacing) */
+  .font-body-regular {
+    font-family: 'Inter', 'Manrope', 'Plus Jakarta Sans', sans-serif;
+    font-weight: 400;
+    letter-spacing: -0.006em;
+    line-height: 1.6;
+  }
+
+  /* Labels & Form Elements (500 Medium, Compact & Clearly Readable) */
+  .font-label-medium {
+    font-family: 'Inter', 'Manrope', 'Plus Jakarta Sans', sans-serif;
+    font-weight: 500;
+    letter-spacing: -0.004em;
+    line-height: 1.4;
+  }
+
+  /* Buttons & Action Items (600 Semi-Bold, Confident, Sentence Case) */
+  .font-button-action {
+    font-family: 'Inter', 'Manrope', 'Plus Jakarta Sans', sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.25;
+  }
+
+  /* Technical Information & Equipment Numerics (JetBrains Mono / Tabular Numbers) */
+  .font-tech-mono {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    font-feature-settings: 'tnum' on, 'zero' on;
+  }
+
+  .font-num-tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' on, 'cv02' on, 'cv03' on;
   }
 }
 
