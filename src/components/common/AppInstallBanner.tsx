@@ -57,7 +57,7 @@ export const AppInstallBanner: React.FC = () => {
   return (
     <>
       {/* Floating Bottom Bar / Notification for Web Visitors */}
-      <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-6 md:max-w-md z-40 animate-slide-up">
+      <div className="fixed bottom-20 left-4 right-4 md:bottom-6 md:left-auto md:right-6 md:max-w-md z-30 animate-slide-up">
         <div className="bg-slate-900/95 backdrop-blur-md border border-blue-500/30 text-white p-4 rounded-2xl shadow-2xl shadow-blue-950/40 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/20">

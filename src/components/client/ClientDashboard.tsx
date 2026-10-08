@@ -64,7 +64,19 @@ export type ClientDashboardTab =
   | 'notifications'
   | 'profile';
 
-export const ClientDashboard: React.FC = () => {
+export interface ClientDashboardProps {
+  activeTab?: ClientDashboardTab | string;
+  onNavigateTab?: (tab: ClientDashboardTab) => void;
+  onOpenEmergencyModal?: () => void;
+  onOpenRaiseModal?: () => void;
+}
+
+export const ClientDashboard: React.FC<ClientDashboardProps> = ({
+  activeTab: propActiveTab,
+  onNavigateTab,
+  onOpenEmergencyModal: propOpenEmergencyModal,
+  onOpenRaiseModal: propOpenRaiseModal,
+}) => {
   const {
     clientScopedLifts,
     clientScopedComplaints,
@@ -80,7 +92,28 @@ export const ClientDashboard: React.FC = () => {
     showToast,
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<ClientDashboardTab>('home');
+  const [internalActiveTab, setInternalActiveTab] = useState<ClientDashboardTab>(() => {
+    const rawHash = typeof window !== 'undefined' ? window.location.hash.toLowerCase().replace('#', '').split('?')[0] : '';
+    if (['lifts', 'complaints', 'history', 'parts', 'amc', 'quotations', 'payments', 'reports', 'pm', 'notifications', 'profile'].includes(rawHash)) {
+      return rawHash as ClientDashboardTab;
+    }
+    if (propActiveTab && ['lifts', 'complaints', 'history', 'parts', 'amc', 'quotations', 'payments', 'reports', 'pm', 'notifications', 'profile', 'home'].includes(propActiveTab)) {
+      return propActiveTab as ClientDashboardTab;
+    }
+    return 'home';
+  });
+
+  const activeTab: ClientDashboardTab = (propActiveTab && ['lifts', 'complaints', 'history', 'parts', 'amc', 'quotations', 'payments', 'reports', 'pm', 'notifications', 'profile', 'home'].includes(propActiveTab))
+    ? (propActiveTab as ClientDashboardTab)
+    : internalActiveTab;
+
+  const setActiveTab = (tab: ClientDashboardTab) => {
+    setInternalActiveTab(tab);
+    if (onNavigateTab) {
+      onNavigateTab(tab);
+    }
+  };
+
   const [isRaiseModalOpen, setIsRaiseModalOpen] = useState(false);
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
   const [isRenewalModalOpen, setIsRenewalModalOpen] = useState(false);
@@ -95,23 +128,29 @@ export const ClientDashboard: React.FC = () => {
     const handleHash = () => {
       const rawHash = window.location.hash.toLowerCase().replace('#', '');
       const hash = rawHash.split('?')[0];
-      if (hash === 'client-lifts' || hash === 'my-lifts' || hash === 'lifts') setActiveTab('lifts');
-      else if (hash === 'client-complaints' || hash === 'complaints' || hash === 'complaint-tracking' || hash === 'complaint') setActiveTab('complaints');
-      else if (hash === 'client-history' || hash === 'service-history' || hash === 'history') setActiveTab('history');
-      else if (hash === 'client-parts' || hash === 'parts' || hash === 'parts-replacement' || hash === 'parts-history') setActiveTab('parts');
-      else if (hash === 'client-amc' || hash === 'amc-management' || hash === 'amc') setActiveTab('amc');
-      else if (hash === 'client-quotations' || hash === 'quotation-approval' || hash === 'quotations') setActiveTab('quotations');
-      else if (hash === 'client-payments' || hash === 'invoices' || hash === 'payments') setActiveTab('payments');
-      else if (hash === 'client-reports' || hash === 'reports') setActiveTab('reports');
-      else if (hash === 'client-pm' || hash === 'preventive-maintenance' || hash === 'pm') setActiveTab('pm');
-      else if (hash === 'notifications' || hash === 'client-notifications' || hash === 'alerts') setActiveTab('notifications');
-      else if (hash === 'profile' || hash === 'my-profile' || hash === 'client-profile' || hash === 'settings' || hash === 'edit-profile' || hash === 'profile-edit') setActiveTab('profile');
+      if (hash === 'client-lifts' || hash === 'my-lifts' || hash === 'lifts') switchTab('lifts');
+      else if (hash === 'client-complaints' || hash === 'complaints' || hash === 'complaint-tracking' || hash === 'complaint') switchTab('complaints');
+      else if (hash === 'client-history' || hash === 'service-history' || hash === 'history') switchTab('history');
+      else if (hash === 'client-parts' || hash === 'parts' || hash === 'parts-replacement' || hash === 'parts-history') switchTab('parts');
+      else if (hash === 'client-amc' || hash === 'amc-management' || hash === 'amc') switchTab('amc');
+      else if (hash === 'client-quotations' || hash === 'quotation-approval' || hash === 'quotations') switchTab('quotations');
+      else if (hash === 'client-payments' || hash === 'invoices' || hash === 'payments') switchTab('payments');
+      else if (hash === 'client-reports' || hash === 'reports') switchTab('reports');
+      else if (hash === 'client-pm' || hash === 'preventive-maintenance' || hash === 'pm') switchTab('pm');
+      else if (hash === 'notifications' || hash === 'client-notifications' || hash === 'alerts') switchTab('notifications');
+      else if (hash === 'profile' || hash === 'my-profile' || hash === 'client-profile' || hash === 'settings' || hash === 'edit-profile' || hash === 'profile-edit') switchTab('profile');
       else if (hash === 'feedback' || hash === 'rate-service') setIsFeedbackModalOpen(true);
       else if (hash === 'amc-renewal') setIsRenewalModalOpen(true);
       else if (hash === 'new-lift-quote' || hash === 'enquiry' || hash === 'new-quotation') setIsEnquiryModalOpen(true);
-      else if (hash === 'raise-complaint') setIsRaiseModalOpen(true);
-      else if (hash === 'emergency' || hash === 'emergency-breakdown') setIsEmergencyModalOpen(true);
-      else if (hash === 'client' || hash === 'client-dashboard' || hash === 'home') setActiveTab('home');
+      else if (hash === 'raise-complaint') {
+        if (propOpenRaiseModal) propOpenRaiseModal();
+        else setIsRaiseModalOpen(true);
+      }
+      else if (hash === 'emergency' || hash === 'emergency-breakdown') {
+        if (propOpenEmergencyModal) propOpenEmergencyModal();
+        else setIsEmergencyModalOpen(true);
+      }
+      else if (hash === 'client' || hash === 'client-dashboard' || hash === 'home' || hash === 'dashboard') switchTab('home');
     };
 
     // Check if user came from quote flow

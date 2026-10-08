@@ -165,3 +165,9 @@ video::-moz-media-controls {
 .animate-fade-in {
   animation: fadeIn 0.25s ease-out forwards;
 }
+
+/* Mobile Safe Bottom Navigation */
+.safe-bottom {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0.5rem));
+}
+

@@ -75,7 +75,17 @@ export type TechNavTab =
   | 'profile'
   | 'pm_checklist';
 
-export const TechnicianDashboard: React.FC = () => {
+export interface TechnicianDashboardProps {
+  activeTab?: TechNavTab | string;
+  onNavigateTab?: (tab: TechNavTab) => void;
+  onOpenQrScanner?: () => void;
+}
+
+export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
+  activeTab: propActiveTab,
+  onNavigateTab,
+  onOpenQrScanner: propOpenQrScanner,
+}) => {
   const {
     activeTechnicianId,
     technicians,
@@ -89,7 +99,46 @@ export const TechnicianDashboard: React.FC = () => {
     aiErrorCodes,
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<TechNavTab>('dashboard');
+  const normalizeTechTab = (tabStr?: string): TechNavTab => {
+    if (!tabStr) return 'jobs';
+    if (tabStr === 'report') return 'service_report';
+    if (tabStr === 'signature') return 'signature_otp';
+    if (tabStr === 'breakdown') return 'diagnosis';
+    if ([
+      'dashboard',
+      'jobs',
+      'client_lift',
+      'service_history',
+      'checkin_checkout',
+      'diagnosis',
+      'parts',
+      'photos',
+      'signature_otp',
+      'service_report',
+      'notifications',
+      'profile',
+      'pm_checklist',
+    ].includes(tabStr)) {
+      return tabStr as TechNavTab;
+    }
+    return 'jobs';
+  };
+
+  const [internalActiveTab, setInternalActiveTab] = useState<TechNavTab>(() => {
+    const rawHash = typeof window !== 'undefined' ? window.location.hash.toLowerCase().replace('#', '').split('?')[0] : '';
+    if (rawHash) return normalizeTechTab(rawHash);
+    if (propActiveTab) return normalizeTechTab(propActiveTab);
+    return 'jobs';
+  });
+
+  const activeTab: TechNavTab = propActiveTab ? normalizeTechTab(propActiveTab) : internalActiveTab;
+
+  const setActiveTab = (tab: TechNavTab) => {
+    setInternalActiveTab(tab);
+    if (onNavigateTab) {
+      onNavigateTab(tab);
+    }
+  };
 
   // Load technician jobs with localStorage persistence
   const [techJobs, setTechJobs] = useState<TechnicianJob[]>(() => {
@@ -169,6 +218,11 @@ export const TechnicianDashboard: React.FC = () => {
     const handleHash = () => {
       const rawHash = window.location.hash.toLowerCase().replace('#', '');
       const hash = rawHash.split('?')[0];
+      if (hash === 'qr-scanner' || hash === 'qr') {
+        if (propOpenQrScanner) propOpenQrScanner();
+        else setIsQrScannerOpen(true);
+        return;
+      }
       if (
         [
           'dashboard',
@@ -184,9 +238,12 @@ export const TechnicianDashboard: React.FC = () => {
           'notifications',
           'profile',
           'pm_checklist',
+          'report',
+          'signature',
+          'breakdown',
         ].includes(hash)
       ) {
-        setActiveTab(hash as TechNavTab);
+        setActiveTab(normalizeTechTab(hash));
       }
     };
     handleHash();

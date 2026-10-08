@@ -41,6 +41,88 @@ import { isMasterAdminAuthenticated } from './lib/masterAuthClient';
 import { WepsunModalContainer } from './components/common/WepsunModalContainer';
 import { EditProfilePage } from './components/common/EditProfilePage';
 
+const CLIENT_ALLOWED_TABS = [
+  'home',
+  'lifts',
+  'client-lifts',
+  'my-lifts',
+  'complaints',
+  'client-complaints',
+  'complaint-tracking',
+  'complaint',
+  'history',
+  'client-history',
+  'service-history',
+  'amc',
+  'client-amc',
+  'amc-management',
+  'quotations',
+  'client-quotations',
+  'quotation-approval',
+  'payments',
+  'invoices',
+  'client-payments',
+  'reports',
+  'client-reports',
+  'profile',
+  'my-profile',
+  'client-profile',
+  'parts',
+  'client-parts',
+  'parts-replacement',
+  'pm',
+  'preventive-maintenance',
+  'client-pm',
+  'notifications',
+  'client-notifications',
+  'alerts',
+  'settings',
+  'edit-profile',
+  'profile-edit',
+  'emergency',
+  'raise-complaint',
+  'feedback',
+];
+
+const TECH_ALLOWED_TABS = [
+  'dashboard',
+  'jobs',
+  'client_lift',
+  'service_history',
+  'checkin_checkout',
+  'diagnosis',
+  'parts',
+  'photos',
+  'signature_otp',
+  'service_report',
+  'report',
+  'signature',
+  'breakdown',
+  'notifications',
+  'profile',
+  'pm_checklist',
+  'qr-scanner',
+  'settings',
+  'edit-profile',
+  'profile-edit',
+];
+
+const ADMIN_EXCLUSIVE_TABS = [
+  'flowchart',
+  'companies',
+  'branches',
+  'buildings',
+  'clients',
+  'technicians',
+  'inventory',
+  'analytics',
+  'service_jobs',
+  'work_orders',
+  'design_system',
+  'admin',
+  'admin-dashboard',
+];
+
 const ADMIN_PROTECTED_TABS = [
   'dashboard',
   'flowchart',
@@ -98,8 +180,19 @@ export const AppContent: React.FC = () => {
       return true;
     }
 
+    const savedRole =
+      localStorage.getItem('wepsun_lift_saas_v2_role') ||
+      localStorage.getItem('wepsun_role');
+
+    if (savedRole === 'client' && CLIENT_ALLOWED_TABS.includes(hash)) {
+      return false;
+    }
+    if (savedRole === 'technician' && TECH_ALLOWED_TABS.includes(hash)) {
+      return false;
+    }
+
     // If directly accessing an admin protected route without Master Auth
-    if ((ADMIN_PROTECTED_TABS.includes(hash) || hash.startsWith('admin')) && !isMasterAdminAuthenticated()) {
+    if ((ADMIN_EXCLUSIVE_TABS.includes(hash) || hash.startsWith('admin')) && !isMasterAdminAuthenticated()) {
       window.history.replaceState(null, '', '#login-technician');
       return true;
     }
@@ -135,15 +228,20 @@ export const AppContent: React.FC = () => {
         return;
       }
 
-      // Route Protection: Prevent unauthorized access to Admin Dashboard
-      const isAdminRoute =
-        ADMIN_PROTECTED_TABS.includes(hash) ||
-        hash === 'admin' ||
-        hash === 'admin-dashboard' ||
-        hash.startsWith('dashboard/') ||
-        hash.startsWith('admin/');
+      const isClientRole = currentRole === 'client';
+      const isTechRole = currentRole === 'technician';
 
-      if (isAdminRoute && !isMasterAdminAuthenticated()) {
+      // Route Protection: Prevent unauthorized access to Admin-exclusive views
+      const isForbiddenAdminRoute =
+        !isMasterAdminAuthenticated() &&
+        (ADMIN_EXCLUSIVE_TABS.includes(hash) ||
+         hash === 'admin' ||
+         hash === 'admin-dashboard' ||
+         hash.startsWith('dashboard/') ||
+         hash.startsWith('admin/') ||
+         (!isClientRole && !isTechRole && ADMIN_PROTECTED_TABS.includes(hash)));
+
+      if (isForbiddenAdminRoute) {
         window.history.replaceState(null, '', '#login-technician');
         setCurrentHash('login-technician');
         setIsFullLoginPage(true);
@@ -221,7 +319,7 @@ export const AppContent: React.FC = () => {
     handleHashChange();
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, [lifts]);
+  }, [lifts, currentRole]);
 
   const clientUsers = users.filter((u) => u.role === 'client');
 
@@ -231,7 +329,17 @@ export const AppContent: React.FC = () => {
     if (currentRole === 'technician') {
       return (
         <div className="max-w-7xl mx-auto">
-          <TechnicianDashboard />
+          <TechnicianDashboard
+            activeTab={activeTab as any}
+            onNavigateTab={(tab) => {
+              setActiveTab(tab as NavTabId);
+              window.location.hash = tab;
+            }}
+            onOpenQrScanner={() => {
+              setIsQrScannerOpen(true);
+              window.location.hash = 'qr-scanner';
+            }}
+          />
         </div>
       );
     }
@@ -239,7 +347,21 @@ export const AppContent: React.FC = () => {
     if (currentRole === 'client') {
       return (
         <div className="max-w-7xl mx-auto">
-          <ClientDashboard />
+          <ClientDashboard
+            activeTab={activeTab as any}
+            onNavigateTab={(tab) => {
+              setActiveTab(tab as NavTabId);
+              window.location.hash = tab;
+            }}
+            onOpenEmergencyModal={() => {
+              setIsEmergencyModalOpen(true);
+              window.location.hash = 'emergency';
+            }}
+            onOpenRaiseModal={() => {
+              setIsEmergencyModalOpen(true);
+              window.location.hash = 'raise-complaint';
+            }}
+          />
         </div>
       );
     }
@@ -649,7 +771,12 @@ export const AppContent: React.FC = () => {
       {/* QR Scanner Modal */}
       <QrScannerModal
         isOpen={isQrScannerOpen}
-        onClose={() => setIsQrScannerOpen(false)}
+        onClose={() => {
+          setIsQrScannerOpen(false);
+          if (window.location.hash.includes('qr-scanner') || window.location.hash.includes('qr-code')) {
+            window.location.hash = activeTab || 'dashboard';
+          }
+        }}
         onScanLift={(lift) => setSelectedLiftForPassport(lift)}
       />
 
@@ -658,13 +785,22 @@ export const AppContent: React.FC = () => {
         lift={selectedLiftForPassport}
         isOpen={!!selectedLiftForPassport}
         onClose={() => setSelectedLiftForPassport(null)}
-        onRaiseTicket={() => setIsEmergencyModalOpen(true)}
+        onRaiseTicket={() => {
+          setIsEmergencyModalOpen(true);
+          window.location.hash = 'emergency';
+        }}
       />
 
       {/* Emergency Breakdown Modal */}
       <RaiseComplaintModal
         isOpen={isEmergencyModalOpen}
-        onClose={() => setIsEmergencyModalOpen(false)}
+        initialMode="emergency"
+        onClose={() => {
+          setIsEmergencyModalOpen(false);
+          if (window.location.hash.includes('emergency') || window.location.hash.includes('raise-complaint')) {
+            window.location.hash = activeTab || 'home';
+          }
+        }}
       />
 
       {/* Login & Sign Up Modal */}
@@ -677,9 +813,18 @@ export const AppContent: React.FC = () => {
       {!isFullLoginPage && !isPublicFeedbackPage && (
         <MobileBottomNav
           activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          onOpenQrScanner={() => setIsQrScannerOpen(true)}
-          onOpenEmergencyModal={() => setIsEmergencyModalOpen(true)}
+          setActiveTab={(tab) => {
+            setActiveTab(tab);
+            window.location.hash = tab;
+          }}
+          onOpenQrScanner={() => {
+            setIsQrScannerOpen(true);
+            window.location.hash = 'qr-scanner';
+          }}
+          onOpenEmergencyModal={() => {
+            setIsEmergencyModalOpen(true);
+            window.location.hash = 'emergency';
+          }}
         />
       )}
 
