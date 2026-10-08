@@ -230,6 +230,8 @@ export const AppContent: React.FC = () => {
 
       const isClientRole = currentRole === 'client';
       const isTechRole = currentRole === 'technician';
+      const isClientTab = CLIENT_ALLOWED_TABS.includes(hash);
+      const isTechTab = TECH_ALLOWED_TABS.includes(hash);
 
       // Route Protection: Prevent unauthorized access to Admin-exclusive views
       const isForbiddenAdminRoute =
@@ -239,7 +241,7 @@ export const AppContent: React.FC = () => {
          hash === 'admin-dashboard' ||
          hash.startsWith('dashboard/') ||
          hash.startsWith('admin/') ||
-         (!isClientRole && !isTechRole && ADMIN_PROTECTED_TABS.includes(hash)));
+         (!isClientRole && !isTechRole && !isClientTab && !isTechTab && ADMIN_PROTECTED_TABS.includes(hash)));
 
       if (isForbiddenAdminRoute) {
         window.history.replaceState(null, '', '#login-technician');
@@ -640,14 +642,10 @@ export const AppContent: React.FC = () => {
               const savedRole =
                 localStorage.getItem('wepsun_lift_saas_v2_role') ||
                 localStorage.getItem('wepsun_role') ||
-                currentRole;
+                currentRole ||
+                'client';
               if (!rawH || rawH === 'login' || rawH === 'signin' || rawH === 'signup' || rawH === 'landing' || rawH.startsWith('login-')) {
-                const target = savedRole === 'client' ? 'home' : savedRole === 'technician' ? 'jobs' : 'dashboard';
-                if (target === 'dashboard' && !isMasterAdminAuthenticated()) {
-                  window.location.hash = 'login-technician';
-                  setIsFullLoginPage(true);
-                  return;
-                }
+                const target = savedRole === 'client' ? 'home' : savedRole === 'technician' ? 'jobs' : (isMasterAdminAuthenticated() ? 'dashboard' : 'home');
                 window.location.hash = target;
                 setActiveTab(target as NavTabId);
               } else {
@@ -674,14 +672,10 @@ export const AppContent: React.FC = () => {
             const savedRole =
               localStorage.getItem('wepsun_lift_saas_v2_role') ||
               localStorage.getItem('wepsun_role') ||
-              currentRole;
+              currentRole ||
+              'client';
             if (!rawH || rawH === 'login' || rawH === 'signin' || rawH === 'signup' || rawH === 'landing' || rawH.startsWith('login-')) {
-              const target = savedRole === 'client' ? 'home' : savedRole === 'technician' ? 'jobs' : 'dashboard';
-              if (target === 'dashboard' && !isMasterAdminAuthenticated()) {
-                window.location.hash = 'login-technician';
-                setIsFullLoginPage(true);
-                return;
-              }
+              const target = savedRole === 'client' ? 'home' : savedRole === 'technician' ? 'jobs' : (isMasterAdminAuthenticated() ? 'dashboard' : 'home');
               window.location.hash = target;
               setActiveTab(target as NavTabId);
             } else {

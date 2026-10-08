@@ -34,6 +34,7 @@ import elevatorLobbyImg from '../../assets/elevator-lobby.jpg';
 import elevatorGlassLobbyImg from '../../assets/elevator-glass-lobby.jpg';
 import buildingGlassImg from '../../assets/building-glass.jpg';
 import constructionPlansImg from '../../assets/construction-plans-sunset.jpg';
+import { isMasterAdminAuthenticated } from '../../lib/masterAuthClient';
 
 interface LandingPageProps {
   onClose?: () => void;
@@ -174,8 +175,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               sessionStorage.removeItem('wepsun_open_quote_after_login');
             }
           } else {
-            const savedRole = localStorage.getItem('wepsun_role') || currentRole || 'company_admin';
-            const target = savedRole === 'client' ? 'home' : savedRole === 'technician' ? 'jobs' : 'dashboard';
+            const savedRole =
+              localStorage.getItem('wepsun_lift_saas_v2_role') ||
+              localStorage.getItem('wepsun_role') ||
+              currentRole ||
+              'client';
+            const target = savedRole === 'client' ? 'home' : savedRole === 'technician' ? 'jobs' : (isMasterAdminAuthenticated() ? 'dashboard' : 'home');
             window.location.hash = target;
             if (onClose) onClose();
           }

@@ -190,12 +190,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 return (
                   <button
                     key={item.id}
+                    type="button"
                     onClick={() => {
                       onSelectTab(item.id);
                       window.location.hash = item.id;
                       onCloseMobile();
                     }}
-                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all ${
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all cursor-pointer touch-manipulation ${
                       isActive
                         ? 'bg-[#1976D2] text-white font-bold shadow-md shadow-blue-900/30'
                         : 'text-slate-300 hover:text-white hover:bg-white/10'
@@ -227,12 +228,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 return (
                   <button
                     key={item.id}
+                    type="button"
                     onClick={() => {
                       onSelectTab(item.id);
                       window.location.hash = item.id;
                       onCloseMobile();
                     }}
-                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all ${
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all cursor-pointer touch-manipulation ${
                       isActive
                         ? 'bg-[#1976D2] text-white font-bold shadow-md shadow-blue-900/30'
                         : 'text-slate-300 hover:text-white hover:bg-white/10'
@@ -264,12 +266,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 return (
                   <button
                     key={item.id}
+                    type="button"
                     onClick={() => {
                       onSelectTab(item.id);
                       window.location.hash = item.id;
                       onCloseMobile();
                     }}
-                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all ${
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all cursor-pointer touch-manipulation ${
                       isActive
                         ? 'bg-[#1976D2] text-white font-bold shadow-md shadow-blue-900/30'
                         : 'text-slate-300 hover:text-white hover:bg-white/10'
@@ -297,25 +300,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Bottom Settings & Logout Actions (matching Image 2 & 3) */}
         <div className="p-3 border-t border-[#0A1828] bg-[#0A192A] shrink-0 space-y-1">
           <button
+            type="button"
             onClick={() => {
               const targetTab: NavTabId = isClient ? 'profile' : isTechnician ? 'profile' : 'settings';
               onSelectTab(targetTab);
               window.location.hash = targetTab;
               onCloseMobile();
             }}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer touch-manipulation"
           >
             <Settings className="w-4 h-4 text-slate-400" />
             <span>{isClient ? 'My Profile' : isTechnician ? 'My Profile' : 'Settings & Profile'}</span>
           </button>
           <button
+            type="button"
             onClick={() => {
               showLogoutModal(() => {
                 logout();
                 onCloseMobile();
               });
             }}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer touch-manipulation"
           >
             <LogOut className="w-4 h-4 text-slate-400" />
             <span>Logout</span>

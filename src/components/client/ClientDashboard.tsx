@@ -64,6 +64,24 @@ export type ClientDashboardTab =
   | 'notifications'
   | 'profile';
 
+export const normalizeClientTab = (tabStr?: string): ClientDashboardTab => {
+  if (!tabStr) return 'home';
+  const t = tabStr.toLowerCase().replace('#', '').split('?')[0];
+  if (t === 'client-lifts' || t === 'my-lifts' || t === 'lifts' || t === 'fleet') return 'lifts';
+  if (t === 'client-complaints' || t === 'complaints' || t === 'complaint-tracking' || t === 'complaint' || t === 'breakdowns') return 'complaints';
+  if (t === 'client-history' || t === 'service-history' || t === 'history' || t === 'service_history') return 'history';
+  if (t === 'client-parts' || t === 'parts' || t === 'parts-replacement' || t === 'parts-history') return 'parts';
+  if (t === 'client-amc' || t === 'amc-management' || t === 'amc') return 'amc';
+  if (t === 'client-quotations' || t === 'quotation-approval' || t === 'quotations' || t === 'quotes') return 'quotations';
+  if (t === 'client-payments' || t === 'invoices' || t === 'payments' || t === 'pay' || t === 'billing') return 'payments';
+  if (t === 'client-reports' || t === 'reports' || t === 'compliance' || t === 'analytics') return 'reports';
+  if (t === 'client-pm' || t === 'preventive-maintenance' || t === 'pm') return 'pm';
+  if (t === 'notifications' || t === 'client-notifications' || t === 'alerts') return 'notifications';
+  if (t === 'profile' || t === 'my-profile' || t === 'client-profile' || t === 'settings' || t === 'edit-profile' || t === 'profile-edit' || t === 'edit_profile') return 'profile';
+  if (t === 'home' || t === 'dashboard' || t === 'overview' || t === 'client') return 'home';
+  return 'home';
+};
+
 export interface ClientDashboardProps {
   activeTab?: ClientDashboardTab | string;
   onNavigateTab?: (tab: ClientDashboardTab) => void;
@@ -94,18 +112,12 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
 
   const [internalActiveTab, setInternalActiveTab] = useState<ClientDashboardTab>(() => {
     const rawHash = typeof window !== 'undefined' ? window.location.hash.toLowerCase().replace('#', '').split('?')[0] : '';
-    if (['lifts', 'complaints', 'history', 'parts', 'amc', 'quotations', 'payments', 'reports', 'pm', 'notifications', 'profile'].includes(rawHash)) {
-      return rawHash as ClientDashboardTab;
-    }
-    if (propActiveTab && ['lifts', 'complaints', 'history', 'parts', 'amc', 'quotations', 'payments', 'reports', 'pm', 'notifications', 'profile', 'home'].includes(propActiveTab)) {
-      return propActiveTab as ClientDashboardTab;
-    }
+    if (rawHash) return normalizeClientTab(rawHash);
+    if (propActiveTab) return normalizeClientTab(propActiveTab);
     return 'home';
   });
 
-  const activeTab: ClientDashboardTab = (propActiveTab && ['lifts', 'complaints', 'history', 'parts', 'amc', 'quotations', 'payments', 'reports', 'pm', 'notifications', 'profile', 'home'].includes(propActiveTab))
-    ? (propActiveTab as ClientDashboardTab)
-    : internalActiveTab;
+  const activeTab: ClientDashboardTab = propActiveTab ? normalizeClientTab(propActiveTab) : internalActiveTab;
 
   const setActiveTab = (tab: ClientDashboardTab) => {
     setInternalActiveTab(tab);
@@ -128,29 +140,21 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
     const handleHash = () => {
       const rawHash = window.location.hash.toLowerCase().replace('#', '');
       const hash = rawHash.split('?')[0];
-      if (hash === 'client-lifts' || hash === 'my-lifts' || hash === 'lifts') switchTab('lifts');
-      else if (hash === 'client-complaints' || hash === 'complaints' || hash === 'complaint-tracking' || hash === 'complaint') switchTab('complaints');
-      else if (hash === 'client-history' || hash === 'service-history' || hash === 'history') switchTab('history');
-      else if (hash === 'client-parts' || hash === 'parts' || hash === 'parts-replacement' || hash === 'parts-history') switchTab('parts');
-      else if (hash === 'client-amc' || hash === 'amc-management' || hash === 'amc') switchTab('amc');
-      else if (hash === 'client-quotations' || hash === 'quotation-approval' || hash === 'quotations') switchTab('quotations');
-      else if (hash === 'client-payments' || hash === 'invoices' || hash === 'payments') switchTab('payments');
-      else if (hash === 'client-reports' || hash === 'reports') switchTab('reports');
-      else if (hash === 'client-pm' || hash === 'preventive-maintenance' || hash === 'pm') switchTab('pm');
-      else if (hash === 'notifications' || hash === 'client-notifications' || hash === 'alerts') switchTab('notifications');
-      else if (hash === 'profile' || hash === 'my-profile' || hash === 'client-profile' || hash === 'settings' || hash === 'edit-profile' || hash === 'profile-edit') switchTab('profile');
-      else if (hash === 'feedback' || hash === 'rate-service') setIsFeedbackModalOpen(true);
-      else if (hash === 'amc-renewal') setIsRenewalModalOpen(true);
-      else if (hash === 'new-lift-quote' || hash === 'enquiry' || hash === 'new-quotation') setIsEnquiryModalOpen(true);
-      else if (hash === 'raise-complaint') {
+      if (hash === 'feedback' || hash === 'rate-service') {
+        setIsFeedbackModalOpen(true);
+      } else if (hash === 'amc-renewal') {
+        setIsRenewalModalOpen(true);
+      } else if (hash === 'new-lift-quote' || hash === 'enquiry' || hash === 'new-quotation') {
+        setIsEnquiryModalOpen(true);
+      } else if (hash === 'raise-complaint') {
         if (propOpenRaiseModal) propOpenRaiseModal();
         else setIsRaiseModalOpen(true);
-      }
-      else if (hash === 'emergency' || hash === 'emergency-breakdown') {
+      } else if (hash === 'emergency' || hash === 'emergency-breakdown') {
         if (propOpenEmergencyModal) propOpenEmergencyModal();
         else setIsEmergencyModalOpen(true);
+      } else if (hash) {
+        setInternalActiveTab(normalizeClientTab(hash));
       }
-      else if (hash === 'client' || hash === 'client-dashboard' || hash === 'home' || hash === 'dashboard') switchTab('home');
     };
 
     // Check if user came from quote flow
