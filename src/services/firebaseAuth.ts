@@ -137,7 +137,7 @@ export async function verifySignupEmailOtp(
       email: cleanEmail,
       otp: cleanOtp,
       name: payload.fullName.trim(),
-      phone: payload.phone?.trim() || '+91 98200 00000',
+      phone: payload.phone?.trim() || '',
       role: payload.role.toUpperCase(),
       password: payload.password,
       companyId: payload.companyId || 'comp-1',
@@ -153,16 +153,14 @@ export async function verifySignupEmailOtp(
         id: authData.user?.id || 'usr-' + Date.now(),
         name: authData.user?.name || payload.fullName,
         email: authData.user?.email || cleanEmail,
-        phone: authData.user?.phone || payload.phone || '+91 98200 00000',
+        phone: authData.user?.phone || payload.phone || '',
         role: (authData.user?.role || payload.role).toLowerCase() as UserRole,
         companyId: authData.user?.companyId || 'comp-1',
         branchId: authData.user?.branchId,
         clientId: authData.user?.clientId || (payload.role === 'client' ? 'client-' + Date.now() : undefined),
         technicianId: authData.user?.technicianId || (payload.role === 'technician' ? 'tech-' + Date.now() : undefined),
-        avatar: authData.user?.avatarUrl || (payload.role === 'client'
-          ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
-          : 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80'),
-        companyName: `${payload.fullName.trim()}'s Organisation`,
+        avatar: authData.user?.avatarUrl || '',
+        companyName: authData.user?.companyName || '',
         isActive: true,
         createdAt: new Date().toISOString(),
       };

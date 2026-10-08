@@ -153,83 +153,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
   const handleSignInSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
     if (!identifier.trim()) {
-      setErrorMessage('Please enter your email address or mobile number');
+      setErrorMessage('Please enter your email address or mobile number.');
       return;
     }
     if (!password.trim()) {
-      setErrorMessage('Please enter your password');
+      setErrorMessage('Please enter your password.');
       return;
     }
 
     setIsSubmitting(true);
     setErrorMessage(null);
-
-    const cleanIdent = identifier.trim().toLowerCase();
-    const cleanPass = password.trim();
-
-    // 1. MASTER ID CREDENTIAL CHECK:
-    // Master ID 1: jaiswalsumit2812@gmail.com | Password: Wepsun@928
-    // Master ID 2: gauravsaini0004@gmail.com   | Password: Wepsun@2025
-    const isMaster1 = cleanIdent === 'jaiswalsumit2812@gmail.com' && cleanPass === 'Wepsun@928';
-    const isMaster2 = cleanIdent === 'gauravsaini0004@gmail.com' && cleanPass === 'Wepsun@2025';
-    const isMasterEmail = cleanIdent === 'jaiswalsumit2812@gmail.com' || cleanIdent === 'gauravsaini0004@gmail.com';
-
-    if (isMasterEmail && !isMaster1 && !isMaster2) {
-      setErrorMessage('Invalid ID or Password. Please try again.');
-      setIsSubmitting(false);
-      return;
-    }
-
-    if (isMaster1 || isMaster2) {
-      const masterAdminUser: UserRecord = {
-        id: isMaster1 ? 'usr-master-sumit' : 'usr-master-gaurav',
-        name: isMaster1 ? 'Sumit Jaiswal (Master Admin)' : 'Gaurav Saini (Master Admin)',
-        email: isMaster1 ? 'jaiswalsumit2812@gmail.com' : 'gauravsaini0004@gmail.com',
-        phone: isMaster1 ? '+91 98201 99928' : '+91 98201 92025',
-        role: 'master_admin',
-        companyId: 'comp-1',
-        branchId: 'br-mum-1',
-        avatar: isMaster1
-          ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
-          : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-        isActive: true,
-        createdAt: new Date().toISOString(),
-      };
-
-      // Set Master Admin session flags for route guards immediately
-      sessionStorage.setItem('wepsun_master_authenticated', 'true');
-      sessionStorage.setItem('wepsun_role', 'master_admin');
-      sessionStorage.setItem('wepsun_lift_saas_v2_role', 'master_admin');
-      sessionStorage.setItem('wepsun_userId', masterAdminUser.id);
-      sessionStorage.setItem('wepsun_lift_saas_v2_userId', masterAdminUser.id);
-
-      localStorage.setItem('wepsun_master_authenticated', 'true');
-      localStorage.setItem('wepsun_role', 'master_admin');
-      localStorage.setItem('wepsun_lift_saas_v2_role', 'master_admin');
-      localStorage.setItem('wepsun_userId', masterAdminUser.id);
-      localStorage.setItem('wepsun_lift_saas_v2_userId', masterAdminUser.id);
-      localStorage.setItem('wepsun_lift_saas_v2_currentUser', JSON.stringify(masterAdminUser));
-
-      loginAsUser(masterAdminUser);
-      setCurrentRole('master_admin');
-
-      showToast('success', 'Master Authentication Verified', `Welcome to Admin Dashboard, ${isMaster1 ? 'Sumit Jaiswal' : 'Gaurav Saini'}!`);
-      try {
-        confetti({
-          particleCount: 80,
-          spread: 70,
-          origin: { y: 0.6 },
-        });
-      } catch {}
-
-      window.location.hash = 'dashboard';
-      if (onClose) {
-        onClose();
-      }
-      setIsSubmitting(false);
-      return;
-    }
 
     try {
       const payload = {
@@ -253,7 +189,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         }
         if (authData.user) {
           const userRole = (authData.user.role || targetRole).toLowerCase() as UserRole;
-          loginAsUser({
+          const finalUser: UserRecord = {
             id: authData.user.id,
             name: authData.user.name,
             email: authData.user.email,
@@ -263,90 +199,72 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             branchId: authData.user.branchId,
             clientId: authData.user.clientId || (userRole === 'client' ? 'client-' + Date.now() : undefined),
             technicianId: authData.user.technicianId || (userRole === 'technician' ? 'tech-' + Date.now() : undefined),
-            avatar: authData.user.avatarUrl,
+            avatar: authData.user.avatarUrl || authData.user.avatar,
             isActive: true,
-          });
-          setCurrentRole(userRole);
-        }
-      } else {
-        // Find existing user in stored state or demo accounts
-        const searchIdent = identifier.trim().toLowerCase();
-        const existingUser = users.find(
-          (u) =>
-            (u.email && u.email.toLowerCase() === searchIdent) ||
-            (u.phone && u.phone.replace(/[\s+-]/g, '') === searchIdent.replace(/[\s+-]/g, ''))
-        );
+          };
 
-        if (existingUser) {
-          const userRole = (existingUser.role || targetRole).toLowerCase() as UserRole;
-          loginAsUser(existingUser);
+          if (userRole === 'master_admin') {
+            sessionStorage.setItem('wepsun_master_authenticated', 'true');
+            sessionStorage.setItem('wepsun_role', 'master_admin');
+            sessionStorage.setItem('wepsun_lift_saas_v2_role', 'master_admin');
+            sessionStorage.setItem('wepsun_userId', finalUser.id);
+            sessionStorage.setItem('wepsun_lift_saas_v2_userId', finalUser.id);
+
+            localStorage.setItem('wepsun_master_authenticated', 'true');
+            localStorage.setItem('wepsun_role', 'master_admin');
+            localStorage.setItem('wepsun_lift_saas_v2_role', 'master_admin');
+            localStorage.setItem('wepsun_userId', finalUser.id);
+            localStorage.setItem('wepsun_lift_saas_v2_userId', finalUser.id);
+            localStorage.setItem('wepsun_lift_saas_v2_currentUser', JSON.stringify(finalUser));
+          }
+
+          loginAsUser(finalUser);
           setCurrentRole(userRole);
-        } else {
-          // Check if demo user
-          const demoUser = DEMO_ACCOUNTS.find(
-            (d) =>
-              d.email.toLowerCase() === searchIdent ||
-              d.phone.replace(/[\s+-]/g, '') === searchIdent.replace(/[\s+-]/g, '')
+
+          if (pendingQuoteService || (typeof window !== 'undefined' && sessionStorage.getItem('wepsun_pending_quote_service'))) {
+            sessionStorage.setItem('wepsun_open_quote_after_login', 'true');
+          }
+
+          const activeDest =
+            userRole === 'client'
+              ? 'home'
+              : userRole === 'technician'
+              ? 'jobs'
+              : 'dashboard';
+
+          window.location.hash = activeDest;
+
+          showToast(
+            'success',
+            'Login Successful',
+            userRole === 'technician'
+              ? 'Welcome to WEPSUN Technician Portal!'
+              : userRole === 'client'
+              ? 'Welcome to WEPSUN Client Portal!'
+              : 'Welcome to WEPSUN Admin Dashboard!'
           );
-          if (demoUser) {
-            loginAsUser(demoUser.id);
-            const userRole = (demoUser.role || targetRole).toLowerCase() as UserRole;
-            setCurrentRole(userRole);
-          } else {
-            // Direct authentication fallback with dedicated user record
-            const rawName = identifier.includes('@') ? identifier.split('@')[0].replace(/[._-]/g, ' ') : 'WEPSUN User';
-            const formattedName = rawName.split(' ').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-            const newUid = 'usr-' + (targetRole === 'client' ? 'client-' : targetRole === 'technician' ? 'tech-' : 'admin-') + Date.now();
-            
-            loginAsUser({
-              id: newUid,
-              name: formattedName,
-              email: identifier.includes('@') ? identifier.trim() : `${identifier.trim()}@wepsun.in`,
-              phone: !identifier.includes('@') ? identifier.trim() : '+91 98200 00000',
-              role: targetRole,
-              companyId: 'comp-1',
-              clientId: targetRole === 'client' ? 'client-' + Date.now() : undefined,
-              technicianId: targetRole === 'technician' ? 'tech-' + Date.now() : undefined,
-              avatar: targetRole === 'client'
-                ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
-                : targetRole === 'technician'
-                ? 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80'
-                : 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
-              companyName: `${formattedName}'s Society / Enterprise`,
-              isActive: true,
-              createdAt: new Date().toISOString(),
+
+          try {
+            confetti({
+              particleCount: 80,
+              spread: 70,
+              origin: { y: 0.6 },
             });
-            setCurrentRole(targetRole);
+          } catch {}
+
+          if (onClose) {
+            onClose();
           }
         }
-      }
-
-      if (pendingQuoteService || (typeof window !== 'undefined' && sessionStorage.getItem('wepsun_pending_quote_service'))) {
-        sessionStorage.setItem('wepsun_open_quote_after_login', 'true');
-      }
-
-      const activeDest =
-        targetRole === 'client'
-          ? 'home'
-          : targetRole === 'technician'
-          ? 'jobs'
-          : 'dashboard';
-
-      window.location.hash = activeDest;
-
-      showToast(
-        'success',
-        'Login Successful',
-        targetRole === 'technician'
-          ? 'Welcome to WEPSUN Technician Portal!'
-          : 'Welcome to WEPSUN Client Portal!'
-      );
-
-      if (onClose) {
-        onClose();
+      } else {
+        const errorMsg = res?.message || 'Invalid email or password.';
+        setErrorMessage(errorMsg);
+        showToast('error', 'Authentication Failed', errorMsg);
       }
     } catch (err: any) {
-      setErrorMessage(err.message || 'Invalid credentials. Please try again.');
+      const errorMsg = err.message || 'Invalid email or password.';
+      setErrorMessage(errorMsg);
+      showToast('error', 'Authentication Failed', errorMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -491,7 +409,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         email: regEmail.trim(),
         otp: fullOtp,
         fullName: regFullName.trim(),
-        phone: regMobile.trim() || '+91 98200 00000',
+        phone: regMobile.trim() || '',
         role: regRole,
         password: regPassword,
         companyId: 'comp-1',
@@ -775,7 +693,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       id: 'usr-google-' + Date.now(),
                       name: googleProfile.name || cleanEmail.split('@')[0],
                       email: cleanEmail,
-                      phone: '+91 98200 00000',
+                      phone: '',
                       role: targetRole,
                       companyId: 'comp-1',
                       clientId: targetRole === 'client' ? 'client-' + Date.now() : undefined,
@@ -793,7 +711,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     id: userRecord.id,
                     name: userRecord.name || googleProfile?.name,
                     email: userRecord.email || googleProfile?.email,
-                    phone: userRecord.phone || '+91 98200 00000',
+                    phone: userRecord.phone || '',
                     role: activeRole,
                     companyId: userRecord.companyId || 'comp-1',
                     branchId: userRecord.branchId,
@@ -904,7 +822,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   id: 'usr-google-' + Date.now(),
                   name: profile.name || cleanEmail.split('@')[0],
                   email: cleanEmail,
-                  phone: '+91 98200 00000',
+                  phone: '',
                   role: targetRole,
                   companyId: 'comp-1',
                   clientId: targetRole === 'client' ? 'client-' + Date.now() : undefined,
@@ -927,7 +845,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               id: userRecord.id,
               name: userRecord.name || (profile?.name ?? 'Google User'),
               email: userRecord.email || (profile?.email ?? ''),
-              phone: userRecord.phone || '+91 98200 00000',
+              phone: userRecord.phone || '',
               role: activeRole,
               companyId: userRecord.companyId || 'comp-1',
               branchId: userRecord.branchId,
@@ -1284,7 +1202,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     className="w-full py-3.5 rounded-2xl bg-[#0066FF] hover:bg-[#0052cc] text-white font-bold text-sm shadow-lg shadow-blue-500/25 active:scale-98 transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer mt-2"
                   >
                     {isSubmitting ? (
-                      <span>Signing In...</span>
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Signing In...</span>
+                      </>
                     ) : (
                       <>
                         <span>Sign In</span>

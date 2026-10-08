@@ -126,6 +126,22 @@ export const Header: React.FC<HeaderProps> = ({
   const effectiveSearchParts = isClient ? [] : tenantInventory;
 
   const trimmedSearch = searchQuery.trim().toLowerCase();
+
+  const isProfileSaved =
+    typeof window !== 'undefined' &&
+    currentUser?.id &&
+    localStorage.getItem('wepsun_profile_saved_' + currentUser.id) === 'true';
+
+  const isDummyAvatar = (a?: string | null) =>
+    !a ||
+    a.includes('534528741775-53994a69daeb') ||
+    a.includes('541888946425') ||
+    a.includes('486406146926') ||
+    a.includes('519494026892') ||
+    a.includes('545324418');
+
+  const hasUserCustomAvatar = isProfileSaved && currentUser?.avatar && !isDummyAvatar(currentUser.avatar);
+
   const matchingLifts = trimmedSearch
     ? effectiveSearchLifts.filter(
         (l) =>
@@ -618,48 +634,54 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* User Profile matching exact style from screenshots */}
         <div className="relative" ref={profileRef}>
-          <button
-            onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
-            className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl hover:bg-white/10 transition-colors"
-          >
-            <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-300 border border-white/20 shadow-sm shrink-0 flex items-center justify-center text-slate-700">
-              {currentUser.avatar ? (
-                <img
-                  src={currentUser.avatar}
-                  alt={displayName}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <User className="w-4 h-4" />
-              )}
-            </div>
-            <div className="hidden sm:block text-left">
-              <span className="block text-xs font-bold text-white leading-tight truncate max-w-[130px]">
-                {displayName}
-              </span>
-              <span className="block text-[11px] text-slate-300 font-normal leading-tight">
-                {displayRoleLabel}
-              </span>
-            </div>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-          </button>
-
-          {isProfileDropdownOpen && (
-            <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 z-50 animate-in fade-in text-slate-800">
-              <div className="p-3 border-b border-slate-100 flex items-center gap-3">
-                <img
-                  src={currentUser.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'}
-                  alt={displayName}
-                  className="w-10 h-10 rounded-full object-cover border border-slate-200 shadow-sm shrink-0"
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-bold text-[#263238] truncate">{displayName}</p>
-                  <p className="text-[11px] text-slate-500 font-mono truncate">{currentUser.email || 'admin@wepsun.com'}</p>
-                  <span className="inline-block mt-0.5 px-2 py-0.5 rounded-md bg-blue-50 text-[#1976D2] text-[10px] font-bold">
+              <button
+                onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
+                className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl hover:bg-white/10 transition-colors"
+              >
+                <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-100 border border-white/20 shadow-sm shrink-0 flex items-center justify-center text-slate-700">
+                  {hasUserCustomAvatar ? (
+                    <img
+                      src={currentUser.avatar}
+                      alt={displayName}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <User className="w-4 h-4 text-slate-500" />
+                  )}
+                </div>
+                <div className="hidden sm:block text-left">
+                  <span className="block text-xs font-bold text-white leading-tight truncate max-w-[130px]">
+                    {displayName}
+                  </span>
+                  <span className="block text-[11px] text-slate-300 font-normal leading-tight">
                     {displayRoleLabel}
                   </span>
                 </div>
-              </div>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              </button>
+
+              {isProfileDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 z-50 animate-in fade-in text-slate-800">
+                  <div className="p-3 border-b border-slate-100 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 shadow-sm shrink-0 flex items-center justify-center overflow-hidden">
+                      {hasUserCustomAvatar ? (
+                        <img
+                          src={currentUser.avatar}
+                          alt={displayName}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <User className="w-5 h-5 text-slate-500" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold text-[#263238] truncate">{displayName}</p>
+                      <p className="text-[11px] text-slate-500 font-mono truncate">{currentUser.email || 'admin@wepsun.com'}</p>
+                      <span className="inline-block mt-0.5 px-2 py-0.5 rounded-md bg-blue-50 text-[#1976D2] text-[10px] font-bold">
+                        {displayRoleLabel}
+                      </span>
+                    </div>
+                  </div>
 
               {/* Profile Actions */}
               <div className="p-2 space-y-2">

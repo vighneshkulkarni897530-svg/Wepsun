@@ -658,6 +658,15 @@ router.post('/login', authLimiter, async (req: AuthenticatedRequest, res: Respon
     return;
   }
 
+  if (!password || !password.trim()) {
+    res.status(400).json({
+      success: false,
+      message: 'Password is required.',
+      code: 'PASSWORD_REQUIRED',
+    });
+    return;
+  }
+
   const userAgent = req.headers['user-agent'];
   const ipAddress = req.ip || req.socket.remoteAddress;
 
@@ -689,19 +698,29 @@ router.post('/login', authLimiter, async (req: AuthenticatedRequest, res: Respon
       );
 
       if (mockUser) {
+        const demoAcc = (db.demoAccounts || []).find(
+          (d: any) => d.id === mockUser.id || (email && d.email.toLowerCase() === email.toLowerCase())
+        );
+        const plainPassword = demoAcc?.password || (mockUser as any).password || 'Wepsun@2026';
+        let pHash = (mockUser as any).passwordHash;
+        if (!pHash) {
+          pHash = await hashPassword(plainPassword);
+          (mockUser as any).passwordHash = pHash;
+        }
+
         user = {
           id: mockUser.id,
           name: mockUser.name,
           email: mockUser.email,
           phone: mockUser.phone,
-          passwordHash: await hashPassword('Wepsun@2026'),
+          passwordHash: pHash,
           role: (role || mockUser.role || 'COMPANY_ADMIN').toUpperCase(),
           companyId: mockUser.companyId,
           branchId: mockUser.branchId || null,
           clientId: (mockUser as any).clientId || null,
           technicianId: (mockUser as any).technicianId || null,
           isActive: true,
-          tokenVersion: 0,
+          tokenVersion: (mockUser as any).tokenVersion || 0,
         };
       }
     }
@@ -726,8 +745,8 @@ router.post('/login', authLimiter, async (req: AuthenticatedRequest, res: Respon
 
       res.status(401).json({
         success: false,
-        message: 'Invalid email/phone or password.',
-        code: 'INVALID_CREDENTIALS',
+        message: 'Account not found with this email. Please check your credentials or register.',
+        code: 'USER_NOT_FOUND',
       });
       return;
     }
@@ -742,25 +761,10 @@ router.post('/login', authLimiter, async (req: AuthenticatedRequest, res: Respon
       return;
     }
 
-    // Verify password with bcrypt and support demo shortcuts
+    // Verify password strictly with bcrypt
     let passwordMatch = false;
     if (user.passwordHash && password) {
       passwordMatch = await verifyPassword(password, user.passwordHash);
-    }
-    if (!passwordMatch && password) {
-      const allowedDemoPasswords = [
-        'Wepsun@2026',
-        'admin123',
-        'tech123',
-        'client123',
-        'password',
-        'password123',
-        '123456',
-        'admin',
-      ];
-      if (allowedDemoPasswords.includes(password)) {
-        passwordMatch = true;
-      }
     }
 
     if (!passwordMatch) {
@@ -788,7 +792,7 @@ router.post('/login', authLimiter, async (req: AuthenticatedRequest, res: Respon
 
       res.status(401).json({
         success: false,
-        message: 'Invalid email/phone or password.',
+        message: 'Invalid email or password.',
         code: 'INVALID_CREDENTIALS',
       });
       return;
@@ -1505,6 +1509,7 @@ router.post('/verify-otp', authLimiter, async (req: AuthenticatedRequest, res: R
         branchId: null,
         clientId,
         technicianId,
+        passwordHash,
         isActive: true,
         authProvider: 'email_otp',
         tokenVersion: 0,

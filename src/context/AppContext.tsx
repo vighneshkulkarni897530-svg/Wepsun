@@ -58,7 +58,7 @@ import {
   INITIAL_CLIENT_NOTIFICATIONS,
   INITIAL_APP_NOTIFICATIONS,
 } from '../data/initialData';
-import { apiService, checkServerHealth, clearTokens, getRefreshToken } from '../services/api';
+import { apiService, checkServerHealth, clearTokens, getAccessToken, getRefreshToken } from '../services/api';
 import { getNetworkStatus, subscribeNetworkStatus } from '../services/nativeApp';
 import { playNotificationSound, isSoundEnabled as getSoundPref, setSoundEnabled } from '../utils/notificationSound';
 
@@ -86,6 +86,8 @@ interface AppContextType {
   demoAccounts: DemoAccount[];
   loginAsUser: (userOrId: User | string) => void;
   logout: () => void;
+  isAuthenticated: boolean;
+  isAuthLoading: boolean;
   isMasterAuthenticated: boolean;
   activeClientId: string;
   setActiveClientId: (id: string) => void;
@@ -654,6 +656,85 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return INITIAL_USERS.find((u) => u.role === 'client') || INITIAL_USERS[2] || INITIAL_USERS[0];
   });
 
+  // Helper to verify cryptographic JWT structure and expiration
+  const isTokenValid = (token: string | null): boolean => {
+    if (!token) return false;
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) return false;
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+      if (payload.exp && payload.exp * 1000 < Date.now()) {
+        return false;
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const token = getAccessToken();
+    return isTokenValid(token);
+  });
+
+  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
+
+  // Authenticate session against backend API on application startup
+  useEffect(() => {
+    let isMounted = true;
+    const validateSession = async () => {
+      const token = getAccessToken();
+      if (!token || !isTokenValid(token)) {
+        if (isMounted) {
+          setIsAuthenticated(false);
+          setIsAuthLoading(false);
+        }
+        return;
+      }
+
+      try {
+        const res = await apiService.getMe();
+        if (!isMounted) return;
+        if (res && res.success && res.data?.user) {
+          const user = res.data.user;
+          const userRole = (user.role || 'client').toLowerCase() as UserRole;
+          setCurrentUserState((prev) => ({
+            ...prev,
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            phone: user.phone || '',
+            role: userRole,
+            companyId: user.companyId || 'comp-1',
+            branchId: user.branchId,
+            clientId: user.clientId,
+            technicianId: user.technicianId,
+            avatar: user.avatarUrl || user.avatar,
+            isActive: true,
+          }));
+          setCurrentRoleState(userRole);
+          setIsAuthenticated(true);
+        } else {
+          clearTokens();
+          setIsAuthenticated(false);
+        }
+      } catch {
+        // If server is unreachable offline but local token is valid, preserve auth
+      } finally {
+        if (isMounted) {
+          setIsAuthLoading(false);
+        }
+      }
+    };
+
+    validateSession();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   useEffect(() => {
     localStorage.setItem(STORAGE_PREFIX + 'currentUser', JSON.stringify(currentUser));
   }, [currentUser]);
@@ -711,6 +792,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     const finalUser = userObj;
+    setIsAuthenticated(true);
 
     // Ensure distinct ClientProfile exists and equipment is provisioned
     if (finalUser.role === 'client' && finalUser.clientId) {
@@ -721,17 +803,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           ...prev,
           [cid]: {
             clientId: cid,
-            companyName: finalUser.companyName || `${finalUser.name}'s Society / Enterprise`,
-            contactPerson: finalUser.name,
-            phone: finalUser.phone || '+91 98200 12345',
-            email: finalUser.email || 'client@wepsun.com',
-            address: finalUser.address || 'Sector 19, Palm Beach Road',
-            city: finalUser.city || 'Mumbai',
-            pincode: '400703',
-            gstin: '27AABCW1234F1Z8',
-            logo: finalUser.avatar || 'https://images.unsplash.com/photo-1541888946425-d0fbb18086f6?w=150&auto=format&fit=crop&q=80',
-            registeredBuildings: [`${finalUser.companyName || finalUser.name + ' Complex'}`],
-            totalLifts: 2,
+            companyName: finalUser.companyName || '',
+            contactPerson: finalUser.name || '',
+            phone: finalUser.phone || '',
+            email: finalUser.email || '',
+            address: finalUser.address || '',
+            city: finalUser.city || '',
+            pincode: finalUser.pincode || '',
+            gstin: '',
+            logo: finalUser.avatar || '',
+            registeredBuildings: [],
+            totalLifts: 0,
           },
         };
       });
@@ -1220,11 +1302,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setCurrentRoleState('client');
       setActiveUserId(clientUser.id);
 
-      window.history.replaceState(null, '', '#landing');
-      window.location.hash = 'landing';
+      setIsAuthenticated(false);
+
+      window.history.replaceState(null, '', '#login');
+      window.location.hash = 'login';
       window.dispatchEvent(new HashChangeEvent('hashchange'));
     }
 
+    setIsAuthenticated(false);
     // Clear all existing toasts so no notifications pop up on logout
     setToasts([]);
   }, []);
@@ -1397,16 +1482,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return (
       clientProfiles[effectiveClientId] || {
         clientId: effectiveClientId,
-        companyName: currentUser.name || 'Valued Society Client',
-        contactPerson: currentUser.name || 'Site Administrator',
-        phone: currentUser.phone || '+91 98200 12345',
-        email: currentUser.email || 'client@wepsun.com',
-        address: 'Sector 19, Palm Beach Road',
-        city: 'Mumbai',
-        pincode: '400703',
-        gstin: '27AABCW1234F1Z8',
-        registeredBuildings: ['Registered Society Complex'],
-        totalLifts: lifts.filter((l) => l.clientId === effectiveClientId).length || 3,
+        companyName: currentUser.companyName || '',
+        contactPerson: currentUser.name || '',
+        phone: currentUser.phone || '',
+        email: currentUser.email || '',
+        address: currentUser.address || '',
+        city: currentUser.city || '',
+        pincode: currentUser.pincode || '',
+        gstin: '',
+        registeredBuildings: [],
+        totalLifts: lifts.filter((l) => l.clientId === effectiveClientId).length || 0,
       }
     );
   }, [clientProfiles, effectiveClientId, currentUser, lifts]);
@@ -3148,6 +3233,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         demoAccounts,
         loginAsUser,
         logout,
+        isAuthenticated,
+        isAuthLoading,
         isMasterAuthenticated,
         activeClientId,
         setActiveClientId,

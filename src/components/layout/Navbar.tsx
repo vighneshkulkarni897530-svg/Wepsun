@@ -4,6 +4,7 @@ import {
   QrCode,
   AlertTriangle,
   GitBranch,
+  User,
 } from 'lucide-react';
 import { Lift } from '../../types';
 import { QrScannerModal } from '../common/QrScannerModal';
@@ -91,14 +92,23 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenRaiseComplaint }) => {
 
             {/* User Profile */}
             <div className="flex items-center gap-2.5 pl-3 border-l border-slate-200">
-              <img
-                src={
-                  currentUser.avatar ||
-                  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'
-                }
-                alt={currentUser.name}
-                className="w-8 h-8 rounded-full object-cover border border-slate-200"
-              />
+              {(() => {
+                const isProfileSaved = typeof window !== 'undefined' && currentUser?.id && localStorage.getItem('wepsun_profile_saved_' + currentUser.id) === 'true';
+                const isDummyAvatar = (a?: string | null) => !a || a.includes('534528741775-53994a69daeb') || a.includes('541888946425') || a.includes('486406146926') || a.includes('519494026892') || a.includes('545324418');
+                const hasValidAvatar = isProfileSaved && currentUser?.avatar && !isDummyAvatar(currentUser.avatar);
+
+                return hasValidAvatar ? (
+                  <img
+                    src={currentUser.avatar}
+                    alt={currentUser.name}
+                    className="w-8 h-8 rounded-full object-cover border border-slate-200"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200 text-slate-500">
+                    <User className="w-4 h-4" />
+                  </div>
+                );
+              })()}
               <div className="hidden sm:block text-left">
                 <p className="text-xs font-bold text-slate-900 truncate max-w-[120px]">
                   {currentUser.name}

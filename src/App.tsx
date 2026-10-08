@@ -32,7 +32,7 @@ import { LandingPage } from './components/common/LandingPage';
 import { PublicFeedbackPage } from './components/common/PublicFeedbackPage';
 import { WepsunSplashAnimation } from './components/common/WepsunSplashAnimation';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
-import { WepsunLogo, WepsunLogoIcon } from './components/common/WepsunLogo';
+import { WepsunLogo, WepsunLogoIcon, GeometricBlueWLogo } from './components/common/WepsunLogo';
 import { Lift } from './types';
 import { PhoneCall } from 'lucide-react';
 import { AppInstallBanner } from './components/common/AppInstallBanner';
@@ -40,6 +40,28 @@ import { MobileBottomNav } from './components/layout/MobileBottomNav';
 import { isMasterAdminAuthenticated } from './lib/masterAuthClient';
 import { WepsunModalContainer } from './components/common/WepsunModalContainer';
 import { EditProfilePage } from './components/common/EditProfilePage';
+import { AuthGuard } from './components/common/AuthGuard';
+
+const PUBLIC_HASHES = [
+  'login',
+  'signin',
+  'signup',
+  'register',
+  'login-technician',
+  'login-client',
+  'login-admin',
+  'forgot-password',
+  'reset-password',
+  'landing',
+  'splash',
+  'animation',
+  'logo-reveal',
+  'feedback-form',
+  'rate-service',
+  'customer-review',
+  'public-feedback',
+  'rate',
+];
 
 const CLIENT_ALLOWED_TABS = [
   'home',
@@ -149,7 +171,19 @@ const ADMIN_PROTECTED_TABS = [
 ];
 
 export const AppContent: React.FC = () => {
-  const { currentRole, setCurrentRole, activeCompany, branches, buildings, users, tenantInvoices, lifts, showToast } = useApp();
+  const {
+    currentRole,
+    setCurrentRole,
+    activeCompany,
+    branches,
+    buildings,
+    users,
+    tenantInvoices,
+    lifts,
+    showToast,
+    isAuthenticated,
+    isAuthLoading,
+  } = useApp();
 
   const [activeTab, setActiveTab] = useState<NavTabId>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
@@ -169,31 +203,25 @@ export const AppContent: React.FC = () => {
     const rawHash = window.location.hash.toLowerCase().replace('#', '');
     const hash = rawHash.split('?')[0];
 
+    const token = localStorage.getItem('wepsun_access_token');
+    const hasValidToken = Boolean(token && token.split('.').length === 3);
+
+    // If unauthenticated: any private route redirects to login
+    if (!hasValidToken) {
+      if (!PUBLIC_HASHES.includes(hash)) {
+        window.history.replaceState(null, '', '#login');
+        return true;
+      }
+      return true;
+    }
+
     const path = window.location.pathname.toLowerCase();
     if ((path.startsWith('/admin') || path.startsWith('/dashboard')) && !isMasterAdminAuthenticated()) {
       window.history.replaceState(null, '', '/#login-technician');
       return true;
     }
 
-    // Default landing page is Login Page
-    if (!hash || hash === 'login' || hash === 'signin' || hash === 'signup' || hash === 'register' || hash === 'landing' || hash === 'login-technician' || hash === 'login-client' || hash === 'login-admin') {
-      return true;
-    }
-
-    const savedRole =
-      localStorage.getItem('wepsun_lift_saas_v2_role') ||
-      localStorage.getItem('wepsun_role');
-
-    if (savedRole === 'client' && CLIENT_ALLOWED_TABS.includes(hash)) {
-      return false;
-    }
-    if (savedRole === 'technician' && TECH_ALLOWED_TABS.includes(hash)) {
-      return false;
-    }
-
-    // If directly accessing an admin protected route without Master Auth
-    if ((ADMIN_EXCLUSIVE_TABS.includes(hash) || hash.startsWith('admin')) && !isMasterAdminAuthenticated()) {
-      window.history.replaceState(null, '', '#login-technician');
+    if (!hash || PUBLIC_HASHES.includes(hash)) {
       return true;
     }
 
@@ -209,6 +237,7 @@ export const AppContent: React.FC = () => {
 
   React.useEffect(() => {
     const handleHashChange = () => {
+      const path = window.location.pathname.toLowerCase();
       const rawHash = window.location.hash.toLowerCase().replace('#', '');
       const hash = rawHash.split('?')[0];
       setCurrentHash(hash);
@@ -221,8 +250,36 @@ export const AppContent: React.FC = () => {
       }
       setIsSplashPage(false);
 
+      // Unauthenticated protection: strictly redirect any private route to #login
+      if (!isAuthenticated && !isAuthLoading) {
+        const isPublicHash = PUBLIC_HASHES.includes(hash);
+        const isPrivatePath = path.startsWith('/dashboard') || path.startsWith('/profile') || path.startsWith('/settings') || path.startsWith('/admin');
+
+        if (isPrivatePath || (!isPublicHash && hash !== '')) {
+          window.history.replaceState(null, '', '#login');
+          setCurrentHash('login');
+          setIsFullLoginPage(true);
+          setIsPublicFeedbackPage(false);
+          return;
+        }
+      }
+
       // Default landing page is Login Page
-      if (!hash || hash === 'login' || hash === 'signin' || hash === 'signup' || hash === 'register' || hash === 'landing' || hash === 'login-technician' || hash === 'login-client' || hash === 'login-admin') {
+      if (!hash || PUBLIC_HASHES.includes(hash)) {
+        if (hash === 'feedback-form' || hash === 'rate-service' || hash === 'customer-review' || hash === 'public-feedback' || hash === 'rate') {
+          setIsFullLoginPage(false);
+          setIsPublicFeedbackPage(true);
+          return;
+        }
+        setIsFullLoginPage(true);
+        setIsPublicFeedbackPage(false);
+        return;
+      }
+
+      // If accessing private route while unauthenticated
+      if (!isAuthenticated && !isAuthLoading) {
+        window.history.replaceState(null, '', '#login');
+        setCurrentHash('login');
         setIsFullLoginPage(true);
         setIsPublicFeedbackPage(false);
         return;
@@ -321,7 +378,7 @@ export const AppContent: React.FC = () => {
     handleHashChange();
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, [lifts, currentRole]);
+  }, [lifts, currentRole, isAuthenticated, isAuthLoading]);
 
   const clientUsers = users.filter((u) => u.role === 'client');
 
@@ -614,6 +671,23 @@ export const AppContent: React.FC = () => {
     );
   };
 
+  // Dedicated Branded Loading Overlay while checking session validity
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen bg-[#071325] flex flex-col items-center justify-center p-4">
+        <div className="flex flex-col items-center gap-4 animate-in fade-in duration-300">
+          <GeometricBlueWLogo className="w-16 h-13 animate-pulse" />
+          <div className="flex items-center gap-2.5">
+            <div className="w-4 h-4 border-2 border-sky-400 border-t-transparent rounded-full animate-spin" />
+            <span className="text-sm font-semibold text-slate-300 tracking-wide">
+              Verifying secure session...
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (isFullLoginPage) {
     const hash = currentHash;
 
@@ -706,125 +780,127 @@ export const AppContent: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#F4F7FB] text-[#263238] flex flex-col">
-      {renderSplashOverlay()}
-      {/* Top Full-Width Dark Navy Header Bar */}
-      <Header
-        onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
-        onOpenQrScanner={() => setIsQrScannerOpen(true)}
-        onOpenRaiseComplaint={() => setIsEmergencyModalOpen(true)}
-        onOpenLoginModal={() => setIsLoginModalOpen(true)}
-        onNavigateTab={setActiveTab}
-      />
-
-      {/* Main Body with Left Sidebar and Page Canvas */}
-      <div className="flex-1 flex">
-        {/* Left Dark Navy Sidebar */}
-        <Sidebar
-          activeTab={activeTab}
-          onSelectTab={setActiveTab}
-          isOpen={isSidebarOpen}
-          onCloseMobile={() => setIsSidebarOpen(false)}
+    <AuthGuard>
+      <div className="min-h-screen bg-[#F4F7FB] text-[#263238] flex flex-col">
+        {renderSplashOverlay()}
+        {/* Top Full-Width Dark Navy Header Bar */}
+        <Header
+          onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+          onOpenQrScanner={() => setIsQrScannerOpen(true)}
+          onOpenRaiseComplaint={() => setIsEmergencyModalOpen(true)}
           onOpenLoginModal={() => setIsLoginModalOpen(true)}
+          onNavigateTab={setActiveTab}
         />
 
-        {/* Main Content Canvas */}
-        <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ease-in-out ${isSidebarOpen ? 'lg:pl-[240px]' : 'lg:pl-0'}`}>
-          <main className="flex-1 p-4 sm:p-6 lg:p-7 max-w-[1600px] w-full mx-auto pb-20 md:pb-7">
-            <ErrorBoundary key={`${currentRole}-${activeTab}`} fallbackTitle="View Failed to Render">
-              {renderMainContent()}
-            </ErrorBoundary>
-          </main>
+        {/* Main Body with Left Sidebar and Page Canvas */}
+        <div className="flex-1 flex">
+          {/* Left Dark Navy Sidebar */}
+          <Sidebar
+            activeTab={activeTab}
+            onSelectTab={setActiveTab}
+            isOpen={isSidebarOpen}
+            onCloseMobile={() => setIsSidebarOpen(false)}
+            onOpenLoginModal={() => setIsLoginModalOpen(true)}
+          />
 
-          {/* Clean Corporate Footer */}
-          <footer className="bg-white border-t border-slate-200 py-4 px-6 text-xs text-slate-500 no-print flex flex-col sm:flex-row items-center justify-between gap-3 mb-16 md:mb-0">
-            <div className="flex items-center gap-2.5">
-              <div className="flex items-center gap-2 font-medium">
-                <span className="font-bold text-[#0E2238] text-xs">WEPSUN Lift Services</span>
-                <span className="text-slate-300">|</span>
-                <span className="text-slate-600">Reliable Service. Safer Tomorrow.</span>
+          {/* Main Content Canvas */}
+          <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ease-in-out ${isSidebarOpen ? 'lg:pl-[240px]' : 'lg:pl-0'}`}>
+            <main className="flex-1 p-4 sm:p-6 lg:p-7 max-w-[1600px] w-full mx-auto pb-20 md:pb-7">
+              <ErrorBoundary key={`${currentRole}-${activeTab}`} fallbackTitle="View Failed to Render">
+                {renderMainContent()}
+              </ErrorBoundary>
+            </main>
+
+            {/* Clean Corporate Footer */}
+            <footer className="bg-white border-t border-slate-200 py-4 px-6 text-xs text-slate-500 no-print flex flex-col sm:flex-row items-center justify-between gap-3 mb-16 md:mb-0">
+              <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-2 font-medium">
+                  <span className="font-bold text-[#0E2238] text-xs">WEPSUN Lift Services</span>
+                  <span className="text-slate-300">|</span>
+                  <span className="text-slate-600">Reliable Service. Safer Tomorrow.</span>
+                </div>
               </div>
-            </div>
-            <div className="flex items-center gap-4 text-[11px] font-mono">
-              <span className="flex items-center gap-1.5 text-slate-600">
-                <PhoneCall className="w-3.5 h-3.5 text-[#1976D2]" />
-                24x7 Control Room: +91 98201 55432
-              </span>
-              <span className="text-slate-300">•</span>
-              <span className="capitalize">{currentRole.replace('_', ' ')} Dashboard</span>
-            </div>
-          </footer>
+              <div className="flex items-center gap-4 text-[11px] font-mono">
+                <span className="flex items-center gap-1.5 text-slate-600">
+                  <PhoneCall className="w-3.5 h-3.5 text-[#1976D2]" />
+                  24x7 Control Room: +91 98201 55432
+                </span>
+                <span className="text-slate-300">•</span>
+                <span className="capitalize">{currentRole.replace('_', ' ')} Dashboard</span>
+              </div>
+            </footer>
+          </div>
         </div>
-      </div>
 
-      {/* Global Notifications Container */}
-      <ToastContainer />
-      {/* Modern WepSun Modal & Pop-up System */}
-      <WepsunModalContainer />
+        {/* Global Notifications Container */}
+        <ToastContainer />
+        {/* Modern WepSun Modal & Pop-up System */}
+        <WepsunModalContainer />
 
-      {/* QR Scanner Modal */}
-      <QrScannerModal
-        isOpen={isQrScannerOpen}
-        onClose={() => {
-          setIsQrScannerOpen(false);
-          if (window.location.hash.includes('qr-scanner') || window.location.hash.includes('qr-code')) {
-            window.location.hash = activeTab || 'dashboard';
-          }
-        }}
-        onScanLift={(lift) => setSelectedLiftForPassport(lift)}
-      />
-
-      {/* Lift Passport Modal */}
-      <LiftPassportModal
-        lift={selectedLiftForPassport}
-        isOpen={!!selectedLiftForPassport}
-        onClose={() => setSelectedLiftForPassport(null)}
-        onRaiseTicket={() => {
-          setIsEmergencyModalOpen(true);
-          window.location.hash = 'emergency';
-        }}
-      />
-
-      {/* Emergency Breakdown Modal */}
-      <RaiseComplaintModal
-        isOpen={isEmergencyModalOpen}
-        initialMode="emergency"
-        onClose={() => {
-          setIsEmergencyModalOpen(false);
-          if (window.location.hash.includes('emergency') || window.location.hash.includes('raise-complaint')) {
-            window.location.hash = activeTab || 'home';
-          }
-        }}
-      />
-
-      {/* Login & Sign Up Modal */}
-      <LoginModal
-        isOpen={isLoginModalOpen}
-        onClose={() => setIsLoginModalOpen(false)}
-      />
-
-      {/* Native Mobile App Bottom Navigation Bar (Android & iOS) */}
-      {!isFullLoginPage && !isPublicFeedbackPage && (
-        <MobileBottomNav
-          activeTab={activeTab}
-          setActiveTab={(tab) => {
-            setActiveTab(tab);
-            window.location.hash = tab;
+        {/* QR Scanner Modal */}
+        <QrScannerModal
+          isOpen={isQrScannerOpen}
+          onClose={() => {
+            setIsQrScannerOpen(false);
+            if (window.location.hash.includes('qr-scanner') || window.location.hash.includes('qr-code')) {
+              window.location.hash = activeTab || 'dashboard';
+            }
           }}
-          onOpenQrScanner={() => {
-            setIsQrScannerOpen(true);
-            window.location.hash = 'qr-scanner';
-          }}
-          onOpenEmergencyModal={() => {
+          onScanLift={(lift) => setSelectedLiftForPassport(lift)}
+        />
+
+        {/* Lift Passport Modal */}
+        <LiftPassportModal
+          lift={selectedLiftForPassport}
+          isOpen={!!selectedLiftForPassport}
+          onClose={() => setSelectedLiftForPassport(null)}
+          onRaiseTicket={() => {
             setIsEmergencyModalOpen(true);
             window.location.hash = 'emergency';
           }}
         />
-      )}
 
-      {/* Cross-Platform App Installation Prompt (Mobile & Desktop) */}
-      <AppInstallBanner />
-    </div>
+        {/* Emergency Breakdown Modal */}
+        <RaiseComplaintModal
+          isOpen={isEmergencyModalOpen}
+          initialMode="emergency"
+          onClose={() => {
+            setIsEmergencyModalOpen(false);
+            if (window.location.hash.includes('emergency') || window.location.hash.includes('raise-complaint')) {
+              window.location.hash = activeTab || 'home';
+            }
+          }}
+        />
+
+        {/* Login & Sign Up Modal */}
+        <LoginModal
+          isOpen={isLoginModalOpen}
+          onClose={() => setIsLoginModalOpen(false)}
+        />
+
+        {/* Native Mobile App Bottom Navigation Bar (Android & iOS) */}
+        {!isFullLoginPage && !isPublicFeedbackPage && (
+          <MobileBottomNav
+            activeTab={activeTab}
+            setActiveTab={(tab) => {
+              setActiveTab(tab);
+              window.location.hash = tab;
+            }}
+            onOpenQrScanner={() => {
+              setIsQrScannerOpen(true);
+              window.location.hash = 'qr-scanner';
+            }}
+            onOpenEmergencyModal={() => {
+              setIsEmergencyModalOpen(true);
+              window.location.hash = 'emergency';
+            }}
+          />
+        )}
+
+        {/* Cross-Platform App Installation Prompt (Mobile & Desktop) */}
+        <AppInstallBanner />
+      </div>
+    </AuthGuard>
   );
 };
 
