@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   CheckCircle2,
   AlertTriangle,
@@ -6,6 +6,7 @@ import {
   Trash2,
   LockKeyhole,
   ShieldAlert,
+  ShieldCheck,
   WifiOff,
   LogOut,
   Sparkles,
@@ -16,8 +17,18 @@ import {
   RotateCcw,
   Loader2,
   Check,
+  Mail,
+  MailCheck,
+  Smartphone,
+  KeyRound,
+  UserX,
+  UserCheck,
+  Clock,
+  FileText,
+  AlertCircle,
+  Key,
 } from 'lucide-react';
-import { GeometricBlueWLogo, WepsunLogoIcon } from './WepsunLogo';
+import { GeometricBlueWLogo } from './WepsunLogo';
 
 export type WepsunModalType =
   | 'success'
@@ -25,6 +36,27 @@ export type WepsunModalType =
   | 'warning'
   | 'delete'
   | 'login_error'
+  | 'account_not_found'
+  | 'incorrect_password'
+  | 'email_exists'
+  | 'invalid_email'
+  | 'missing_fields'
+  | 'too_many_attempts'
+  | 'terms_required'
+  | 'password_requirements'
+  | 'password_mismatch'
+  | 'registration_failed'
+  | 'check_inbox'
+  | 'code_sent'
+  | 'verification_failed'
+  | 'verification_success'
+  | 'password_updated'
+  | 'google_connecting'
+  | 'google_cancelled'
+  | 'google_error'
+  | 'google_success'
+  | 'master_invalid'
+  | 'master_success'
   | 'access_denied'
   | 'network_error'
   | 'logout'
@@ -63,6 +95,28 @@ export interface WepsunModalProps extends WepsunModalOptions {
   isOpen: boolean;
 }
 
+// Google Colored G SVG
+const GoogleGIcon = () => (
+  <svg className="w-8 h-8" viewBox="0 0 24 24">
+    <path
+      fill="#4285F4"
+      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
+    />
+    <path
+      fill="#34A853"
+      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
+    />
+    <path
+      fill="#FBBC05"
+      d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
+    />
+    <path
+      fill="#EA4335"
+      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+    />
+  </svg>
+);
+
 export const WepsunModal: React.FC<WepsunModalProps> = ({
   isOpen,
   type = 'info',
@@ -84,18 +138,33 @@ export const WepsunModal: React.FC<WepsunModalProps> = ({
   const [isAnimating, setIsAnimating] = useState(false);
   const [isActionLoading, setIsActionLoading] = useState(false);
 
+  const previousActiveElementRef = useRef<HTMLElement | null>(null);
+  const primaryButtonRef = useRef<HTMLButtonElement | null>(null);
+  const modalContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Focus preservation and restoration
   useEffect(() => {
     if (isOpen) {
+      previousActiveElementRef.current = document.activeElement as HTMLElement;
       setIsRendered(true);
-      const timer = setTimeout(() => setIsAnimating(true), 15);
+      const timer = setTimeout(() => {
+        setIsAnimating(true);
+        primaryButtonRef.current?.focus();
+      }, 20);
       return () => clearTimeout(timer);
     } else {
       setIsAnimating(false);
-      const timer = setTimeout(() => setIsRendered(false), 250);
+      const timer = setTimeout(() => {
+        setIsRendered(false);
+        if (previousActiveElementRef.current && typeof previousActiveElementRef.current.focus === 'function') {
+          previousActiveElementRef.current.focus();
+        }
+      }, 240);
       return () => clearTimeout(timer);
     }
   }, [isOpen]);
 
+  // Auto-close countdown timer if set
   useEffect(() => {
     if (isOpen && autoCloseMs && autoCloseMs > 0 && onClose) {
       const autoTimer = setTimeout(() => {
@@ -105,16 +174,43 @@ export const WepsunModal: React.FC<WepsunModalProps> = ({
     }
   }, [isOpen, autoCloseMs, onClose]);
 
-  // Handle ESC key to dismiss
+  // Handle ESC key and focus trapping
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen && onClose && closeOnBackdropClick) {
+      if (!isOpen) return;
+
+      if (e.key === 'Escape' && onClose && closeOnBackdropClick && type !== 'loading' && type !== 'google_connecting') {
+        e.preventDefault();
         onClose();
+        return;
+      }
+
+      if (e.key === 'Tab' && modalContainerRef.current) {
+        const focusableElements = modalContainerRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusableElements.length === 0) return;
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === firstElement) {
+            e.preventDefault();
+            lastElement.focus();
+          }
+        } else {
+          if (document.activeElement === lastElement) {
+            e.preventDefault();
+            firstElement.focus();
+          }
+        }
       }
     };
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose, closeOnBackdropClick]);
+  }, [isOpen, onClose, closeOnBackdropClick, type]);
 
   if (!isRendered) return null;
 
@@ -122,28 +218,311 @@ export const WepsunModal: React.FC<WepsunModalProps> = ({
   const getTypeConfig = () => {
     switch (type) {
       case 'success':
+      case 'google_success':
         return {
-          defaultTitle: 'Successfully Saved!',
-          defaultMessage: 'Your changes have been saved successfully.',
-          badge: badgeText || 'Operation Complete',
+          defaultTitle: type === 'google_success' ? 'Welcome to WEPSUN!' : 'Welcome Back!',
+          defaultMessage:
+            type === 'google_success'
+              ? 'You have successfully authenticated with Google.'
+              : 'You have successfully signed in to your WEPSUN account.',
+          badge: badgeText || (type === 'google_success' ? 'Google Verified' : 'Authentication Successful'),
           badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200/80',
           iconWrapperClass: 'bg-gradient-to-br from-emerald-500/15 via-emerald-500/10 to-transparent text-emerald-600 ring-emerald-500/20',
           glowClass: 'bg-emerald-500/10',
           icon: <CheckCircle2 className="w-8 h-8 text-emerald-600 animate-in zoom-in duration-300" strokeWidth={2.2} />,
           defaultPrimary: { label: 'Continue', variant: 'primary' as const },
+          defaultSecondary: undefined,
+        };
+
+      case 'account_not_found':
+        return {
+          defaultTitle: 'Account Not Found',
+          defaultMessage: "We couldn't find an account associated with this email address. Please check your email or create a new account to continue.",
+          badge: badgeText || 'Account Verification',
+          badgeClass: 'bg-rose-50 text-rose-700 border-rose-200/80',
+          iconWrapperClass: 'bg-gradient-to-br from-rose-500/15 via-amber-500/10 to-transparent text-rose-600 ring-rose-500/20',
+          glowClass: 'bg-rose-500/10',
+          icon: <UserX className="w-8 h-8 text-rose-600 animate-in zoom-in duration-300" strokeWidth={2.2} />,
+          defaultPrimary: { label: 'Create Account', variant: 'primary' as const },
+          defaultSecondary: { label: 'Try Again', variant: 'secondary' as const },
+        };
+
+      case 'incorrect_password':
+        return {
+          defaultTitle: 'Incorrect Password',
+          defaultMessage: 'The password you entered is incorrect. Please try again or reset your password.',
+          badge: badgeText || 'Security Check',
+          badgeClass: 'bg-rose-50 text-rose-700 border-rose-200/80',
+          iconWrapperClass: 'bg-gradient-to-br from-rose-500/15 via-rose-500/10 to-transparent text-rose-600 ring-rose-500/20',
+          glowClass: 'bg-rose-500/10',
+          icon: <LockKeyhole className="w-8 h-8 text-rose-600 animate-in zoom-in duration-300" strokeWidth={2.2} />,
+          defaultPrimary: { label: 'Try Again', variant: 'primary' as const },
+          defaultSecondary: { label: 'Forgot Password', variant: 'secondary' as const },
+        };
+
+      case 'email_exists':
+        return {
+          defaultTitle: 'Account Already Exists',
+          defaultMessage: 'An account with this email may already exist. Try signing in or use password recovery.',
+          badge: badgeText || 'Existing Account',
+          badgeClass: 'bg-blue-50 text-[#0066FF] border-blue-200/80',
+          iconWrapperClass: 'bg-gradient-to-br from-[#0066FF]/15 via-blue-500/10 to-transparent text-[#0066FF] ring-[#0066FF]/20',
+          glowClass: 'bg-[#0066FF]/10',
+          icon: <UserCheck className="w-8 h-8 text-[#0066FF] animate-in zoom-in duration-300" strokeWidth={2.2} />,
+          defaultPrimary: { label: 'Sign In', variant: 'primary' as const },
+          defaultSecondary: { label: 'Forgot Password', variant: 'secondary' as const },
+        };
+
+      case 'invalid_email':
+        return {
+          defaultTitle: 'Check Your Email',
+          defaultMessage: 'Please enter a valid email address.',
+          badge: badgeText || 'Email Verification',
+          badgeClass: 'bg-amber-50 text-amber-700 border-amber-200/80',
+          iconWrapperClass: 'bg-gradient-to-br from-amber-500/15 via-amber-500/10 to-transparent text-amber-600 ring-amber-500/20',
+          glowClass: 'bg-amber-500/10',
+          icon: <Mail className="w-8 h-8 text-amber-600 animate-in zoom-in duration-300" strokeWidth={2.2} />,
+          defaultPrimary: { label: 'Okay', variant: 'primary' as const },
+          defaultSecondary: undefined,
+        };
+
+      case 'missing_fields':
+        return {
+          defaultTitle: 'Complete All Fields',
+          defaultMessage: 'Please enter your email address and password to continue.',
+          badge: badgeText || 'Required Fields',
+          badgeClass: 'bg-amber-50 text-amber-700 border-amber-200/80',
+          iconWrapperClass: 'bg-gradient-to-br from-amber-500/15 via-amber-500/10 to-transparent text-amber-600 ring-amber-500/20',
+          glowClass: 'bg-amber-500/10',
+          icon: <AlertCircle className="w-8 h-8 text-amber-600 animate-in zoom-in duration-300" strokeWidth={2.2} />,
+          defaultPrimary: { label: 'Okay', variant: 'primary' as const },
+          defaultSecondary: undefined,
+        };
+
+      case 'too_many_attempts':
+        return {
+          defaultTitle: 'Too Many Attempts',
+          defaultMessage: "You've made too many sign-in attempts. Please wait before trying again.",
+          badge: badgeText || 'Rate Limited',
+          badgeClass: 'bg-rose-50 text-rose-700 border-rose-200/80',
+          iconWrapperClass: 'bg-gradient-to-br from-rose-500/15 via-orange-500/10 to-transparent text-rose-600 ring-rose-500/20',
+          glowClass: 'bg-rose-500/10',
+          icon: <Clock className="w-8 h-8 text-rose-600 animate-in zoom-in duration-300" strokeWidth={2.2} />,
+          defaultPrimary: { label: 'Okay', variant: 'primary' as const },
+          defaultSecondary: undefined,
+        };
+
+      case 'terms_required':
+        return {
+          defaultTitle: 'Agreement Required',
+          defaultMessage: 'Please accept the Terms and Conditions and Privacy Policy to create your account.',
+          badge: badgeText || 'Terms Agreement',
+          badgeClass: 'bg-amber-50 text-amber-700 border-amber-200/80',
+          iconWrapperClass: 'bg-gradient-to-br from-amber-500/15 via-amber-500/10 to-transparent text-amber-600 ring-amber-500/20',
+          glowClass: 'bg-amber-500/10',
+          icon: <FileText className="w-8 h-8 text-amber-600 animate-in zoom-in duration-300" strokeWidth={2.2} />,
+          defaultPrimary: { label: 'Okay', variant: 'primary' as const },
+          defaultSecondary: undefined,
+        };
+
+      case 'password_requirements':
+        return {
+          defaultTitle: 'Password Requirements',
+          defaultMessage: 'Please create a password that meets all the security requirements.',
+          badge: badgeText || 'Password Policy',
+          badgeClass: 'bg-amber-50 text-amber-700 border-amber-200/80',
+          iconWrapperClass: 'bg-gradient-to-br from-amber-500/15 via-amber-500/10 to-transparent text-amber-600 ring-amber-500/20',
+          glowClass: 'bg-amber-500/10',
+          icon: <KeyRound className="w-8 h-8 text-amber-600 animate-in zoom-in duration-300" strokeWidth={2.2} />,
+          defaultPrimary: { label: 'Okay', variant: 'primary' as const },
+          defaultSecondary: undefined,
+        };
+
+      case 'password_mismatch':
+        return {
+          defaultTitle: "Passwords Don't Match",
+          defaultMessage: 'Your password and confirmation password must match.',
+          badge: badgeText || 'Validation',
+          badgeClass: 'bg-rose-50 text-rose-700 border-rose-200/80',
+          iconWrapperClass: 'bg-gradient-to-br from-rose-500/15 via-rose-500/10 to-transparent text-rose-600 ring-rose-500/20',
+          glowClass: 'bg-rose-500/10',
+          icon: <AlertTriangle className="w-8 h-8 text-rose-600 animate-in zoom-in duration-300" strokeWidth={2.2} />,
+          defaultPrimary: { label: 'Try Again', variant: 'primary' as const },
+          defaultSecondary: undefined,
+        };
+
+      case 'registration_failed':
+        return {
+          defaultTitle: 'Registration Unsuccessful',
+          defaultMessage: "We couldn't create your account. Please review your information and try again.",
+          badge: badgeText || 'Registration Failed',
+          badgeClass: 'bg-rose-50 text-rose-700 border-rose-200/80',
+          iconWrapperClass: 'bg-gradient-to-br from-rose-500/15 via-rose-500/10 to-transparent text-rose-600 ring-rose-500/20',
+          glowClass: 'bg-rose-500/10',
+          icon: <AlertOctagon className="w-8 h-8 text-rose-600 animate-in zoom-in duration-300" strokeWidth={2.2} />,
+          defaultPrimary: { label: 'Retry', variant: 'primary' as const },
+          defaultSecondary: undefined,
+        };
+
+      case 'check_inbox':
+        return {
+          defaultTitle: 'Check Your Inbox',
+          defaultMessage: "If the email is eligible for password recovery, you'll receive instructions shortly.",
+          badge: badgeText || 'Password Recovery',
+          badgeClass: 'bg-blue-50 text-[#0066FF] border-blue-200/80',
+          iconWrapperClass: 'bg-gradient-to-br from-[#0066FF]/15 via-sky-500/10 to-transparent text-[#0066FF] ring-[#0066FF]/20',
+          glowClass: 'bg-[#0066FF]/10',
+          icon: <MailCheck className="w-8 h-8 text-[#0066FF] animate-in zoom-in duration-300" strokeWidth={2.2} />,
+          defaultPrimary: { label: 'Okay', variant: 'primary' as const },
+          defaultSecondary: undefined,
+        };
+
+      case 'code_sent':
+        return {
+          defaultTitle: 'Verification Code Sent',
+          defaultMessage: 'If delivery succeeds, a verification code will be sent to your registered contact.',
+          badge: badgeText || 'Security Code',
+          badgeClass: 'bg-blue-50 text-[#0066FF] border-blue-200/80',
+          iconWrapperClass: 'bg-gradient-to-br from-[#0066FF]/15 via-sky-500/10 to-transparent text-[#0066FF] ring-[#0066FF]/20',
+          glowClass: 'bg-[#0066FF]/10',
+          icon: <Mail className="w-8 h-8 text-[#0066FF] animate-in zoom-in duration-300" strokeWidth={2.2} />,
+          defaultPrimary: { label: 'Enter OTP', variant: 'primary' as const },
+          defaultSecondary: undefined,
+        };
+
+      case 'verification_failed':
+        return {
+          defaultTitle: 'Verification Failed',
+          defaultMessage: 'The code is invalid or has expired. Please check the code or request a new one.',
+          badge: badgeText || 'Security Verification',
+          badgeClass: 'bg-rose-50 text-rose-700 border-rose-200/80',
+          iconWrapperClass: 'bg-gradient-to-br from-rose-500/15 via-rose-500/10 to-transparent text-rose-600 ring-rose-500/20',
+          glowClass: 'bg-rose-500/10',
+          icon: <ShieldAlert className="w-8 h-8 text-rose-600 animate-in zoom-in duration-300" strokeWidth={2.2} />,
+          defaultPrimary: { label: 'Try Again', variant: 'primary' as const },
+          defaultSecondary: { label: 'Resend Code', variant: 'secondary' as const },
+        };
+
+      case 'verification_success':
+        return {
+          defaultTitle: 'Verification Successful',
+          defaultMessage: 'Your identity has been verified. You can now continue.',
+          badge: badgeText || 'Identity Verified',
+          badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200/80',
+          iconWrapperClass: 'bg-gradient-to-br from-emerald-500/15 via-emerald-500/10 to-transparent text-emerald-600 ring-emerald-500/20',
+          glowClass: 'bg-emerald-500/10',
+          icon: <ShieldCheck className="w-8 h-8 text-emerald-600 animate-in zoom-in duration-300" strokeWidth={2.2} />,
+          defaultPrimary: { label: 'Continue', variant: 'primary' as const },
+          defaultSecondary: undefined,
+        };
+
+      case 'password_updated':
+        return {
+          defaultTitle: 'Password Updated',
+          defaultMessage: 'Your password has been changed successfully. You can now sign in using your new password.',
+          badge: badgeText || 'Password Updated',
+          badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200/80',
+          iconWrapperClass: 'bg-gradient-to-br from-emerald-500/15 via-emerald-500/10 to-transparent text-emerald-600 ring-emerald-500/20',
+          glowClass: 'bg-emerald-500/10',
+          icon: <CheckCircle2 className="w-8 h-8 text-emerald-600 animate-in zoom-in duration-300" strokeWidth={2.2} />,
+          defaultPrimary: { label: 'Back to Sign In', variant: 'primary' as const },
+          defaultSecondary: undefined,
+        };
+
+      case 'google_connecting':
+        return {
+          defaultTitle: 'Connecting to Google',
+          defaultMessage: 'Please wait while we securely authenticate your account.',
+          badge: badgeText || 'Google Authentication',
+          badgeClass: 'bg-blue-50 text-blue-700 border-blue-200/80',
+          iconWrapperClass: 'bg-gradient-to-br from-[#0066FF]/15 via-blue-500/10 to-transparent text-[#0066FF] ring-[#0066FF]/25',
+          glowClass: 'bg-[#0066FF]/10',
+          icon: (
+            <div className="relative flex items-center justify-center">
+              <GoogleGIcon />
+              <div className="absolute -inset-2 rounded-full border-2 border-t-[#0066FF] border-r-transparent border-b-transparent border-l-transparent animate-spin" />
+            </div>
+          ),
+          defaultPrimary: undefined,
+          defaultSecondary: undefined,
+        };
+
+      case 'google_cancelled':
+        return {
+          defaultTitle: 'Sign-In Cancelled',
+          defaultMessage: 'Google sign-in was cancelled. You can try again whenever you’re ready.',
+          badge: badgeText || 'Google Sign-In',
+          badgeClass: 'bg-slate-100 text-slate-700 border-slate-200/80',
+          iconWrapperClass: 'bg-gradient-to-br from-slate-200/60 via-slate-100 to-transparent text-slate-700 ring-slate-200',
+          glowClass: 'bg-slate-300/10',
+          icon: <Info className="w-8 h-8 text-slate-700 animate-in zoom-in duration-300" strokeWidth={2.2} />,
+          defaultPrimary: { label: 'Try Again', variant: 'primary' as const },
+          defaultSecondary: undefined,
+        };
+
+      case 'google_error':
+        return {
+          defaultTitle: 'Google Sign-In Unsuccessful',
+          defaultMessage: "We couldn't complete Google sign-in. Please try again.",
+          badge: badgeText || 'Google Sign-In',
+          badgeClass: 'bg-rose-50 text-rose-700 border-rose-200/80',
+          iconWrapperClass: 'bg-gradient-to-br from-rose-500/15 via-rose-500/10 to-transparent text-rose-600 ring-rose-500/20',
+          glowClass: 'bg-rose-500/10',
+          icon: <AlertOctagon className="w-8 h-8 text-rose-600 animate-in zoom-in duration-300" strokeWidth={2.2} />,
+          defaultPrimary: { label: 'Retry', variant: 'primary' as const },
+          defaultSecondary: undefined,
+        };
+
+      case 'master_invalid':
+        return {
+          defaultTitle: 'Invalid Master ID',
+          defaultMessage: 'The Master ID credentials provided are invalid. Access denied.',
+          badge: badgeText || 'Administrative Access',
+          badgeClass: 'bg-rose-50 text-rose-700 border-rose-200/80',
+          iconWrapperClass: 'bg-gradient-to-br from-rose-500/15 via-slate-900/10 to-transparent text-rose-600 ring-rose-500/20',
+          glowClass: 'bg-rose-500/10',
+          icon: <Key className="w-8 h-8 text-rose-600 animate-in zoom-in duration-300" strokeWidth={2.2} />,
+          defaultPrimary: { label: 'Try Again', variant: 'primary' as const },
+          defaultSecondary: undefined,
+        };
+
+      case 'master_success':
+        return {
+          defaultTitle: 'Master Authentication Verified',
+          defaultMessage: 'Granted executive access to the Admin Dashboard.',
+          badge: badgeText || 'Master Admin',
+          badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-200/80',
+          iconWrapperClass: 'bg-gradient-to-br from-indigo-500/15 via-blue-500/10 to-transparent text-indigo-600 ring-indigo-500/20',
+          glowClass: 'bg-indigo-500/10',
+          icon: <ShieldCheck className="w-8 h-8 text-indigo-600 animate-in zoom-in duration-300" strokeWidth={2.2} />,
+          defaultPrimary: { label: 'Continue to Admin Dashboard', variant: 'primary' as const },
+          defaultSecondary: undefined,
+        };
+
+      case 'network_error':
+        return {
+          defaultTitle: 'Connection Problem',
+          defaultMessage: "We couldn't connect to the server. Check your internet connection and try again.",
+          badge: badgeText || 'Network Offline',
+          badgeClass: 'bg-sky-50 text-sky-700 border-sky-200/80',
+          iconWrapperClass: 'bg-gradient-to-br from-sky-500/15 via-blue-900/10 to-transparent text-sky-600 ring-sky-500/20',
+          glowClass: 'bg-sky-500/10',
+          icon: <WifiOff className="w-8 h-8 text-sky-600 animate-in zoom-in duration-300" strokeWidth={2.2} />,
+          defaultPrimary: { label: 'Retry', variant: 'primary' as const, icon: <RotateCcw className="w-4 h-4" /> },
+          defaultSecondary: { label: 'Cancel', variant: 'secondary' as const },
         };
 
       case 'error':
         return {
           defaultTitle: 'Something Went Wrong',
-          defaultMessage: "We couldn't complete your request. Please try again.",
+          defaultMessage: "We couldn't complete your request right now. Please try again later.",
           badge: badgeText || 'Action Failed',
           badgeClass: 'bg-rose-50 text-rose-700 border-rose-200/80',
           iconWrapperClass: 'bg-gradient-to-br from-rose-500/15 via-rose-500/10 to-transparent text-rose-600 ring-rose-500/20',
           glowClass: 'bg-rose-500/10',
           icon: <AlertOctagon className="w-8 h-8 text-rose-600 animate-in zoom-in duration-300" strokeWidth={2.2} />,
           defaultPrimary: { label: 'Try Again', variant: 'primary' as const },
-          defaultSecondary: { label: 'Cancel', variant: 'secondary' as const },
+          defaultSecondary: undefined,
         };
 
       case 'warning':
@@ -182,6 +561,7 @@ export const WepsunModal: React.FC<WepsunModalProps> = ({
           glowClass: 'bg-rose-500/10',
           icon: <LockKeyhole className="w-8 h-8 text-rose-600 animate-in zoom-in duration-300" strokeWidth={2.2} />,
           defaultPrimary: { label: 'Try Again', variant: 'primary' as const },
+          defaultSecondary: undefined,
         };
 
       case 'access_denied':
@@ -194,18 +574,7 @@ export const WepsunModal: React.FC<WepsunModalProps> = ({
           glowClass: 'bg-indigo-500/10',
           icon: <ShieldAlert className="w-8 h-8 text-indigo-600 animate-in zoom-in duration-300" strokeWidth={2.2} />,
           defaultPrimary: { label: 'OK', variant: 'primary' as const },
-        };
-
-      case 'network_error':
-        return {
-          defaultTitle: 'No Internet Connection',
-          defaultMessage: 'Please check your internet connection and try again.',
-          badge: badgeText || 'Network Offline',
-          badgeClass: 'bg-sky-50 text-sky-700 border-sky-200/80',
-          iconWrapperClass: 'bg-gradient-to-br from-sky-500/15 via-blue-900/10 to-transparent text-sky-600 ring-sky-500/20',
-          glowClass: 'bg-sky-500/10',
-          icon: <WifiOff className="w-8 h-8 text-sky-600 animate-in zoom-in duration-300" strokeWidth={2.2} />,
-          defaultPrimary: { label: 'Retry', variant: 'primary' as const, icon: <RotateCcw className="w-4 h-4" /> },
+          defaultSecondary: undefined,
         };
 
       case 'logout':
@@ -224,7 +593,7 @@ export const WepsunModal: React.FC<WepsunModalProps> = ({
       case 'loading':
         return {
           defaultTitle: 'Please wait…',
-          defaultMessage: 'Processing your request securely with WepSun Cloud Services.',
+          defaultMessage: 'Processing your request securely with WEPSUN Cloud Services.',
           badge: badgeText || 'Processing Action',
           badgeClass: 'bg-blue-50 text-blue-700 border-blue-200/80',
           iconWrapperClass: 'bg-gradient-to-br from-[#0066FF]/15 via-blue-500/10 to-transparent text-[#0066FF] ring-[#0066FF]/25',
@@ -232,10 +601,11 @@ export const WepsunModal: React.FC<WepsunModalProps> = ({
           icon: (
             <div className="relative flex items-center justify-center">
               <GeometricBlueWLogo className="w-9 h-7 animate-pulse" />
-              <div className="absolute inset-0 rounded-full border-2 border-t-[#0066FF] border-r-transparent border-b-transparent border-l-transparent animate-spin" />
+              <div className="absolute -inset-2 rounded-full border-2 border-t-[#0066FF] border-r-transparent border-b-transparent border-l-transparent animate-spin" />
             </div>
           ),
           defaultPrimary: undefined,
+          defaultSecondary: undefined,
         };
 
       case 'update':
@@ -283,7 +653,7 @@ export const WepsunModal: React.FC<WepsunModalProps> = ({
     }
   };
 
-  const renderButton = (action: WepsunModalAction, isPrimary = false) => {
+  const renderButton = (action: WepsunModalAction, isPrimary = false, refProp?: React.RefObject<HTMLButtonElement | null>) => {
     const variant = action.variant || (isPrimary ? 'primary' : 'secondary');
 
     let btnClass = 'w-full py-3.5 px-5 rounded-2xl font-bold text-xs sm:text-sm transition-all duration-200 shadow-xs active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2 ';
@@ -298,11 +668,12 @@ export const WepsunModal: React.FC<WepsunModalProps> = ({
       btnClass += 'border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700';
     } else {
       // secondary
-      btnClass += 'border border-slate-200/90 hover:border-slate-300 bg-slate-100/80 hover:bg-slate-200/80 text-slate-700';
+      btnClass += 'border border-slate-200/90 hover:border-slate-300 bg-slate-100/90 hover:bg-slate-200/90 text-slate-700';
     }
 
     return (
       <button
+        ref={refProp}
         key={action.label}
         type="button"
         disabled={isActionLoading || action.isLoading}
@@ -319,6 +690,8 @@ export const WepsunModal: React.FC<WepsunModalProps> = ({
     );
   };
 
+  const isDismissible = showCloseButton && onClose && type !== 'loading' && type !== 'google_connecting';
+
   return (
     <div
       role="dialog"
@@ -331,7 +704,7 @@ export const WepsunModal: React.FC<WepsunModalProps> = ({
       {/* Semi-transparent dark overlay with soft background blur */}
       <div
         onClick={() => {
-          if (closeOnBackdropClick && onClose && type !== 'loading') {
+          if (closeOnBackdropClick && onClose && type !== 'loading' && type !== 'google_connecting') {
             onClose();
           }
         }}
@@ -342,7 +715,8 @@ export const WepsunModal: React.FC<WepsunModalProps> = ({
 
       {/* Modal Surface Card */}
       <div
-        className={`relative z-10 w-full max-w-[380px] sm:max-w-[420px] bg-white border border-slate-200/90 rounded-[28px] shadow-[0_25px_60px_-15px_rgba(11,37,69,0.35)] p-6 sm:p-7 overflow-hidden text-center transition-all duration-250 ease-out transform ${
+        ref={modalContainerRef}
+        className={`relative z-10 w-full max-w-[390px] sm:max-w-[430px] bg-white border border-slate-200/90 rounded-[28px] shadow-[0_25px_60px_-15px_rgba(11,37,69,0.35)] p-6 sm:p-7 overflow-hidden text-center transition-all duration-250 ease-out transform ${
           isAnimating ? 'scale-100 translate-y-0 opacity-100' : 'scale-95 translate-y-3 opacity-0'
         } ${className}`}
       >
@@ -350,7 +724,7 @@ export const WepsunModal: React.FC<WepsunModalProps> = ({
         <div className={`absolute -top-24 left-1/2 -translate-x-1/2 w-48 h-48 rounded-full blur-3xl pointer-events-none ${config.glowClass}`} />
 
         {/* Top Floating Close Button */}
-        {showCloseButton && onClose && type !== 'loading' && (
+        {isDismissible && (
           <button
             type="button"
             onClick={onClose}
@@ -402,7 +776,7 @@ export const WepsunModal: React.FC<WepsunModalProps> = ({
         {/* Modal Actions / Buttons Layout */}
         {(effectivePrimary || effectiveSecondary || tertiaryAction) && (
           <div className="space-y-2.5 pt-1">
-            {effectivePrimary && renderButton(effectivePrimary, true)}
+            {effectivePrimary && renderButton(effectivePrimary, true, primaryButtonRef)}
             {effectiveSecondary && renderButton(effectiveSecondary, false)}
             {tertiaryAction && renderButton(tertiaryAction, false)}
           </div>

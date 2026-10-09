@@ -28,11 +28,12 @@ import {
   Check,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { useAuthPopup } from '../../hooks/useAuthPopup';
 import { GeometricBlueWLogo } from './WepsunLogo';
 import { apiService, setTokens } from '../../services/api';
 import type { User as UserRecord, UserRole } from '../../types';
 import { GoogleAuthModal } from './GoogleAuthModal';
-import { loadGoogleGisScript, triggerGoogleSignIn, triggerGoogleOAuth2Popup, parseGoogleJwt } from '../../services/googleAuth';
+import { loadGoogleGisScript, triggerGoogleSignIn, triggerGoogleOAuth2Popup } from '../../services/googleAuth';
 import {
   sendSignupEmailOtp,
   verifySignupEmailOtp,
@@ -64,6 +65,35 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     showToast,
     currentRole,
   } = useApp();
+
+  const {
+    showAccountNotFound,
+    showIncorrectPassword,
+    showSignInSuccess,
+    showInvalidEmail,
+    showMissingFields,
+    showTooManyAttempts,
+    showConnectionProblem,
+    showSomethingWentWrong,
+    showAccountCreatedSuccess,
+    showEmailAlreadyExists,
+    showPasswordRequirements,
+    showPasswordMismatch,
+    showAgreementRequired,
+    showRegistrationFailed,
+    showCheckInbox,
+    showOtpSent,
+    showVerificationFailed,
+    showVerificationSuccess,
+    showPasswordResetSuccess,
+    showGoogleConnecting,
+    showGoogleCancelled,
+    showGoogleFailed,
+    showGoogleSuccess,
+    showMasterInvalid,
+    showMasterSuccess,
+    closePopup,
+  } = useAuthPopup();
 
   const [view, setView] = useState<'signin' | 'signup'>(() => {
     const hash = window.location.hash.toLowerCase();
@@ -99,7 +129,24 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Input element refs for precise focus control
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  const passwordInputRef = useRef<HTMLInputElement>(null);
+  const regFullNameRef = useRef<HTMLInputElement>(null);
+  const regEmailInputRef = useRef<HTMLInputElement>(null);
+  const regMobileInputRef = useRef<HTMLInputElement>(null);
+  const regPasswordInputRef = useRef<HTMLInputElement>(null);
+  const regConfirmPasswordInputRef = useRef<HTMLInputElement>(null);
+  const termsCheckboxRef = useRef<HTMLInputElement>(null);
+  const masterIdInputRef = useRef<HTMLInputElement>(null);
+  const masterEmailOtpRef = useRef<HTMLInputElement>(null);
+  const masterSmsOtpRef = useRef<HTMLInputElement>(null);
+  const otpInputRef = useRef<HTMLInputElement>(null);
+  const forgotEmailInputRef = useRef<HTMLInputElement>(null);
+  const forgotOtpInputRef = useRef<HTMLInputElement>(null);
+  const forgotPasswordInputRef = useRef<HTMLInputElement>(null);
+  const forgotConfirmPasswordInputRef = useRef<HTMLInputElement>(null);
 
   // Master ID Dual-Factor Authentication State (Executive Admin Flow)
   const [masterIdInput, setMasterIdInput] = useState('');
@@ -111,12 +158,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [masterSmsOtp, setMasterSmsOtp] = useState('');
   const [masterTimer, setMasterTimer] = useState<number>(60);
   const [canResendMasterOtp, setCanResendMasterOtp] = useState<boolean>(false);
-  const [masterError, setMasterError] = useState<string | null>(null);
   const [isInitiatingMaster, setIsInitiatingMaster] = useState(false);
   const [isVerifyingMaster, setIsVerifyingMaster] = useState(false);
   const [devMasterOtp, setDevMasterOtp] = useState<{ emailOtp: string; smsOtp: string } | null>(null);
-  const masterEmailOtpRef = useRef<HTMLInputElement>(null);
-  const masterSmsOtpRef = useRef<HTMLInputElement>(null);
 
   // Sign Up Form Fields (Client Registration)
   const [regFullName, setRegFullName] = useState('');
@@ -135,13 +179,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [otpValue, setOtpValue] = useState<string>('');
   const [otpTimer, setOtpTimer] = useState<number>(60);
   const [canResendOtp, setCanResendOtp] = useState<boolean>(false);
-  const [otpError, setOtpError] = useState<string | null>(null);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState<boolean>(false);
   const [isSendingOtp, setIsSendingOtp] = useState<boolean>(false);
   const [devSignupOtp, setDevSignupOtp] = useState<string | null>(null);
-  const [signupErrorMessage, setSignupErrorMessage] = useState<string | null>(null);
-  const [emailAlreadyExists, setEmailAlreadyExists] = useState<boolean>(false);
-  const otpInputRef = useRef<HTMLInputElement>(null);
 
   // Forgot Password Modal (Step 1: Request, Step 2: OTP & Reset, Step 3: Success)
   const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
@@ -154,12 +194,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [forgotShowConfirmPassword, setForgotShowConfirmPassword] = useState(false);
   const [forgotTimer, setForgotTimer] = useState<number>(60);
   const [canResendForgotOtp, setCanResendForgotOtp] = useState<boolean>(false);
-  const [forgotError, setForgotError] = useState<string | null>(null);
   const [isSendingForgot, setIsSendingForgot] = useState<boolean>(false);
   const [isResettingPassword, setIsResettingPassword] = useState<boolean>(false);
-  const [firebaseResetSent, setFirebaseResetSent] = useState<boolean>(false);
   const [devForgotOtp, setDevForgotOtp] = useState<string | null>(null);
-  const forgotOtpInputRef = useRef<HTMLInputElement>(null);
 
   // Google OAuth Modal
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
@@ -173,10 +210,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   // Role Tab Change: Exactly Client or Technician
   const handleRoleChange = (role: 'client' | 'technician') => {
     setSelectedRole(role);
-    setErrorMessage(null);
     setTechMode('standard');
     setMasterStep('id_entry');
-    setMasterError(null);
   };
 
   // Sign In Submission Handler
@@ -184,22 +219,37 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     e.preventDefault();
     if (isSubmitting) return;
 
-    if (!identifier.trim()) {
-      setErrorMessage('Please enter your email address or mobile number.');
+    const cleanIdentifier = identifier.trim();
+    if (!cleanIdentifier) {
+      showMissingFields({
+        message: 'Please enter your email address or mobile number to continue.',
+        onOk: () => emailInputRef.current?.focus(),
+      });
       return;
     }
+
     if (!password.trim()) {
-      setErrorMessage('Please enter your password.');
+      showMissingFields({
+        message: 'Please enter your password to continue.',
+        onOk: () => passwordInputRef.current?.focus(),
+      });
+      return;
+    }
+
+    // If looks like an email, validate email syntax
+    if (cleanIdentifier.includes('@') && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanIdentifier)) {
+      showInvalidEmail({
+        onOk: () => emailInputRef.current?.focus(),
+      });
       return;
     }
 
     setIsSubmitting(true);
-    setErrorMessage(null);
 
     try {
       const payload = {
-        email: identifier.includes('@') ? identifier.trim() : undefined,
-        phone: !identifier.includes('@') ? identifier.trim() : undefined,
+        email: cleanIdentifier.includes('@') ? cleanIdentifier : undefined,
+        phone: !cleanIdentifier.includes('@') ? cleanIdentifier : undefined,
         password: password,
       };
 
@@ -241,18 +291,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               ? 'jobs'
               : 'dashboard';
 
-          window.location.hash = activeDest;
-
-          showToast(
-            'success',
-            'Login Successful',
-            userRole === 'technician'
-              ? 'Welcome to WEPSUN Technician Portal!'
-              : userRole === 'client'
-              ? 'Welcome to WEPSUN Client Portal!'
-              : 'Welcome to WEPSUN Admin Dashboard!'
-          );
-
           try {
             confetti({
               particleCount: 80,
@@ -261,17 +299,69 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             });
           } catch {}
 
-          if (onClose) onClose();
+          showSignInSuccess({
+            name: finalUser.name,
+            role: userRole,
+            onContinue: () => {
+              window.location.hash = activeDest;
+              if (onClose) onClose();
+            },
+          });
         }
       } else {
-        const errorMsg = res?.message || 'Invalid email or password.';
-        setErrorMessage(errorMsg);
-        showToast('error', 'Authentication Failed', errorMsg);
+        const errorCode = res?.code;
+        if (errorCode === 'USER_NOT_FOUND') {
+          showAccountNotFound({
+            email: cleanIdentifier,
+            onCreateAccount: () => {
+              setView('signup');
+              setRegEmail(cleanIdentifier);
+              setSignUpStep('form');
+              window.location.hash = 'signup';
+              setTimeout(() => regFullNameRef.current?.focus(), 80);
+            },
+            onTryAgain: () => {
+              emailInputRef.current?.focus();
+            },
+          });
+        } else if (errorCode === 'INVALID_CREDENTIALS') {
+          showIncorrectPassword({
+            onTryAgain: () => {
+              passwordInputRef.current?.focus();
+            },
+            onForgotPassword: () => {
+              setForgotIdentifier(cleanIdentifier);
+              setIsForgotPasswordOpen(true);
+            },
+          });
+        } else if (errorCode === 'TOO_MANY_ATTEMPTS' || res?.status === 429) {
+          showTooManyAttempts({
+            waitTimeSeconds: (res as any)?.retryAfter || 60,
+            onOk: () => emailInputRef.current?.focus(),
+          });
+        } else if (errorCode === 'ACCOUNT_DEACTIVATED') {
+          showSomethingWentWrong({
+            message: 'This account has been deactivated. Please contact WEPSUN Support.',
+          });
+        } else if (errorCode === 'OFFLINE' || errorCode === 'NETWORK_ERROR' || errorCode === 'TIMEOUT') {
+          showConnectionProblem({
+            onRetry: () => {
+              handleSignInSubmit(e);
+            },
+            onCancel: () => closePopup(),
+          });
+        } else {
+          showSomethingWentWrong({
+            message: res?.message || "We couldn't complete your request right now. Please try again later.",
+            onTryAgain: () => emailInputRef.current?.focus(),
+          });
+        }
       }
     } catch (err: any) {
-      const errorMsg = err.message || 'Invalid email or password.';
-      setErrorMessage(errorMsg);
-      showToast('error', 'Authentication Failed', errorMsg);
+      showSomethingWentWrong({
+        message: err.message || "We couldn't complete your request right now. Please try again later.",
+        onTryAgain: () => emailInputRef.current?.focus(),
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -288,18 +378,20 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
     const candidate = masterIdInput.trim();
     if (!candidate) {
-      setMasterError('Please enter an authorized Master ID.');
+      showMissingFields({
+        message: 'Please enter an authorized Master ID to continue.',
+        onOk: () => masterIdInputRef.current?.focus(),
+      });
       return;
     }
 
     setIsInitiatingMaster(true);
-    setMasterError(null);
 
     try {
       const res = await apiService.initiateMaster2FA({ masterId: candidate });
       if (res && res.success && res.data) {
         setMasterChallengeToken(res.data.challengeToken);
-        setMasterMaskedEmail(res.data.maskedEmail || 'registered email');
+        setMasterMaskedEmail(res.data.maskedEmail || 'registered admin email');
         setMasterMaskedPhone(res.data.maskedPhone || 'registered mobile');
         setMasterStep('otp_verify');
         setMasterEmailOtp('');
@@ -310,16 +402,24 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           setDevMasterOtp(res.data.devOtp);
         }
 
-        showToast(
-          'success',
-          'Verification Dispatched',
-          `Security OTP codes sent to ${res.data.maskedEmail} and ${res.data.maskedPhone}.`
-        );
+        showOtpSent({
+          maskedContact: `${res.data.maskedEmail} and ${res.data.maskedPhone}`,
+          onEnterOtp: () => masterEmailOtpRef.current?.focus(),
+        });
       } else {
-        setMasterError(res?.message || 'Invalid Master ID credentials. Access denied.');
+        showMasterInvalid({
+          onTryAgain: () => {
+            setMasterIdInput('');
+            masterIdInputRef.current?.focus();
+          },
+        });
       }
     } catch (err: any) {
-      setMasterError(err?.message || 'Verification could not be initialized. Please try again.');
+      showMasterInvalid({
+        onTryAgain: () => {
+          masterIdInputRef.current?.focus();
+        },
+      });
     } finally {
       setIsInitiatingMaster(false);
     }
@@ -334,12 +434,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     const cleanSmsOtp = masterSmsOtp.replace(/\D/g, '').trim();
 
     if (cleanEmailOtp.length !== 6) {
-      setMasterError('Please enter the 6-digit Email verification code.');
+      showMissingFields({
+        message: 'Please enter the complete 6-digit Email verification code.',
+        onOk: () => masterEmailOtpRef.current?.focus(),
+      });
       return;
     }
 
     setIsVerifyingMaster(true);
-    setMasterError(null);
 
     try {
       const res = await apiService.verifyMaster2FA({
@@ -384,14 +486,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         loginAsUser(masterUser);
         setCurrentRole('master_admin');
 
-        window.location.hash = 'dashboard';
-
-        showToast(
-          'success',
-          'Master Authentication Verified',
-          `Welcome, ${masterUser.name}! Granted executive access to Admin Dashboard.`
-        );
-
         try {
           confetti({
             particleCount: 100,
@@ -401,12 +495,30 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           });
         } catch {}
 
-        if (onClose) onClose();
+        showMasterSuccess({
+          name: masterUser.name,
+          onContinue: () => {
+            window.location.hash = 'dashboard';
+            if (onClose) onClose();
+          },
+        });
       } else {
-        setMasterError(res?.message || 'Invalid verification codes. Please try again.');
+        showVerificationFailed({
+          onTryAgain: () => {
+            setMasterEmailOtp('');
+            setMasterSmsOtp('');
+            masterEmailOtpRef.current?.focus();
+          },
+          onResendCode: () => {
+            handleResendMaster2FA();
+          },
+        });
       }
     } catch (err: any) {
-      setMasterError(err?.message || 'Authentication verification failed.');
+      showVerificationFailed({
+        onTryAgain: () => masterEmailOtpRef.current?.focus(),
+        onResendCode: () => handleResendMaster2FA(),
+      });
     } finally {
       setIsVerifyingMaster(false);
     }
@@ -415,7 +527,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   // Master Resend OTP
   const handleResendMaster2FA = async () => {
     if (!canResendMasterOtp || !masterChallengeToken) return;
-    setMasterError(null);
 
     try {
       const res = await apiService.resendMaster2FA({ challengeToken: masterChallengeToken });
@@ -427,12 +538,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         if (res.data?.devOtp) {
           setDevMasterOtp(res.data.devOtp);
         }
-        showToast('success', 'Fresh Codes Dispatched', res.message || 'New OTPs sent to your admin email & phone.');
+        showOtpSent({
+          maskedContact: `${masterMaskedEmail} and ${masterMaskedPhone}`,
+          onEnterOtp: () => masterEmailOtpRef.current?.focus(),
+        });
       } else {
-        setMasterError(res?.message || 'Could not resend OTP.');
+        showSomethingWentWrong({
+          message: res?.message || 'Could not resend Master 2FA codes.',
+        });
       }
     } catch (err: any) {
-      setMasterError(err?.message || 'Failed to resend code.');
+      showSomethingWentWrong({
+        message: err?.message || 'Failed to resend code.',
+      });
     }
   };
 
@@ -501,30 +619,43 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     const phoneClean = regMobile.trim() ? `${regCountryCode}${regMobile.trim().replace(/^0+/, '')}` : '';
 
     if (!nameClean) {
-      setSignupErrorMessage('Please enter your full name.');
+      showMissingFields({
+        message: 'Please enter your full name to create an account.',
+        onOk: () => regFullNameRef.current?.focus(),
+      });
       return;
     }
+
     if (!emailClean || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailClean)) {
-      setSignupErrorMessage('Please enter a valid email address.');
+      showInvalidEmail({
+        onOk: () => regEmailInputRef.current?.focus(),
+      });
       return;
     }
+
     if (!regPassword || regPassword.length < 8) {
-      setSignupErrorMessage('Password must be at least 8 characters long (12+ characters recommended).');
+      showPasswordRequirements({
+        onOk: () => regPasswordInputRef.current?.focus(),
+      });
       return;
     }
+
     if (regPassword !== regConfirmPassword) {
-      setSignupErrorMessage('Passwords do not match. Please re-enter.');
+      showPasswordMismatch({
+        onTryAgain: () => regConfirmPasswordInputRef.current?.focus(),
+      });
       return;
     }
+
     if (!regAgreeTerms) {
-      setSignupErrorMessage('You must accept the Terms of Service and Privacy Policy to register.');
+      showAgreementRequired({
+        onOk: () => termsCheckboxRef.current?.focus(),
+      });
       return;
     }
 
     setRegIsSubmitting(true);
     setIsSendingOtp(true);
-    setSignupErrorMessage(null);
-    setEmailAlreadyExists(false);
 
     try {
       const res = await sendSignupEmailOtp(emailClean, nameClean);
@@ -534,25 +665,45 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         setOtpValue('');
         setOtpTimer(60);
         setCanResendOtp(false);
-        setOtpError(null);
         if (res.devOtp) {
           setDevSignupOtp(res.devOtp);
         }
-        showToast(
-          'success',
-          'Verification Code Dispatched',
-          `6-digit OTP sent to ${emailClean}. Please verify your email.`
-        );
+        showOtpSent({
+          maskedContact: emailClean,
+          onEnterOtp: () => otpInputRef.current?.focus(),
+        });
       } else {
-        if (res.message?.toLowerCase().includes('already') || res.message?.toLowerCase().includes('exists')) {
-          setEmailAlreadyExists(true);
-          setSignupErrorMessage(`An account with ${emailClean} already exists. Please sign in.`);
+        if (
+          res.code === 'EMAIL_EXISTS' ||
+          res.message?.toLowerCase().includes('already') ||
+          res.message?.toLowerCase().includes('exists')
+        ) {
+          showEmailAlreadyExists({
+            email: emailClean,
+            onSignIn: () => {
+              setView('signin');
+              setIdentifier(emailClean);
+              setSignUpStep('form');
+              window.location.hash = 'login';
+              setTimeout(() => passwordInputRef.current?.focus(), 80);
+            },
+            onForgotPassword: () => {
+              setForgotIdentifier(emailClean);
+              setIsForgotPasswordOpen(true);
+            },
+          });
         } else {
-          setSignupErrorMessage(res.message || 'Unable to send verification OTP.');
+          showRegistrationFailed({
+            message: res.message || "We couldn't create your account. Please review your information and try again.",
+            onRetry: () => handleSignUpSubmit(e),
+          });
         }
       }
     } catch (err: any) {
-      setSignupErrorMessage(err?.message || 'Failed to dispatch verification code.');
+      showRegistrationFailed({
+        message: err?.message || "We couldn't create your account. Please review your information and try again.",
+        onRetry: () => handleSignUpSubmit(e),
+      });
     } finally {
       setRegIsSubmitting(false);
       setIsSendingOtp(false);
@@ -563,12 +714,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const handleVerifySignupOtp = async (codeToVerify?: string) => {
     const code = (codeToVerify || otpValue).replace(/\D/g, '').trim();
     if (code.length !== 6) {
-      setOtpError('Please enter all 6 digits of the verification code.');
+      showMissingFields({
+        message: 'Please enter all 6 digits of the verification code.',
+        onOk: () => otpInputRef.current?.focus(),
+      });
       return;
     }
 
     setIsVerifyingOtp(true);
-    setOtpError(null);
 
     const emailClean = regEmail.trim().toLowerCase();
     const nameClean = regFullName.trim();
@@ -606,14 +759,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           sessionStorage.setItem('wepsun_open_quote_after_login', 'true');
         }
 
-        window.location.hash = 'home';
-
-        showToast(
-          'success',
-          'Account Activated!',
-          `Welcome to WEPSUN Engineering Solution, ${finalUser.name}!`
-        );
-
         try {
           confetti({
             particleCount: 80,
@@ -622,12 +767,28 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           });
         } catch {}
 
-        if (onClose) onClose();
+        showAccountCreatedSuccess({
+          onContinue: () => {
+            window.location.hash = 'home';
+            if (onClose) onClose();
+          },
+        });
       } else {
-        setOtpError(res.message || 'Invalid or expired verification code.');
+        showVerificationFailed({
+          onTryAgain: () => {
+            setOtpValue('');
+            otpInputRef.current?.focus();
+          },
+          onResendCode: () => {
+            handleResendSignupOtp();
+          },
+        });
       }
     } catch (err: any) {
-      setOtpError(err?.message || 'Verification failed. Please try again.');
+      showVerificationFailed({
+        onTryAgain: () => otpInputRef.current?.focus(),
+        onResendCode: () => handleResendSignupOtp(),
+      });
     } finally {
       setIsVerifyingOtp(false);
     }
@@ -636,7 +797,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   // Resend Sign Up OTP
   const handleResendSignupOtp = async () => {
     if (!canResendOtp) return;
-    setOtpError(null);
     setIsSendingOtp(true);
 
     try {
@@ -648,12 +808,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         if (res.devOtp) {
           setDevSignupOtp(res.devOtp);
         }
-        showToast('success', 'Fresh Code Sent', `A fresh 6-digit OTP was sent to ${regEmail.trim()}.`);
+        showOtpSent({
+          maskedContact: regEmail.trim(),
+          onEnterOtp: () => otpInputRef.current?.focus(),
+        });
       } else {
-        setOtpError(res.message || 'Failed to resend code.');
+        showSomethingWentWrong({
+          message: res.message || 'Failed to resend verification code.',
+        });
       }
     } catch (err: any) {
-      setOtpError(err?.message || 'Failed to resend code.');
+      showSomethingWentWrong({
+        message: err?.message || 'Failed to resend verification code.',
+      });
     } finally {
       setIsSendingOtp(false);
     }
@@ -663,6 +830,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const handleGoogleAuth = async () => {
     if (isGoogleSubmitting) return;
     setIsGoogleSubmitting(true);
+    showGoogleConnecting();
 
     try {
       await triggerGoogleOAuth2Popup(
@@ -699,9 +867,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
               loginAsUser(finalUser);
               setCurrentRole('client');
-              window.location.hash = 'home';
-
-              showToast('success', 'Google Sign-In Successful', `Welcome to WEPSUN, ${finalUser.name}!`);
 
               try {
                 confetti({
@@ -711,52 +876,87 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 });
               } catch {}
 
-              if (onClose) onClose();
+              showGoogleSuccess({
+                name: finalUser.name,
+                onContinue: () => {
+                  window.location.hash = 'home';
+                  if (onClose) onClose();
+                },
+              });
+            } else {
+              showGoogleFailed({
+                error: res?.message,
+                onRetry: () => handleGoogleAuth(),
+              });
             }
           } catch (err: any) {
-            showToast('error', 'Google Sign-In Error', err?.message || 'Authentication failed.');
+            showGoogleFailed({
+              error: err?.message,
+              onRetry: () => handleGoogleAuth(),
+            });
           } finally {
             setIsGoogleSubmitting(false);
           }
         },
         (popupError) => {
           setIsGoogleSubmitting(false);
-          if (!popupError.message?.includes('closed') && !popupError.message?.includes('cancel')) {
-            setIsGoogleModalOpen(true);
+          if (popupError.message?.includes('closed') || popupError.message?.includes('cancel')) {
+            showGoogleCancelled({
+              onTryAgain: () => handleGoogleAuth(),
+            });
+          } else {
+            showGoogleFailed({
+              error: popupError.message,
+              onRetry: () => handleGoogleAuth(),
+            });
           }
         }
       );
     } catch {
       setIsGoogleSubmitting(false);
-      setIsGoogleModalOpen(true);
+      showGoogleCancelled({
+        onTryAgain: () => handleGoogleAuth(),
+      });
     }
   };
 
   // Forgot Password Handlers
   const handleSendForgotEmail = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!forgotIdentifier.trim()) {
-      setForgotError('Please enter your email address.');
+    const cleanForgotEmail = forgotIdentifier.trim().toLowerCase();
+
+    if (!cleanForgotEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanForgotEmail)) {
+      showInvalidEmail({
+        onOk: () => forgotEmailInputRef.current?.focus(),
+      });
       return;
     }
+
     setIsSendingForgot(true);
-    setForgotError(null);
 
     try {
-      const res = await sendForgotPasswordEmail(forgotIdentifier.trim());
+      const res = await sendForgotPasswordEmail(cleanForgotEmail);
       if (res.success) {
         setForgotStep('otp_reset');
         setForgotOtpValue('');
         setForgotTimer(60);
         setCanResendForgotOtp(false);
-        setFirebaseResetSent(Boolean(res.firebaseEmailSent));
         if (res.devOtp) setDevForgotOtp(res.devOtp);
-        showToast('success', 'Reset Code Sent', `6-digit reset code sent to ${forgotIdentifier.trim()}.`);
+
+        showCheckInbox({
+          onOk: () => forgotOtpInputRef.current?.focus(),
+        });
       } else {
-        setForgotError(res.message || 'Could not dispatch password reset OTP.');
+        showSomethingWentWrong({
+          message: res.message || 'Could not dispatch password reset OTP.',
+          onTryAgain: () => forgotEmailInputRef.current?.focus(),
+        });
       }
     } catch (err: any) {
-      setForgotError(err?.message || 'Unable to request password reset.');
+      showSomethingWentWrong({
+        message: err?.message || 'Unable to request password reset.',
+        onTryAgain: () => forgotEmailInputRef.current?.focus(),
+      });
     } finally {
       setIsSendingForgot(false);
     }
@@ -767,24 +967,30 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     const enteredOtp = forgotOtpValue.replace(/\D/g, '').trim();
 
     if (enteredOtp.length !== 6) {
-      setForgotError('Please enter the 6-digit verification code.');
+      showMissingFields({
+        message: 'Please enter the complete 6-digit verification code.',
+        onOk: () => forgotOtpInputRef.current?.focus(),
+      });
       return;
     }
     if (!forgotNewPassword.trim() || forgotNewPassword.length < 8) {
-      setForgotError('New password must be at least 8 characters long.');
+      showPasswordRequirements({
+        onOk: () => forgotPasswordInputRef.current?.focus(),
+      });
       return;
     }
     if (forgotNewPassword !== forgotConfirmPassword) {
-      setForgotError('Passwords do not match. Please re-enter.');
+      showPasswordMismatch({
+        onTryAgain: () => forgotConfirmPasswordInputRef.current?.focus(),
+      });
       return;
     }
 
     setIsResettingPassword(true);
-    setForgotError(null);
 
     try {
       const res = await verifyForgotPasswordOtpAndReset(
-        forgotIdentifier.trim(),
+        forgotIdentifier.trim().toLowerCase(),
         enteredOtp,
         forgotNewPassword
       );
@@ -793,7 +999,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         setForgotStep('success');
         setIdentifier(forgotIdentifier.trim());
         setPassword('');
-        showToast('success', 'Password Reset Successful', 'You can now sign in with your new password.');
+
         try {
           confetti({
             particleCount: 50,
@@ -801,11 +1007,31 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             origin: { y: 0.6 },
           });
         } catch {}
+
+        showPasswordResetSuccess({
+          onSignIn: () => {
+            setIsForgotPasswordOpen(false);
+            setForgotStep('email');
+            setView('signin');
+            setTimeout(() => passwordInputRef.current?.focus(), 80);
+          },
+        });
       } else {
-        setForgotError(res.message || 'Invalid verification code or expired token.');
+        showVerificationFailed({
+          onTryAgain: () => {
+            setForgotOtpValue('');
+            forgotOtpInputRef.current?.focus();
+          },
+          onResendCode: () => {
+            handleResendForgotOtp();
+          },
+        });
       }
     } catch (err: any) {
-      setForgotError(err?.message || 'Failed to complete password reset.');
+      showVerificationFailed({
+        onTryAgain: () => forgotOtpInputRef.current?.focus(),
+        onResendCode: () => handleResendForgotOtp(),
+      });
     } finally {
       setIsResettingPassword(false);
     }
@@ -813,22 +1039,27 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
   const handleResendForgotOtp = async () => {
     if (!canResendForgotOtp) return;
-    setForgotError(null);
     setIsSendingForgot(true);
 
     try {
-      const res = await resendOtp(forgotIdentifier.trim(), 'forgot_password');
+      const res = await resendOtp(forgotIdentifier.trim().toLowerCase(), 'forgot_password');
       if (res.success) {
         setForgotOtpValue('');
         setForgotTimer(60);
         setCanResendForgotOtp(false);
         if (res.devOtp) setDevForgotOtp(res.devOtp);
-        showToast('success', 'New Code Sent', `A fresh 6-digit OTP was sent to ${forgotIdentifier.trim()}.`);
+        showCheckInbox({
+          onOk: () => forgotOtpInputRef.current?.focus(),
+        });
       } else {
-        setForgotError(res.message || 'Failed to resend code.');
+        showSomethingWentWrong({
+          message: res.message || 'Failed to resend code.',
+        });
       }
     } catch (err: any) {
-      setForgotError(err?.message || 'Failed to resend code.');
+      showSomethingWentWrong({
+        message: err?.message || 'Failed to resend code.',
+      });
     } finally {
       setIsSendingForgot(false);
     }
@@ -1048,14 +1279,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 </div>
               )}
 
-              {/* Error Message Alert */}
-              {errorMessage && (
-                <div className="mb-4 p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{errorMessage}</span>
-                </div>
-              )}
-
               {/* TECHNICIAN TAB: Standard Technician vs Master Access Mode */}
               {selectedRole === 'technician' && (
                 <div className="mb-4">
@@ -1070,8 +1293,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                         onClick={() => {
                           setTechMode('master');
                           setMasterStep('id_entry');
-                          setMasterError(null);
-                          setErrorMessage(null);
                         }}
                         className="text-xs font-bold text-[#0066FF] hover:underline cursor-pointer"
                       >
@@ -1089,7 +1310,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                         onClick={() => {
                           setTechMode('standard');
                           setMasterStep('id_entry');
-                          setMasterError(null);
                         }}
                         className="text-xs font-medium text-slate-300 hover:text-white hover:underline cursor-pointer"
                       >
@@ -1106,24 +1326,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   {/* Master Step 1: Enter Master ID */}
                   {masterStep === 'id_entry' ? (
                     <form onSubmit={handleInitiateMaster2FA} className="space-y-3.5">
-                      {masterError && (
-                        <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
-                          <AlertCircle className="w-4 h-4 shrink-0" />
-                          <span>{masterError}</span>
-                        </div>
-                      )}
-
                       <div className="relative">
                         <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                           <Key className="w-4 h-4" />
                         </div>
                         <input
+                          ref={masterIdInputRef}
                           type="password"
                           value={masterIdInput}
-                          onChange={(e) => {
-                            setMasterIdInput(e.target.value);
-                            if (masterError) setMasterError(null);
-                          }}
+                          onChange={(e) => setMasterIdInput(e.target.value)}
                           placeholder="Enter Authorized Master ID"
                           required
                           autoFocus
@@ -1176,13 +1387,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                         </div>
                       </div>
 
-                      {masterError && (
-                        <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
-                          <AlertCircle className="w-4 h-4 shrink-0" />
-                          <span>{masterError}</span>
-                        </div>
-                      )}
-
                       {/* Email OTP Field */}
                       <div>
                         <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
@@ -1200,7 +1404,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                             value={masterEmailOtp}
                             onChange={(e) => {
                               setMasterEmailOtp(e.target.value.replace(/\D/g, '').slice(0, 6));
-                              if (masterError) setMasterError(null);
                             }}
                             placeholder="Enter 6-digit Email code"
                             required
@@ -1227,7 +1430,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                             value={masterSmsOtp}
                             onChange={(e) => {
                               setMasterSmsOtp(e.target.value.replace(/\D/g, '').slice(0, 6));
-                              if (masterError) setMasterError(null);
                             }}
                             placeholder="Enter 6-digit SMS code"
                             className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs sm:text-sm font-mono font-bold tracking-widest text-slate-800 focus:bg-white focus:border-[#0066FF] outline-none"
@@ -1280,6 +1482,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       <Mail className="w-4 h-4" />
                     </div>
                     <input
+                      ref={emailInputRef}
                       type="text"
                       value={identifier}
                       onChange={(e) => setIdentifier(e.target.value)}
@@ -1295,6 +1498,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       <Lock className="w-4 h-4" />
                     </div>
                     <input
+                      ref={passwordInputRef}
                       type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
@@ -1412,31 +1616,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               {/* STEP 1: Registration Details Form */}
               {signUpStep === 'form' ? (
                 <div>
-                  {signupErrorMessage && (
-                    <div className="mb-3.5 p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex flex-col gap-2 animate-in fade-in">
-                      <div className="flex items-start gap-2">
-                        <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-                        <span className="font-medium">{signupErrorMessage}</span>
-                      </div>
-                      {emailAlreadyExists && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIdentifier(regEmail);
-                            setView('signin');
-                            setSignUpStep('form');
-                            setSignupErrorMessage(null);
-                            setEmailAlreadyExists(false);
-                            window.location.hash = 'login';
-                          }}
-                          className="self-start px-3 py-1 bg-[#0066FF] hover:bg-[#0052cc] text-white font-bold rounded-xl text-[11px] transition-all shadow-xs cursor-pointer"
-                        >
-                          👉 Sign In With This Email
-                        </button>
-                      )}
-                    </div>
-                  )}
-
                   <form onSubmit={handleSignUpSubmit} className="space-y-3">
                     {/* Full Name */}
                     <div className="relative">
@@ -1444,12 +1623,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                         <User className="w-4 h-4" />
                       </div>
                       <input
+                        ref={regFullNameRef}
                         type="text"
                         value={regFullName}
-                        onChange={(e) => {
-                          setRegFullName(e.target.value);
-                          if (signupErrorMessage) setSignupErrorMessage(null);
-                        }}
+                        onChange={(e) => setRegFullName(e.target.value)}
                         placeholder="Full Name"
                         required
                         className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
@@ -1462,12 +1639,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                         <Mail className="w-4 h-4" />
                       </div>
                       <input
+                        ref={regEmailInputRef}
                         type="email"
                         value={regEmail}
-                        onChange={(e) => {
-                          setRegEmail(e.target.value);
-                          if (signupErrorMessage) setSignupErrorMessage(null);
-                        }}
+                        onChange={(e) => setRegEmail(e.target.value)}
                         placeholder="Email Address"
                         required
                         className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
@@ -1494,11 +1669,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                           <Phone className="w-4 h-4" />
                         </div>
                         <input
+                          ref={regMobileInputRef}
                           type="tel"
                           value={regMobile}
                           onChange={(e) => {
                             setRegMobile(e.target.value.replace(/\D/g, '').slice(0, 10));
-                            if (signupErrorMessage) setSignupErrorMessage(null);
                           }}
                           placeholder="Mobile Number"
                           className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
@@ -1512,6 +1687,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                         <Lock className="w-4 h-4" />
                       </div>
                       <input
+                        ref={regPasswordInputRef}
                         type={regShowPassword ? 'text' : 'password'}
                         value={regPassword}
                         onChange={(e) => setRegPassword(e.target.value)}
@@ -1535,6 +1711,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                         <Lock className="w-4 h-4" />
                       </div>
                       <input
+                        ref={regConfirmPasswordInputRef}
                         type={regShowConfirmPassword ? 'text' : 'password'}
                         value={regConfirmPassword}
                         onChange={(e) => setRegConfirmPassword(e.target.value)}
@@ -1555,12 +1732,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     <div className="pt-1">
                       <label className="flex items-start gap-2 cursor-pointer select-none text-left">
                         <input
+                          ref={termsCheckboxRef}
                           type="checkbox"
                           checked={regAgreeTerms}
-                          onChange={(e) => {
-                            setRegAgreeTerms(e.target.checked);
-                            if (signupErrorMessage) setSignupErrorMessage(null);
-                          }}
+                          onChange={(e) => setRegAgreeTerms(e.target.checked)}
                           required
                           className="w-4 h-4 mt-0.5 rounded text-[#0066FF] focus:ring-[#0066FF] border-slate-300 shrink-0"
                         />
@@ -1622,7 +1797,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     type="button"
                     onClick={() => {
                       setSignUpStep('form');
-                      setOtpError(null);
                     }}
                     className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-[#0066FF] transition-colors mb-3 cursor-pointer"
                   >
@@ -1650,13 +1824,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     </span>
                   </div>
 
-                  {otpError && (
-                    <div className="mb-3.5 p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4 shrink-0" />
-                      <span>{otpError}</span>
-                    </div>
-                  )}
-
                   {/* 6-Digit Visual OTP Boxes with Single Overlay Input */}
                   <div
                     className="relative my-3 cursor-text"
@@ -1673,7 +1840,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       onChange={(e) => {
                         const clean = e.target.value.replace(/\D/g, '').slice(0, 6);
                         setOtpValue(clean);
-                        setOtpError(null);
                         if (clean.length === 6) {
                           handleVerifySignupOtp(clean);
                         }
@@ -1803,7 +1969,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               onClick={() => {
                 setIsForgotPasswordOpen(false);
                 setForgotStep('email');
-                setForgotError(null);
               }}
               className="absolute top-5 right-5 p-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
               title="Close"
@@ -1821,19 +1986,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   Enter your registered email address. We'll send a 6-digit OTP verification code to reset your password.
                 </p>
 
-                {forgotError && (
-                  <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    <span>{forgotError}</span>
-                  </div>
-                )}
-
                 <form onSubmit={handleSendForgotEmail} className="space-y-4">
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                       <Mail className="w-4 h-4" />
                     </div>
                     <input
+                      ref={forgotEmailInputRef}
                       type="email"
                       value={forgotIdentifier}
                       onChange={(e) => setForgotIdentifier(e.target.value)}
@@ -1871,7 +2030,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   type="button"
                   onClick={() => {
                     setForgotStep('email');
-                    setForgotError(null);
                   }}
                   className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-[#0066FF] transition-colors mb-3 cursor-pointer"
                 >
@@ -1883,13 +2041,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 <p className="text-xs text-slate-500 mt-1 mb-3">
                   Enter the 6-digit code sent to <strong className="text-slate-800">{forgotIdentifier}</strong> and create your new password.
                 </p>
-
-                {forgotError && (
-                  <div className="mb-3 p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    <span>{forgotError}</span>
-                  </div>
-                )}
 
                 <form onSubmit={handleVerifyForgotOtpAndReset} className="space-y-3.5">
                   <div>
@@ -1911,7 +2062,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                         onChange={(e) => {
                           const clean = e.target.value.replace(/\D/g, '').slice(0, 6);
                           setForgotOtpValue(clean);
-                          setForgotError(null);
                         }}
                         className="absolute inset-0 w-full h-full opacity-0 z-20 cursor-text"
                         style={{ fontSize: '16px' }}
@@ -1945,6 +2095,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       <Lock className="w-4 h-4" />
                     </div>
                     <input
+                      ref={forgotPasswordInputRef}
                       type={forgotShowPassword ? 'text' : 'password'}
                       value={forgotNewPassword}
                       onChange={(e) => setForgotNewPassword(e.target.value)}
@@ -1967,6 +2118,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       <Lock className="w-4 h-4" />
                     </div>
                     <input
+                      ref={forgotConfirmPasswordInputRef}
                       type={forgotShowConfirmPassword ? 'text' : 'password'}
                       value={forgotConfirmPassword}
                       onChange={(e) => setForgotConfirmPassword(e.target.value)}

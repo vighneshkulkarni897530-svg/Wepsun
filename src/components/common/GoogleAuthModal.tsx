@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useApp } from '../../context/AppContext';
+import { useAuthPopup } from '../../hooks/useAuthPopup';
 import { setTokens, apiService } from '../../services/api';
 import { triggerGoogleSignIn, triggerGoogleOAuth2Popup } from '../../services/googleAuth';
 import { UserRole } from '../../types';
@@ -49,6 +50,12 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
   targetRoleHint,
 }) => {
   const { loginAsUser, setCurrentRole, showToast, users } = useApp();
+  const {
+    showGoogleSuccess,
+    showGoogleFailed,
+    showGoogleCancelled,
+    showInvalidEmail,
+  } = useAuthPopup();
 
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [authStep, setAuthStep] = useState<string>('');
@@ -146,8 +153,8 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
     role?: UserRole;
   }) => {
     const emailClean = account.email.trim().toLowerCase();
-    if (!emailClean || !emailClean.includes('@')) {
-      showToast('error', 'Invalid Email', 'Please enter a valid Google Account email.');
+    if (!emailClean || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailClean)) {
+      showInvalidEmail();
       return;
     }
 
@@ -160,7 +167,7 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
     setAuthStep(`Connecting ${emailClean} with Google Identity...`);
 
     try {
-      await new Promise((r) => setTimeout(r, 400));
+      await new Promise((r) => setTimeout(r, 300));
       setAuthStep('Authenticating session on WEPSUN Cloud Gateway...');
 
       const defaultAvatar =
@@ -233,7 +240,6 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
 
       setCurrentRole(activeRole);
       triggerConfetti();
-      showToast('success', 'Google Sign-In Successful', `Welcome, ${userRecord.name || displayName}!`);
 
       if (sessionStorage.getItem('wepsun_pending_quote_service')) {
         sessionStorage.setItem('wepsun_open_quote_after_login', 'true');
@@ -246,13 +252,20 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
           ? 'jobs'
           : 'dashboard';
 
-      window.location.hash = targetDest;
-
       if (onSuccess) onSuccess();
       if (onClose) onClose();
-      window.dispatchEvent(new HashChangeEvent('hashchange'));
+
+      showGoogleSuccess({
+        name: userRecord.name || displayName,
+        onContinue: () => {
+          window.location.hash = targetDest;
+        },
+      });
     } catch (err: any) {
-      showToast('error', 'Sign In Failed', err?.message || 'Could not complete Google authentication.');
+      showGoogleFailed({
+        error: err?.message,
+        onRetry: () => handleExecuteGoogleLogin(account),
+      });
     } finally {
       setIsAuthenticating(false);
       setAuthStep('');
@@ -337,7 +350,6 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
 
             setCurrentRole(activeRole);
             triggerConfetti();
-            showToast('success', 'Google Sign-In Successful', `Welcome, ${userRecord.name}!`);
 
             const targetDest =
               activeRole === 'client'
@@ -346,13 +358,20 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
                 ? 'jobs'
                 : 'dashboard';
 
-            window.location.hash = targetDest;
-
             if (onSuccess) onSuccess();
             if (onClose) onClose();
-            window.dispatchEvent(new HashChangeEvent('hashchange'));
+
+            showGoogleSuccess({
+              name: userRecord.name || profile?.name || 'Google User',
+              onContinue: () => {
+                window.location.hash = targetDest;
+              },
+            });
           } catch (backendErr: any) {
-            showToast('error', 'Authentication Error', backendErr?.message || 'Unable to sign in with Google.');
+            showGoogleFailed({
+              error: backendErr?.message,
+              onRetry: () => handleTriggerGisPopup(),
+            });
           } finally {
             setIsAuthenticating(false);
             setAuthStep('');
@@ -361,15 +380,25 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
         (error) => {
           setIsAuthenticating(false);
           setAuthStep('');
-          if (!error.message?.includes('closed') && !error.message?.includes('cancel')) {
-            showToast('error', 'Google Sign-In Error', error.message || 'Could not launch Google Sign-In.');
+          if (error.message?.includes('closed') || error.message?.includes('cancel')) {
+            showGoogleCancelled({
+              onTryAgain: () => handleTriggerGisPopup(),
+            });
+          } else {
+            showGoogleFailed({
+              error: error.message,
+              onRetry: () => handleTriggerGisPopup(),
+            });
           }
         }
       );
     } catch (err: any) {
       setIsAuthenticating(false);
       setAuthStep('');
-      showToast('error', 'Google Sign-In Error', err?.message || 'Could not launch Google Sign-In.');
+      showGoogleFailed({
+        error: err?.message,
+        onRetry: () => handleTriggerGisPopup(),
+      });
     }
   };
 
