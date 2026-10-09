@@ -317,6 +317,12 @@ export async function apiFetch<T = any>(
  */
 export const apiService = {
   // Authentication & Session
+  initiateMaster2FA: (payload: { masterId: string }) =>
+    apiFetch('/auth/master-id/initiate', { method: 'POST', body: JSON.stringify(payload), skipAuth: true }),
+  verifyMaster2FA: (payload: { challengeToken: string; emailOtp: string; smsOtp?: string; rememberMe?: boolean }) =>
+    apiFetch('/auth/master-id/verify', { method: 'POST', body: JSON.stringify(payload), skipAuth: true }),
+  resendMaster2FA: (payload: { challengeToken: string }) =>
+    apiFetch('/auth/master-id/resend', { method: 'POST', body: JSON.stringify(payload), skipAuth: true }),
   verifyMasterId: (payload: { masterId: string; rememberMe?: boolean }) =>
     apiFetch('/auth/master-id', { method: 'POST', body: JSON.stringify(payload), skipAuth: true }),
   login: (payload: { email?: string; phone?: string; password?: string; otp?: string; companyCode?: string }) =>

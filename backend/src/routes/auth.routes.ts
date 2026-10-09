@@ -21,7 +21,7 @@ import {
 import { requireAuth, requireRole, AuthenticatedRequest } from '../middleware/auth.js';
 import { authLimiter } from '../middleware/rateLimiter.js';
 import { verifyGoogleIdToken, verifyGoogleAccessToken } from '../lib/googleAuth.js';
-import { validateMasterId, getMasterAdminUser } from '../lib/masterAuth.js';
+import { validateMasterId, getMasterAdminUser, initiateMaster2FA, verifyMaster2FA, resendMaster2FA } from '../lib/masterAuth.js';
 import { sendEmailOtp, verifyEmailOtp, getEmailServiceHealth } from '../lib/emailOtpService.js';
 
 const router = Router();
@@ -531,53 +531,59 @@ router.get('/google/callback', (_req, res: Response): void => {
 </html>`);
 });
 
-// Handler for Master ID / Master Login Authentication
-const handleMasterIdAuth = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  const { masterId, rememberMe } = req.body;
-  const rawInput = String(masterId || '').trim();
-  const userAgent = req.headers['user-agent'];
-  const ipAddress = req.ip || req.socket.remoteAddress;
-
-  if (!rawInput) {
-    res.status(400).json({
-      success: false,
-      message: 'Please enter your Master ID.',
-      code: 'EMPTY_MASTER_ID',
-    });
-    return;
-  }
-
+// POST /api/auth/master-id/initiate — Step 1: Initiate Master ID 2FA (Dispatches Email + SMS OTP)
+router.post('/master-id/initiate', authLimiter, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  const { masterId } = req.body;
   try {
-    const validation = validateMasterId(rawInput);
-
-    if (!validation.isValid || !validation.masterSlot) {
-      // Record failed authentication in audit log
-      try {
-        await prisma.auditLog.create({
-          data: {
-            companyId: 'comp-1',
-            entityType: 'MasterAuth',
-            entityId: 'technician-master-portal',
-            action: 'LOGIN_FAILURE',
-            performedBy: 'Technician Access',
-            userRole: 'ANONYMOUS',
-            details: 'Invalid Master ID attempt received at Technician portal',
-          },
-        });
-      } catch {
-        // Non-blocking
-      }
-
+    const result = await initiateMaster2FA(masterId);
+    if (!result.success) {
       res.status(401).json({
         success: false,
-        message: 'Invalid Master ID. Please try again.',
+        message: result.message || 'Invalid Master ID credentials.',
         code: 'INVALID_MASTER_ID',
       });
       return;
     }
 
-    const slot = validation.masterSlot;
-    const masterUser = getMasterAdminUser(slot);
+    res.json({
+      success: true,
+      message: result.message,
+      data: {
+        challengeToken: result.challengeToken,
+        maskedEmail: result.maskedEmail,
+        maskedPhone: result.maskedPhone,
+        expirySeconds: result.expirySeconds,
+        resendCooldownSeconds: result.resendCooldownSeconds,
+        devOtp: result.devOtp,
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to initiate Master ID verification.',
+      error: err?.message,
+    });
+  }
+});
+
+// POST /api/auth/master-id/verify — Step 2: Verify Master ID 2FA OTPs & Establish Admin Session
+router.post('/master-id/verify', authLimiter, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  const { challengeToken, emailOtp, smsOtp, rememberMe } = req.body;
+  const userAgent = req.headers['user-agent'];
+  const ipAddress = req.ip || req.socket.remoteAddress;
+
+  try {
+    const result = verifyMaster2FA({ challengeToken, emailOtp, smsOtp });
+    if (!result.success || !result.masterUser) {
+      res.status(401).json({
+        success: false,
+        message: result.message || 'Invalid verification codes.',
+        code: 'INVALID_2FA_CODE',
+      });
+      return;
+    }
+
+    const masterUser = result.masterUser;
 
     const jwtPayload: JwtUserPayload = {
       sub: masterUser.id,
@@ -607,12 +613,119 @@ const handleMasterIdAuth = async (req: AuthenticatedRequest, res: Response): Pro
         companyId: masterUser.companyId,
         entityType: 'MasterAuth',
         entityId: masterUser.id,
-        action: 'LOGIN_SUCCESS',
+        action: 'LOGIN_SUCCESS_2FA',
         performedBy: masterUser.name,
         userRole: 'MASTER_ADMIN',
-        details: `Authorized Master ID #${slot} authenticated from Technician option. Granted full Admin Dashboard access.`,
+        details: `Authorized Master ID authenticated with verified 2FA factors. Granted full Admin Dashboard access.`,
       },
     }).catch(() => {});
+
+    res.json({
+      success: true,
+      message: 'Master ID 2FA verified successfully. Access granted to Admin Dashboard.',
+      data: {
+        user: sanitizeUser(masterUser),
+        accessToken,
+        refreshToken: session.refreshToken,
+        expiresIn: 900,
+        tokens: {
+          accessToken,
+          refreshToken: session.refreshToken,
+          expiresIn: 900,
+        },
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to verify Master ID.',
+      error: err?.message,
+    });
+  }
+});
+
+// POST /api/auth/master-id/resend — Resend Master 2FA OTP codes
+router.post('/master-id/resend', authLimiter, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  const { challengeToken } = req.body;
+  try {
+    const result = await resendMaster2FA(challengeToken);
+    if (!result.success) {
+      res.status(400).json({
+        success: false,
+        message: result.message,
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      message: result.message,
+      data: {
+        maskedEmail: result.maskedEmail,
+        maskedPhone: result.maskedPhone,
+        devOtp: result.devOtp,
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to resend Master ID verification codes.',
+      error: err?.message,
+    });
+  }
+});
+
+// Handler for Master ID / Master Login Authentication (Direct Fallback)
+const handleMasterIdAuth = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  const { masterId, rememberMe } = req.body;
+  const rawInput = String(masterId || '').trim();
+  const userAgent = req.headers['user-agent'];
+  const ipAddress = req.ip || req.socket.remoteAddress;
+
+  if (!rawInput) {
+    res.status(400).json({
+      success: false,
+      message: 'Please enter your Master ID.',
+      code: 'EMPTY_MASTER_ID',
+    });
+    return;
+  }
+
+  try {
+    const validation = validateMasterId(rawInput);
+
+    if (!validation.isValid || !validation.masterSlot) {
+      res.status(401).json({
+        success: false,
+        message: 'Invalid Master ID. Please try again.',
+        code: 'INVALID_MASTER_ID',
+      });
+      return;
+    }
+
+    const slot = validation.masterSlot;
+    const masterUser = getMasterAdminUser(slot);
+
+    const jwtPayload: JwtUserPayload = {
+      sub: masterUser.id,
+      userId: masterUser.id,
+      email: masterUser.email,
+      role: 'MASTER_ADMIN',
+      companyId: masterUser.companyId,
+      branchId: masterUser.branchId,
+      tokenVersion: 0,
+    };
+
+    const accessToken = generateAccessToken(jwtPayload);
+    const session = await createSession(masterUser.id, masterUser.companyId, userAgent, ipAddress);
+
+    res.cookie('refreshToken', session.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: (rememberMe ? 30 : 7) * 24 * 60 * 60 * 1000,
+      path: '/api/auth',
+    });
 
     res.json({
       success: true,
@@ -643,6 +756,7 @@ const handleMasterIdAuth = async (req: AuthenticatedRequest, res: Response): Pro
 router.post('/master-id', authLimiter, handleMasterIdAuth);
 
 // Alias: POST /api/auth/master-login
+router.post('/master-login', authLimiter, handleMasterIdAuth);
 router.post('/master-login', authLimiter, handleMasterIdAuth);
 
 // POST /api/auth/login — Production Cryptographic Login

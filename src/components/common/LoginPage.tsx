@@ -18,20 +18,19 @@ import {
   ArrowLeft,
   ChevronRight,
   Settings,
-  Wifi,
   KeyRound,
   Loader2,
   MailCheck,
   RefreshCw,
   Shield,
   Key,
+  Smartphone,
+  Check,
 } from 'lucide-react';
-import { Capacitor } from '@capacitor/core';
 import { useApp } from '../../context/AppContext';
 import { GeometricBlueWLogo } from './WepsunLogo';
 import { apiService, setTokens } from '../../services/api';
 import type { User as UserRecord, UserRole } from '../../types';
-import { DEMO_ACCOUNTS } from '../../data/initialData';
 import { GoogleAuthModal } from './GoogleAuthModal';
 import { loadGoogleGisScript, triggerGoogleSignIn, triggerGoogleOAuth2Popup, parseGoogleJwt } from '../../services/googleAuth';
 import {
@@ -64,7 +63,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     setCurrentRole,
     showToast,
     currentRole,
-    users,
   } = useApp();
 
   const [view, setView] = useState<'signin' | 'signup'>(() => {
@@ -75,8 +73,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     return 'signin';
   });
 
-  // Selected Role for authentication (Only Client and Technician)
-  const [selectedRole, setSelectedRole] = useState<'technician' | 'client'>(() => {
+  // Selected Role for authentication: Exactly TWO visible tabs (Client | Technician)
+  const [selectedRole, setSelectedRole] = useState<'client' | 'technician'>(() => {
     const hash = window.location.hash.toLowerCase();
     if (hash.includes('login-technician') || hash.includes('technician')) return 'technician';
     if (hash.includes('login-client') || hash.includes('client')) return 'client';
@@ -84,6 +82,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     if (currentRole === 'technician') return 'technician';
     return 'client';
   });
+
+  // Technician Portal Mode: Normal Technician Credentials vs Authorized Master ID Entry
+  const [techMode, setTechMode] = useState<'standard' | 'master'>('standard');
 
   // Sign In Form Fields
   const [pendingQuoteService, setPendingQuoteService] = useState<string | null>(() => {
@@ -100,18 +101,36 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Sign Up Form Fields
-  const [regRole, setRegRole] = useState<'client' | 'technician'>('client');
+  // Master ID Dual-Factor Authentication State (Executive Admin Flow)
+  const [masterIdInput, setMasterIdInput] = useState('');
+  const [masterStep, setMasterStep] = useState<'id_entry' | 'otp_verify'>('id_entry');
+  const [masterChallengeToken, setMasterChallengeToken] = useState<string | null>(null);
+  const [masterMaskedEmail, setMasterMaskedEmail] = useState('');
+  const [masterMaskedPhone, setMasterMaskedPhone] = useState('');
+  const [masterEmailOtp, setMasterEmailOtp] = useState('');
+  const [masterSmsOtp, setMasterSmsOtp] = useState('');
+  const [masterTimer, setMasterTimer] = useState<number>(60);
+  const [canResendMasterOtp, setCanResendMasterOtp] = useState<boolean>(false);
+  const [masterError, setMasterError] = useState<string | null>(null);
+  const [isInitiatingMaster, setIsInitiatingMaster] = useState(false);
+  const [isVerifyingMaster, setIsVerifyingMaster] = useState(false);
+  const [devMasterOtp, setDevMasterOtp] = useState<{ emailOtp: string; smsOtp: string } | null>(null);
+  const masterEmailOtpRef = useRef<HTMLInputElement>(null);
+  const masterSmsOtpRef = useRef<HTMLInputElement>(null);
+
+  // Sign Up Form Fields (Client Registration)
   const [regFullName, setRegFullName] = useState('');
   const [regEmail, setRegEmail] = useState('');
+  const [regCountryCode, setRegCountryCode] = useState('+91');
   const [regMobile, setRegMobile] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
   const [regShowPassword, setRegShowPassword] = useState(false);
   const [regShowConfirmPassword, setRegShowConfirmPassword] = useState(false);
+  const [regAgreeTerms, setRegAgreeTerms] = useState(false);
   const [regIsSubmitting, setRegIsSubmitting] = useState(false);
 
-  // Email OTP Verification State for Sign Up (Android & Web Unified Single Overlay)
+  // Email OTP Verification State for Sign Up
   const [signUpStep, setSignUpStep] = useState<'form' | 'otp'>('form');
   const [otpValue, setOtpValue] = useState<string>('');
   const [otpTimer, setOtpTimer] = useState<number>(60);
@@ -144,13 +163,23 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
   // Google OAuth Modal
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
+  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
 
-  // Role tab switch (Client | Technician only)
-  const handleRoleChange = (role: 'technician' | 'client') => {
+  // Pre-load Google Identity Services
+  useEffect(() => {
+    loadGoogleGisScript().catch(() => {});
+  }, []);
+
+  // Role Tab Change: Exactly Client or Technician
+  const handleRoleChange = (role: 'client' | 'technician') => {
     setSelectedRole(role);
     setErrorMessage(null);
+    setTechMode('standard');
+    setMasterStep('id_entry');
+    setMasterError(null);
   };
 
+  // Sign In Submission Handler
   const handleSignInSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
@@ -174,12 +203,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         password: password,
       };
 
-      const targetRole: UserRole =
-        selectedRole === 'client'
-          ? 'client'
-          : selectedRole === 'technician'
-          ? 'technician'
-          : 'company_admin';
+      const targetRole: UserRole = selectedRole === 'client' ? 'client' : 'technician';
 
       const res = await apiService.login(payload);
       if (res && res.success && res.data) {
@@ -202,21 +226,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             avatar: authData.user.avatarUrl || authData.user.avatar,
             isActive: true,
           };
-
-          if (userRole === 'master_admin') {
-            sessionStorage.setItem('wepsun_master_authenticated', 'true');
-            sessionStorage.setItem('wepsun_role', 'master_admin');
-            sessionStorage.setItem('wepsun_lift_saas_v2_role', 'master_admin');
-            sessionStorage.setItem('wepsun_userId', finalUser.id);
-            sessionStorage.setItem('wepsun_lift_saas_v2_userId', finalUser.id);
-
-            localStorage.setItem('wepsun_master_authenticated', 'true');
-            localStorage.setItem('wepsun_role', 'master_admin');
-            localStorage.setItem('wepsun_lift_saas_v2_role', 'master_admin');
-            localStorage.setItem('wepsun_userId', finalUser.id);
-            localStorage.setItem('wepsun_lift_saas_v2_userId', finalUser.id);
-            localStorage.setItem('wepsun_lift_saas_v2_currentUser', JSON.stringify(finalUser));
-          }
 
           loginAsUser(finalUser);
           setCurrentRole(userRole);
@@ -252,9 +261,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             });
           } catch {}
 
-          if (onClose) {
-            onClose();
-          }
+          if (onClose) onClose();
         }
       } else {
         const errorMsg = res?.message || 'Invalid email or password.';
@@ -271,7 +278,183 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   };
 
   // =========================================================================
-  // EMAIL OTP TIMERS & LIFECYCLE
+  // MASTER ID DUAL-FACTOR AUTHENTICATION (ADMIN ENTRY VIA TECHNICIAN TAB)
+  // =========================================================================
+
+  // Step 1: Initiate Master ID 2FA
+  const handleInitiateMaster2FA = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isInitiatingMaster) return;
+
+    const candidate = masterIdInput.trim();
+    if (!candidate) {
+      setMasterError('Please enter an authorized Master ID.');
+      return;
+    }
+
+    setIsInitiatingMaster(true);
+    setMasterError(null);
+
+    try {
+      const res = await apiService.initiateMaster2FA({ masterId: candidate });
+      if (res && res.success && res.data) {
+        setMasterChallengeToken(res.data.challengeToken);
+        setMasterMaskedEmail(res.data.maskedEmail || 'registered email');
+        setMasterMaskedPhone(res.data.maskedPhone || 'registered mobile');
+        setMasterStep('otp_verify');
+        setMasterEmailOtp('');
+        setMasterSmsOtp('');
+        setMasterTimer(60);
+        setCanResendMasterOtp(false);
+        if (res.data.devOtp) {
+          setDevMasterOtp(res.data.devOtp);
+        }
+
+        showToast(
+          'success',
+          'Verification Dispatched',
+          `Security OTP codes sent to ${res.data.maskedEmail} and ${res.data.maskedPhone}.`
+        );
+      } else {
+        setMasterError(res?.message || 'Invalid Master ID credentials. Access denied.');
+      }
+    } catch (err: any) {
+      setMasterError(err?.message || 'Verification could not be initialized. Please try again.');
+    } finally {
+      setIsInitiatingMaster(false);
+    }
+  };
+
+  // Step 2: Verify Master Dual-Factor OTPs & Launch Admin Dashboard
+  const handleVerifyMaster2FA = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isVerifyingMaster || !masterChallengeToken) return;
+
+    const cleanEmailOtp = masterEmailOtp.replace(/\D/g, '').trim();
+    const cleanSmsOtp = masterSmsOtp.replace(/\D/g, '').trim();
+
+    if (cleanEmailOtp.length !== 6) {
+      setMasterError('Please enter the 6-digit Email verification code.');
+      return;
+    }
+
+    setIsVerifyingMaster(true);
+    setMasterError(null);
+
+    try {
+      const res = await apiService.verifyMaster2FA({
+        challengeToken: masterChallengeToken,
+        emailOtp: cleanEmailOtp,
+        smsOtp: cleanSmsOtp || undefined,
+        rememberMe,
+      });
+
+      if (res && res.success && res.data) {
+        const authData = res.data as any;
+        if (authData.tokens?.accessToken) {
+          setTokens(authData.tokens.accessToken, authData.tokens.refreshToken);
+        }
+
+        const masterUser: UserRecord = {
+          id: authData.user.id,
+          name: authData.user.name,
+          email: authData.user.email,
+          phone: authData.user.phone || '+91 98201 55432',
+          role: 'master_admin',
+          companyId: authData.user.companyId || 'comp-1',
+          branchId: authData.user.branchId,
+          avatar: authData.user.avatarUrl || authData.user.avatar,
+          isActive: true,
+        };
+
+        // Set persistent Master Admin session tokens
+        sessionStorage.setItem('wepsun_master_authenticated', 'true');
+        sessionStorage.setItem('wepsun_role', 'master_admin');
+        sessionStorage.setItem('wepsun_lift_saas_v2_role', 'master_admin');
+        sessionStorage.setItem('wepsun_userId', masterUser.id);
+        sessionStorage.setItem('wepsun_lift_saas_v2_userId', masterUser.id);
+
+        localStorage.setItem('wepsun_master_authenticated', 'true');
+        localStorage.setItem('wepsun_role', 'master_admin');
+        localStorage.setItem('wepsun_lift_saas_v2_role', 'master_admin');
+        localStorage.setItem('wepsun_userId', masterUser.id);
+        localStorage.setItem('wepsun_lift_saas_v2_userId', masterUser.id);
+        localStorage.setItem('wepsun_lift_saas_v2_currentUser', JSON.stringify(masterUser));
+
+        loginAsUser(masterUser);
+        setCurrentRole('master_admin');
+
+        window.location.hash = 'dashboard';
+
+        showToast(
+          'success',
+          'Master Authentication Verified',
+          `Welcome, ${masterUser.name}! Granted executive access to Admin Dashboard.`
+        );
+
+        try {
+          confetti({
+            particleCount: 100,
+            spread: 80,
+            origin: { y: 0.6 },
+            colors: ['#0066FF', '#00C853', '#FFD600', '#6200EA'],
+          });
+        } catch {}
+
+        if (onClose) onClose();
+      } else {
+        setMasterError(res?.message || 'Invalid verification codes. Please try again.');
+      }
+    } catch (err: any) {
+      setMasterError(err?.message || 'Authentication verification failed.');
+    } finally {
+      setIsVerifyingMaster(false);
+    }
+  };
+
+  // Master Resend OTP
+  const handleResendMaster2FA = async () => {
+    if (!canResendMasterOtp || !masterChallengeToken) return;
+    setMasterError(null);
+
+    try {
+      const res = await apiService.resendMaster2FA({ challengeToken: masterChallengeToken });
+      if (res && res.success) {
+        setMasterTimer(60);
+        setCanResendMasterOtp(false);
+        setMasterEmailOtp('');
+        setMasterSmsOtp('');
+        if (res.data?.devOtp) {
+          setDevMasterOtp(res.data.devOtp);
+        }
+        showToast('success', 'Fresh Codes Dispatched', res.message || 'New OTPs sent to your admin email & phone.');
+      } else {
+        setMasterError(res?.message || 'Could not resend OTP.');
+      }
+    } catch (err: any) {
+      setMasterError(err?.message || 'Failed to resend code.');
+    }
+  };
+
+  // Master 2FA Countdown Timer
+  useEffect(() => {
+    let interval: any;
+    if (masterStep === 'otp_verify' && masterTimer > 0) {
+      interval = setInterval(() => {
+        setMasterTimer((prev) => {
+          if (prev <= 1) {
+            setCanResendMasterOtp(true);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [masterStep, masterTimer]);
+
+  // =========================================================================
+  // CLIENT REGISTRATION & EMAIL OTP TIMERS
   // =========================================================================
 
   // Sign Up OTP Countdown Timer
@@ -308,161 +491,156 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     return () => clearInterval(interval);
   }, [isForgotPasswordOpen, forgotStep, forgotTimer]);
 
-  // Focus single OTP overlay input on step change
-  useEffect(() => {
-    if (signUpStep === 'otp') {
-      setTimeout(() => {
-        otpInputRef.current?.focus();
-      }, 150);
-    }
-  }, [signUpStep]);
-
-  useEffect(() => {
-    if (forgotStep === 'otp_reset') {
-      setTimeout(() => {
-        forgotOtpInputRef.current?.focus();
-      }, 150);
-    }
-  }, [forgotStep]);
-
-  // =========================================================================
-  // SIGN UP VIA EMAIL OTP FLOW
-  // =========================================================================
-
-  // Step 1: Validate input and send 6-digit Email OTP
+  // Step 1: Submit Client Sign Up Details & Request Verification OTP
   const handleSignUpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setOtpError(null);
+    if (regIsSubmitting || isSendingOtp) return;
 
-    if (!regFullName.trim()) {
-      showToast('error', 'Incomplete Form', 'Please enter your full name.');
+    const emailClean = regEmail.trim().toLowerCase();
+    const nameClean = regFullName.trim();
+    const phoneClean = regMobile.trim() ? `${regCountryCode}${regMobile.trim().replace(/^0+/, '')}` : '';
+
+    if (!nameClean) {
+      setSignupErrorMessage('Please enter your full name.');
       return;
     }
-    if (!regEmail.trim() || !regEmail.includes('@')) {
-      showToast('error', 'Invalid Email', 'Please enter a valid email address.');
+    if (!emailClean || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailClean)) {
+      setSignupErrorMessage('Please enter a valid email address.');
       return;
     }
-    if (!regPassword.trim() || regPassword.length < 6) {
-      showToast('error', 'Password Too Short', 'Password must be at least 6 characters long.');
+    if (!regPassword || regPassword.length < 8) {
+      setSignupErrorMessage('Password must be at least 8 characters long (12+ characters recommended).');
       return;
     }
     if (regPassword !== regConfirmPassword) {
-      showToast('error', 'Password Mismatch', 'Passwords do not match. Please re-enter.');
+      setSignupErrorMessage('Passwords do not match. Please re-enter.');
+      return;
+    }
+    if (!regAgreeTerms) {
+      setSignupErrorMessage('You must accept the Terms of Service and Privacy Policy to register.');
       return;
     }
 
-    setIsSendingOtp(true);
     setRegIsSubmitting(true);
+    setIsSendingOtp(true);
     setSignupErrorMessage(null);
     setEmailAlreadyExists(false);
 
     try {
-      const res = await sendSignupEmailOtp(regEmail.trim(), regFullName.trim());
+      const res = await sendSignupEmailOtp(emailClean, nameClean);
 
       if (res.success) {
         setSignUpStep('otp');
         setOtpValue('');
         setOtpTimer(60);
         setCanResendOtp(false);
+        setOtpError(null);
         if (res.devOtp) {
           setDevSignupOtp(res.devOtp);
         }
         showToast(
           'success',
-          'Verification Code Sent',
-          `We sent a 6-digit verification code to ${regEmail.trim()}. Please check your email inbox and spam folder.`
+          'Verification Code Dispatched',
+          `6-digit OTP sent to ${emailClean}. Please verify your email.`
         );
       } else {
-        const isExisting = res.code === 'USER_ALREADY_EXISTS' || (res.message && res.message.toLowerCase().includes('already exists'));
-        if (isExisting) {
+        if (res.message?.toLowerCase().includes('already') || res.message?.toLowerCase().includes('exists')) {
           setEmailAlreadyExists(true);
-          setSignupErrorMessage(res.message || 'An account with this email address already exists. Please sign in instead.');
+          setSignupErrorMessage(`An account with ${emailClean} already exists. Please sign in.`);
         } else {
-          setSignupErrorMessage(res.message || 'Unable to send verification OTP. Please try again.');
+          setSignupErrorMessage(res.message || 'Unable to send verification OTP.');
         }
-        showToast('error', 'Registration Notice', res.message || 'Unable to send verification OTP.');
       }
     } catch (err: any) {
-      setSignupErrorMessage(err.message || 'Could not dispatch verification email.');
-      showToast('error', 'Registration Error', err.message || 'Could not dispatch verification email.');
+      setSignupErrorMessage(err?.message || 'Failed to dispatch verification code.');
     } finally {
-      setIsSendingOtp(false);
       setRegIsSubmitting(false);
+      setIsSendingOtp(false);
     }
   };
 
-  // Step 2: Verify OTP and activate account
-  const handleVerifySignupOtp = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const fullOtp = otpValue.replace(/\D/g, '').trim();
-
-    if (fullOtp.length !== 6) {
-      setOtpError('Please enter the full 6-digit OTP code.');
+  // Step 2: Verify OTP & Activate Account
+  const handleVerifySignupOtp = async (codeToVerify?: string) => {
+    const code = (codeToVerify || otpValue).replace(/\D/g, '').trim();
+    if (code.length !== 6) {
+      setOtpError('Please enter all 6 digits of the verification code.');
       return;
     }
 
     setIsVerifyingOtp(true);
     setOtpError(null);
 
+    const emailClean = regEmail.trim().toLowerCase();
+    const nameClean = regFullName.trim();
+    const phoneClean = regMobile.trim() ? `${regCountryCode}${regMobile.trim().replace(/^0+/, '')}` : '';
+
     try {
       const res = await verifySignupEmailOtp({
-        email: regEmail.trim(),
-        otp: fullOtp,
-        fullName: regFullName.trim(),
-        phone: regMobile.trim() || '',
-        role: regRole,
+        email: emailClean,
+        otp: code,
+        fullName: nameClean,
+        phone: phoneClean,
+        role: 'client',
         password: regPassword,
-        companyId: 'comp-1',
       });
 
       if (res.success && res.user) {
-        loginAsUser(res.user);
-        setCurrentRole(res.user.role);
+        const userRole: UserRole = 'client';
+        const finalUser: UserRecord = {
+          id: res.user.id,
+          name: res.user.name,
+          email: res.user.email,
+          phone: res.user.phone || phoneClean,
+          role: userRole,
+          companyId: res.user.companyId || 'comp-1',
+          branchId: res.user.branchId,
+          clientId: res.user.clientId || 'client-' + Date.now(),
+          avatar: res.user.avatar || '',
+          isActive: true,
+        };
 
-        confetti({
-          particleCount: 85,
-          spread: 70,
-          origin: { y: 0.6 },
-          colors: ['#0066FF', '#34A853', '#4285F4', '#FBBC05', '#10B981'],
-        });
-
-        showToast(
-          'success',
-          'Email Verified Successfully',
-          `Welcome to WEPSUN, ${res.user.name}! Your account is now active.`
-        );
+        loginAsUser(finalUser);
+        setCurrentRole(userRole);
 
         if (pendingQuoteService || (typeof window !== 'undefined' && sessionStorage.getItem('wepsun_pending_quote_service'))) {
           sessionStorage.setItem('wepsun_open_quote_after_login', 'true');
         }
 
-        window.location.hash =
-          res.user.role === 'client'
-            ? 'home'
-            : res.user.role === 'technician'
-            ? 'jobs'
-            : 'dashboard';
+        window.location.hash = 'home';
 
-        if (onClose) {
-          onClose();
-        }
+        showToast(
+          'success',
+          'Account Activated!',
+          `Welcome to WEPSUN Engineering Solution, ${finalUser.name}!`
+        );
+
+        try {
+          confetti({
+            particleCount: 80,
+            spread: 70,
+            origin: { y: 0.6 },
+          });
+        } catch {}
+
+        if (onClose) onClose();
       } else {
-        setOtpError(res.message || 'Invalid verification code. Please check and try again.');
+        setOtpError(res.message || 'Invalid or expired verification code.');
       }
     } catch (err: any) {
-      setOtpError(err.message || 'Verification could not be completed.');
+      setOtpError(err?.message || 'Verification failed. Please try again.');
     } finally {
       setIsVerifyingOtp(false);
     }
   };
 
+  // Resend Sign Up OTP
   const handleResendSignupOtp = async () => {
     if (!canResendOtp) return;
     setOtpError(null);
     setIsSendingOtp(true);
 
     try {
-      const res = await resendOtp(regEmail.trim(), 'signup');
+      const res = await resendOtp(regEmail.trim().toLowerCase(), 'signup');
       if (res.success) {
         setOtpValue('');
         setOtpTimer(60);
@@ -470,32 +648,97 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         if (res.devOtp) {
           setDevSignupOtp(res.devOtp);
         }
-        showToast(
-          'success',
-          'New Code Sent',
-          `A fresh 6-digit verification code was sent to ${regEmail.trim()}. Please check your inbox and spam folder.`
-        );
+        showToast('success', 'Fresh Code Sent', `A fresh 6-digit OTP was sent to ${regEmail.trim()}.`);
       } else {
-        setOtpError(res.message || 'Could not resend OTP.');
+        setOtpError(res.message || 'Failed to resend code.');
       }
     } catch (err: any) {
-      setOtpError(err.message || 'Failed to resend code.');
+      setOtpError(err?.message || 'Failed to resend code.');
     } finally {
       setIsSendingOtp(false);
     }
   };
 
-  // =========================================================================
-  // FORGOT PASSWORD VIA FIREBASE + OTP FLOW
-  // =========================================================================
+  // Google OAuth Authentication
+  const handleGoogleAuth = async () => {
+    if (isGoogleSubmitting) return;
+    setIsGoogleSubmitting(true);
 
+    try {
+      await triggerGoogleOAuth2Popup(
+        async (profile, token) => {
+          try {
+            const res = await apiService.googleLogin({
+              accessToken: token,
+              email: profile?.email,
+              name: profile?.name,
+              avatarUrl: profile?.picture,
+              role: 'client',
+              companyId: 'comp-1',
+              googleId: profile?.sub,
+            });
+
+            if (res.success && res.data) {
+              const authData = res.data as any;
+              if (authData.tokens?.accessToken) {
+                setTokens(authData.tokens.accessToken, authData.tokens.refreshToken);
+              }
+
+              const finalUser: UserRecord = {
+                id: authData.user.id,
+                name: authData.user.name,
+                email: authData.user.email,
+                phone: authData.user.phone || '',
+                role: 'client',
+                companyId: authData.user.companyId || 'comp-1',
+                branchId: authData.user.branchId,
+                clientId: authData.user.clientId || 'client-' + Date.now(),
+                avatar: authData.user.avatarUrl || profile?.picture,
+                isActive: true,
+              };
+
+              loginAsUser(finalUser);
+              setCurrentRole('client');
+              window.location.hash = 'home';
+
+              showToast('success', 'Google Sign-In Successful', `Welcome to WEPSUN, ${finalUser.name}!`);
+
+              try {
+                confetti({
+                  particleCount: 70,
+                  spread: 60,
+                  origin: { y: 0.65 },
+                });
+              } catch {}
+
+              if (onClose) onClose();
+            }
+          } catch (err: any) {
+            showToast('error', 'Google Sign-In Error', err?.message || 'Authentication failed.');
+          } finally {
+            setIsGoogleSubmitting(false);
+          }
+        },
+        (popupError) => {
+          setIsGoogleSubmitting(false);
+          if (!popupError.message?.includes('closed') && !popupError.message?.includes('cancel')) {
+            setIsGoogleModalOpen(true);
+          }
+        }
+      );
+    } catch {
+      setIsGoogleSubmitting(false);
+      setIsGoogleModalOpen(true);
+    }
+  };
+
+  // Forgot Password Handlers
   const handleSendForgotEmail = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!forgotIdentifier.trim() || !forgotIdentifier.includes('@')) {
-      setForgotError('Please enter a valid registered email address.');
+    if (!forgotIdentifier.trim()) {
+      setForgotError('Please enter your email address.');
       return;
     }
-
     setIsSendingForgot(true);
     setForgotError(null);
 
@@ -507,19 +750,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         setForgotTimer(60);
         setCanResendForgotOtp(false);
         setFirebaseResetSent(Boolean(res.firebaseEmailSent));
-        if (res.devOtp) {
-          setDevForgotOtp(res.devOtp);
-        }
-        showToast(
-          'success',
-          'Password Reset Code Sent',
-          `6-digit reset code sent to ${forgotIdentifier.trim()}. Please check your email inbox and spam folder.`
-        );
+        if (res.devOtp) setDevForgotOtp(res.devOtp);
+        showToast('success', 'Reset Code Sent', `6-digit reset code sent to ${forgotIdentifier.trim()}.`);
       } else {
         setForgotError(res.message || 'Could not dispatch password reset OTP.');
       }
     } catch (err: any) {
-      setForgotError(err.message || 'Unable to request password reset.');
+      setForgotError(err?.message || 'Unable to request password reset.');
     } finally {
       setIsSendingForgot(false);
     }
@@ -533,8 +770,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       setForgotError('Please enter the 6-digit verification code.');
       return;
     }
-    if (!forgotNewPassword.trim() || forgotNewPassword.length < 6) {
-      setForgotError('New password must be at least 6 characters long.');
+    if (!forgotNewPassword.trim() || forgotNewPassword.length < 8) {
+      setForgotError('New password must be at least 8 characters long.');
       return;
     }
     if (forgotNewPassword !== forgotConfirmPassword) {
@@ -568,7 +805,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         setForgotError(res.message || 'Invalid verification code or expired token.');
       }
     } catch (err: any) {
-      setForgotError(err.message || 'Failed to complete password reset.');
+      setForgotError(err?.message || 'Failed to complete password reset.');
     } finally {
       setIsResettingPassword(false);
     }
@@ -585,324 +822,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         setForgotOtpValue('');
         setForgotTimer(60);
         setCanResendForgotOtp(false);
-        if (res.devOtp) {
-          setDevForgotOtp(res.devOtp);
-        }
-        showToast('success', 'New Code Sent', `A fresh 6-digit OTP was sent to ${forgotIdentifier.trim()}. Please check inbox & spam.`);
+        if (res.devOtp) setDevForgotOtp(res.devOtp);
+        showToast('success', 'New Code Sent', `A fresh 6-digit OTP was sent to ${forgotIdentifier.trim()}.`);
       } else {
         setForgotError(res.message || 'Failed to resend code.');
       }
     } catch (err: any) {
-      setForgotError(err.message || 'Failed to resend code.');
+      setForgotError(err?.message || 'Failed to resend code.');
     } finally {
       setIsSendingForgot(false);
-    }
-  };
-
-  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
-
-  // Eagerly pre-load Google Identity Services
-  useEffect(() => {
-    loadGoogleGisScript().catch(() => {});
-  }, []);
-
-  // Listen for Google OAuth callback deep-links in native Android app (wepsun://auth-callback)
-  useEffect(() => {
-    let appUrlListener: any;
-    let browserFinishedListener: any;
-
-    const setupNativeAuthListeners = async () => {
-      try {
-        const { Browser } = await import('@capacitor/browser');
-        const { App } = await import('@capacitor/app');
-
-        browserFinishedListener = await Browser.addListener('browserFinished', () => {
-          setIsGoogleSubmitting(false);
-        });
-
-        appUrlListener = await App.addListener('appUrlOpen', async (event) => {
-          if (event.url && event.url.includes('auth-callback')) {
-            try {
-              await Browser.close();
-            } catch {}
-
-            try {
-              setIsGoogleSubmitting(true);
-              const rawQuery = event.url.split(/auth-callback[?#]/)[1] || '';
-              const searchParams = new URLSearchParams(rawQuery);
-              const accessToken = searchParams.get('access_token') || undefined;
-              const idToken = searchParams.get('id_token') || searchParams.get('credential') || undefined;
-
-              let googleProfile: any = null;
-              if (idToken) {
-                googleProfile = parseGoogleJwt(idToken);
-              }
-
-              if (!googleProfile && accessToken) {
-                try {
-                  const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-                    headers: { Authorization: `Bearer ${accessToken}` },
-                  });
-                  if (userInfoRes.ok) {
-                    googleProfile = await userInfoRes.json();
-                  }
-                } catch {}
-              }
-
-              if (accessToken || idToken || googleProfile) {
-                const targetRole: UserRole =
-                  view === 'signup'
-                    ? regRole
-                    : selectedRole === 'client'
-                    ? 'client'
-                    : selectedRole === 'technician'
-                    ? 'technician'
-                    : 'company_admin';
-
-                let userRecord: any = null;
-                try {
-                  const res = await apiService.googleLogin({
-                    credential: idToken,
-                    accessToken: accessToken,
-                    email: googleProfile?.email,
-                    name: googleProfile?.name,
-                    avatarUrl: googleProfile?.picture,
-                    googleId: googleProfile?.sub,
-                    role: targetRole.toUpperCase(),
-                    companyId: 'comp-1',
-                  });
-
-                  if (res && res.success && res.data) {
-                    const { user, accessToken: newAccess, refreshToken: newRefresh } = res.data;
-                    if (newAccess) {
-                      setTokens(newAccess, newRefresh);
-                    }
-                    userRecord = user;
-                  }
-                } catch (apiErr: any) {
-                  console.warn('[NativeGoogleAuth] Server sync notice:', apiErr?.message);
-                }
-
-                if (!userRecord && googleProfile?.email) {
-                  const cleanEmail = googleProfile.email.toLowerCase().trim();
-                  const existingUser = users.find((u) => u.email && u.email.toLowerCase() === cleanEmail);
-                  if (existingUser) {
-                    userRecord = existingUser;
-                  } else {
-                    userRecord = {
-                      id: 'usr-google-' + Date.now(),
-                      name: googleProfile.name || cleanEmail.split('@')[0],
-                      email: cleanEmail,
-                      phone: '',
-                      role: targetRole,
-                      companyId: 'comp-1',
-                      clientId: targetRole === 'client' ? 'client-' + Date.now() : undefined,
-                      technicianId: targetRole === 'technician' ? 'tech-' + Date.now() : undefined,
-                      avatar: googleProfile.picture,
-                      isActive: true,
-                      createdAt: new Date().toISOString(),
-                    };
-                  }
-                }
-
-                if (userRecord) {
-                  const activeRole = ((userRecord.role || targetRole) as string).toLowerCase() as UserRole;
-                  loginAsUser({
-                    id: userRecord.id,
-                    name: userRecord.name || googleProfile?.name,
-                    email: userRecord.email || googleProfile?.email,
-                    phone: userRecord.phone || '',
-                    role: activeRole,
-                    companyId: userRecord.companyId || 'comp-1',
-                    branchId: userRecord.branchId,
-                    clientId: userRecord.clientId || (activeRole === 'client' ? 'client-' + Date.now() : undefined),
-                    technicianId: userRecord.technicianId || (activeRole === 'technician' ? 'tech-' + Date.now() : undefined),
-                    avatar: userRecord.avatarUrl || userRecord.avatar || googleProfile?.picture,
-                    isActive: userRecord.isActive ?? true,
-                  });
-                  setCurrentRole(activeRole);
-                  confetti({
-                    particleCount: 70,
-                    spread: 60,
-                    origin: { y: 0.65 },
-                    colors: ['#4285F4', '#EA4335', '#FBBC05', '#34A853', '#0066FF'],
-                  });
-                  showToast('success', 'Google Sign-In Successful', `Welcome to WEPSUN, ${userRecord.name}!`);
-                  window.location.hash = activeRole === 'client' ? 'home' : activeRole === 'technician' ? 'jobs' : 'dashboard';
-                  if (onClose) onClose();
-                  window.dispatchEvent(new HashChangeEvent('hashchange'));
-                }
-              }
-            } catch (err: any) {
-              showToast('error', 'Google Auth Error', err?.message || 'Authentication encountered an error.');
-            } finally {
-              setIsGoogleSubmitting(false);
-            }
-          }
-        });
-      } catch {}
-    };
-
-    if (Capacitor.isNativePlatform()) {
-      setupNativeAuthListeners();
-    }
-
-    return () => {
-      if (appUrlListener?.remove) appUrlListener.remove();
-      if (browserFinishedListener?.remove) browserFinishedListener.remove();
-    };
-  }, [view, regRole, selectedRole, users]);
-
-  const handleGoogleAuth = async () => {
-    setErrorMessage(null);
-    setIsGoogleSubmitting(true);
-
-    // On native mobile app (Android/iOS), open official Google OAuth Account Chooser in secure In-App Custom Tab
-    if (Capacitor.isNativePlatform()) {
-      try {
-        const { openNativeGoogleOAuth } = await import('../../services/googleAuth');
-        await openNativeGoogleOAuth();
-      } catch {
-        setIsGoogleSubmitting(false);
-        setIsGoogleModalOpen(true);
-      }
-      return;
-    }
-
-    // On Web (Desktop/Browser), launch Google Identity Services flow
-    try {
-      await triggerGoogleSignIn(
-        async (credential, profile) => {
-          try {
-            // Send credential (Google ID Token) or access token to backend for cryptographic verification
-            const isIdToken = credential && credential.split('.').length === 3;
-            const targetRole: UserRole =
-              view === 'signup'
-                ? regRole
-                : selectedRole === 'client'
-                ? 'client'
-                : selectedRole === 'technician'
-                ? 'technician'
-                : 'company_admin';
-
-            let userRecord: any = null;
-
-            try {
-              const res = await apiService.googleLogin({
-                credential: isIdToken ? credential : (typeof credential === 'string' && credential.length > 50 ? credential : undefined),
-                accessToken: !isIdToken ? credential : undefined,
-                email: profile?.email,
-                name: profile?.name,
-                avatarUrl: profile?.picture,
-                picture: profile?.picture,
-                googleId: profile?.sub,
-                role: targetRole.toUpperCase(),
-                companyId: 'comp-1',
-              });
-
-              if (res && res.success && res.data) {
-                const { user, accessToken: newAccess, refreshToken: newRefresh } = res.data;
-                if (newAccess) {
-                  setTokens(newAccess, newRefresh);
-                }
-                userRecord = user;
-              }
-            } catch (backendApiErr: any) {
-              console.warn('[GoogleAuth] Backend verification notice:', backendApiErr?.message);
-            }
-
-            // If backend is in transition/offline, fallback to verified Google profile
-            if (!userRecord && profile?.email) {
-              const cleanEmail = profile.email.toLowerCase().trim();
-              const existingUser = users.find((u) => u.email && u.email.toLowerCase() === cleanEmail);
-              if (existingUser) {
-                userRecord = existingUser;
-              } else {
-                userRecord = {
-                  id: 'usr-google-' + Date.now(),
-                  name: profile.name || cleanEmail.split('@')[0],
-                  email: cleanEmail,
-                  phone: '',
-                  role: targetRole,
-                  companyId: 'comp-1',
-                  clientId: targetRole === 'client' ? 'client-' + Date.now() : undefined,
-                  technicianId: targetRole === 'technician' ? 'tech-' + Date.now() : undefined,
-                  avatar: profile.picture,
-                  isActive: true,
-                  createdAt: new Date().toISOString(),
-                };
-              }
-            }
-
-            if (!userRecord) {
-              throw new Error('Google authentication could not be completed.');
-            }
-
-            // Backend controls the role (never trust client)
-            const activeRole = ((userRecord.role || targetRole) as string).toLowerCase() as UserRole;
-
-            loginAsUser({
-              id: userRecord.id,
-              name: userRecord.name || (profile?.name ?? 'Google User'),
-              email: userRecord.email || (profile?.email ?? ''),
-              phone: userRecord.phone || '',
-              role: activeRole,
-              companyId: userRecord.companyId || 'comp-1',
-              branchId: userRecord.branchId,
-              clientId: userRecord.clientId || (activeRole === 'client' ? 'client-' + Date.now() : undefined),
-              technicianId: userRecord.technicianId || (activeRole === 'technician' ? 'tech-' + Date.now() : undefined),
-              avatar: userRecord.avatarUrl || userRecord.avatar || profile?.picture,
-              isActive: userRecord.isActive ?? true,
-            });
-
-            setCurrentRole(activeRole);
-            confetti({
-              particleCount: 70,
-              spread: 60,
-              origin: { y: 0.65 },
-              colors: ['#4285F4', '#EA4335', '#FBBC05', '#34A853', '#0066FF'],
-            });
-
-            showToast('success', 'Google Sign-In Successful', `Welcome to WEPSUN, ${userRecord.name}!`);
-
-            if (pendingQuoteService || (typeof window !== 'undefined' && sessionStorage.getItem('wepsun_pending_quote_service'))) {
-              sessionStorage.setItem('wepsun_open_quote_after_login', 'true');
-            }
-
-            // Role-based redirect to respective dashboards
-            const targetDest =
-              activeRole === 'client'
-                ? 'home'
-                : activeRole === 'technician'
-                ? 'jobs'
-                : 'dashboard';
-
-            window.location.hash = targetDest;
-
-            if (onClose) onClose();
-            window.dispatchEvent(new HashChangeEvent('hashchange'));
-          } catch (backendErr: any) {
-            showToast('error', 'Authentication Error', backendErr?.message || 'Unable to sign in with Google. Please try again.');
-          } finally {
-            setIsGoogleSubmitting(false);
-          }
-        },
-        (popupError) => {
-          setIsGoogleSubmitting(false);
-          if (
-            popupError.message?.includes('closed') ||
-            popupError.message?.includes('cancel') ||
-            popupError.message?.includes('popup_closed_by_user')
-          ) {
-            showToast('info', 'Sign-In Cancelled', 'Google sign-in was cancelled.');
-          } else {
-            setIsGoogleModalOpen(true);
-          }
-        }
-      );
-    } catch {
-      setIsGoogleSubmitting(false);
-      setIsGoogleModalOpen(true);
     }
   };
 
@@ -950,9 +878,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         />
       </div>
 
-      {/* Top Header / Close Area */}
+      {/* Top Header / Back Button Area */}
       <div className="relative z-10 w-full pt-8 pb-4 px-4 sm:px-8 flex flex-col items-center justify-center text-center">
-        {/* Back to Home Button */}
         <button
           onClick={() => {
             if (onClose) onClose();
@@ -963,8 +890,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           <span>← Back to Home</span>
         </button>
 
-
-        {/* Modal Close Button */}
         {onClose && (
           <button
             onClick={onClose}
@@ -994,7 +919,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               </span>
             </div>
           </div>
-          {/* Subtitle */}
           <p className="text-white/90 font-medium text-xs sm:text-sm mt-2 tracking-wide drop-shadow">
             {view === 'signin'
               ? 'Smarter Engineering for a Better Tomorrow'
@@ -1006,13 +930,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       {/* Main Centered Floating Card */}
       <div className="relative z-10 flex-1 flex items-center justify-center px-4 py-6">
         <div className="w-full max-w-[440px] bg-white/95 backdrop-blur-md rounded-[28px] shadow-2xl border border-white/60 p-6 sm:p-8 animate-in fade-in zoom-in-95 duration-200">
-          {/* Header: Sign In & Sign Up options beside each other */}
+          
+          {/* Top Tabs: Sign In | Sign Up */}
           <div className="mb-6">
             <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={() => {
                   setView('signin');
+                  setSignUpStep('form');
                   window.location.hash = 'login';
                 }}
                 className={`text-2xl sm:text-[28px] font-black tracking-tight transition-all cursor-pointer relative pb-1 ${
@@ -1049,8 +975,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             </div>
             <p className="text-xs sm:text-[13px] text-slate-500 mt-1 leading-relaxed">
               {view === 'signin'
-                ? 'Welcome back! Please sign in to your Wepsun Engineering Solution account.'
-                : 'Get started with Wepsun Engineering Solution'}
+                ? 'Welcome back! Please sign in to your WEPSUN account.'
+                : 'Create your WEPSUN client account and verify your email.'}
             </p>
           </div>
 
@@ -1059,6 +985,33 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           {/* ========================================================================= */}
           {view === 'signin' ? (
             <div>
+              {/* Role Selection Tabs — Exactly TWO Options: Client | Technician */}
+              <div className="mb-4">
+                <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100/90 rounded-2xl">
+                  <button
+                    type="button"
+                    onClick={() => handleRoleChange('client')}
+                    className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      selectedRole === 'client'
+                        ? 'bg-white text-[#0066FF] shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Client
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleRoleChange('technician')}
+                    className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      selectedRole === 'technician'
+                        ? 'bg-white text-[#0066FF] shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Technician
+                  </button>
+                </div>
+              </div>
 
               {/* Pending Quote Service Notice */}
               {pendingQuoteService && (
@@ -1095,7 +1048,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 </div>
               )}
 
-              {/* Error Message */}
+              {/* Error Message Alert */}
               {errorMessage && (
                 <div className="mb-4 p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0" />
@@ -1103,38 +1056,225 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 </div>
               )}
 
-              {/* Role Selection Tabs — Only Client | Technician */}
-              <div className="mb-4">
-                <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100/90 rounded-2xl">
-                  <button
-                    type="button"
-                    onClick={() => handleRoleChange('client')}
-                    className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      selectedRole === 'client'
-                        ? 'bg-white text-[#0066FF] shadow-sm'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Client
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleRoleChange('technician')}
-                    className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      selectedRole === 'technician'
-                        ? 'bg-white text-[#0066FF] shadow-sm'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Technician
-                  </button>
+              {/* TECHNICIAN TAB: Standard Technician vs Master Access Mode */}
+              {selectedRole === 'technician' && (
+                <div className="mb-4">
+                  {techMode === 'standard' ? (
+                    <div className="p-3 bg-blue-50/60 border border-blue-200/70 rounded-2xl flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Shield className="w-4 h-4 text-[#0066FF]" />
+                        <span className="text-xs font-semibold text-slate-700">Authorized Master ID?</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTechMode('master');
+                          setMasterStep('id_entry');
+                          setMasterError(null);
+                          setErrorMessage(null);
+                        }}
+                        className="text-xs font-bold text-[#0066FF] hover:underline cursor-pointer"
+                      >
+                        Enter Master ID →
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-slate-900 text-white rounded-2xl flex items-center justify-between gap-2 shadow-md">
+                      <div className="flex items-center gap-2">
+                        <Key className="w-4 h-4 text-amber-400" />
+                        <span className="text-xs font-bold tracking-wide">Master Admin Portal</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTechMode('standard');
+                          setMasterStep('id_entry');
+                          setMasterError(null);
+                        }}
+                        className="text-xs font-medium text-slate-300 hover:text-white hover:underline cursor-pointer"
+                      >
+                        ← Field Tech Login
+                      </button>
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
 
-              {/* Sign In Form with Email and Password for both Client and Technician */}
-              <div>
+              {/* TECHNICIAN TAB: MASTER ID 2FA FLOW */}
+              {selectedRole === 'technician' && techMode === 'master' ? (
+                <div>
+                  {/* Master Step 1: Enter Master ID */}
+                  {masterStep === 'id_entry' ? (
+                    <form onSubmit={handleInitiateMaster2FA} className="space-y-3.5">
+                      {masterError && (
+                        <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4 shrink-0" />
+                          <span>{masterError}</span>
+                        </div>
+                      )}
+
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                          <Key className="w-4 h-4" />
+                        </div>
+                        <input
+                          type="password"
+                          value={masterIdInput}
+                          onChange={(e) => {
+                            setMasterIdInput(e.target.value);
+                            if (masterError) setMasterError(null);
+                          }}
+                          placeholder="Enter Authorized Master ID"
+                          required
+                          autoFocus
+                          className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
+                        />
+                      </div>
+
+                      <p className="text-[11px] text-slate-500 leading-tight">
+                        Submitting an authorized Master ID initiates 2-Factor OTP verification sent to pre-registered administrative contact points.
+                      </p>
+
+                      <button
+                        type="submit"
+                        disabled={isInitiatingMaster || !masterIdInput.trim()}
+                        className="w-full py-3.5 rounded-2xl bg-[#0066FF] hover:bg-[#0052cc] text-white font-bold text-sm shadow-lg shadow-blue-500/25 active:scale-98 transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
+                      >
+                        {isInitiatingMaster ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin text-white" />
+                            <span>Validating Master ID...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>Authorize & Send Dual-Factor OTP</span>
+                            <ArrowRight className="w-4 h-4" />
+                          </>
+                        )}
+                      </button>
+                    </form>
+                  ) : (
+                    /* Master Step 2: Dual-Factor (Email + SMS OTP) Verification Screen */
+                    <form onSubmit={handleVerifyMaster2FA} className="space-y-3.5 animate-in fade-in duration-200">
+                      <div className="p-3.5 bg-blue-50/90 border border-blue-200 rounded-2xl text-left">
+                        <div className="flex items-center gap-2 text-[#0066FF] font-bold text-xs mb-1">
+                          <ShieldCheck className="w-4 h-4" />
+                          <span>Master Dual-Factor Verification Required</span>
+                        </div>
+                        <p className="text-[11px] text-slate-600 leading-tight">
+                          Verification codes dispatched to:
+                        </p>
+                        <div className="mt-1.5 space-y-0.5 text-xs text-slate-800 font-semibold font-mono">
+                          <div className="flex items-center gap-1.5">
+                            <Mail className="w-3.5 h-3.5 text-slate-500" />
+                            <span>{masterMaskedEmail}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <Smartphone className="w-3.5 h-3.5 text-slate-500" />
+                            <span>{masterMaskedPhone}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {masterError && (
+                        <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4 shrink-0" />
+                          <span>{masterError}</span>
+                        </div>
+                      )}
+
+                      {/* Email OTP Field */}
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                          Email Verification OTP (6 Digits)
+                        </label>
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                            <Mail className="w-4 h-4" />
+                          </div>
+                          <input
+                            ref={masterEmailOtpRef}
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={6}
+                            value={masterEmailOtp}
+                            onChange={(e) => {
+                              setMasterEmailOtp(e.target.value.replace(/\D/g, '').slice(0, 6));
+                              if (masterError) setMasterError(null);
+                            }}
+                            placeholder="Enter 6-digit Email code"
+                            required
+                            autoFocus
+                            className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs sm:text-sm font-mono font-bold tracking-widest text-slate-800 focus:bg-white focus:border-[#0066FF] outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      {/* SMS OTP Field */}
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                          SMS Mobile OTP (6 Digits)
+                        </label>
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                            <Smartphone className="w-4 h-4" />
+                          </div>
+                          <input
+                            ref={masterSmsOtpRef}
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={6}
+                            value={masterSmsOtp}
+                            onChange={(e) => {
+                              setMasterSmsOtp(e.target.value.replace(/\D/g, '').slice(0, 6));
+                              if (masterError) setMasterError(null);
+                            }}
+                            placeholder="Enter 6-digit SMS code"
+                            className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs sm:text-sm font-mono font-bold tracking-widest text-slate-800 focus:bg-white focus:border-[#0066FF] outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Resend Cooldown */}
+                      <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
+                        <span>Didn't receive codes?</span>
+                        {canResendMasterOtp ? (
+                          <button
+                            type="button"
+                            onClick={handleResendMaster2FA}
+                            className="font-bold text-[#0066FF] hover:underline cursor-pointer"
+                          >
+                            Resend Codes
+                          </button>
+                        ) : (
+                          <span>Resend in <strong className="text-[#0066FF] font-mono">{masterTimer}s</strong></span>
+                        )}
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={isVerifyingMaster || masterEmailOtp.length !== 6}
+                        className="w-full py-3.5 rounded-2xl bg-[#0066FF] hover:bg-[#0052cc] text-white font-bold text-sm shadow-lg shadow-blue-500/25 active:scale-98 transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
+                      >
+                        {isVerifyingMaster ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin text-white" />
+                            <span>Verifying Credentials...</span>
+                          </>
+                        ) : (
+                          <>
+                            <ShieldCheck className="w-4 h-4" />
+                            <span>Verify & Access Admin Dashboard</span>
+                          </>
+                        )}
+                      </button>
+                    </form>
+                  )}
+                </div>
+              ) : (
+                /* STANDARD SIGN IN FORM (CLIENTS & STANDARD TECHNICIANS) */
                 <form onSubmit={handleSignInSubmit} className="space-y-3.5">
-                  {/* Email Address Field */}
+                  {/* Email / Identifier Field */}
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                       <Mail className="w-4 h-4" />
@@ -1143,7 +1283,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       type="text"
                       value={identifier}
                       onChange={(e) => setIdentifier(e.target.value)}
-                      placeholder="Email Address"
+                      placeholder={selectedRole === 'technician' ? 'Technician Email / Code' : 'Email Address'}
                       required
                       className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
                     />
@@ -1214,36 +1354,39 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     )}
                   </button>
                 </form>
+              )}
 
-                {/* OR Divider */}
-                <div className="relative flex items-center justify-center my-4">
-                  <div className="border-t border-slate-200 w-full" />
-                  <span className="bg-white px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                    OR
-                  </span>
-                  <div className="border-t border-slate-200 w-full" />
-                </div>
+              {/* Continue with Google Option (ONLY on Client tab as per security requirements) */}
+              {selectedRole === 'client' && (
+                <>
+                  <div className="relative flex items-center justify-center my-4">
+                    <div className="border-t border-slate-200 w-full" />
+                    <span className="bg-white px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                      OR
+                    </span>
+                    <div className="border-t border-slate-200 w-full" />
+                  </div>
 
-                {/* Continue with Google */}
-                <button
-                  type="button"
-                  onClick={handleGoogleAuth}
-                  disabled={isGoogleSubmitting}
-                  aria-label="Continue with Google"
-                  className="w-full py-2.5 px-4 rounded-2xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2.5 shadow-sm transition-all cursor-pointer active:scale-98 disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {isGoogleSubmitting ? (
-                    <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin shrink-0" />
-                  ) : (
-                    <GoogleGIcon />
-                  )}
-                  <span>{isGoogleSubmitting ? 'Connecting with Google...' : 'Continue with Google'}</span>
-                </button>
-              </div>
+                  <button
+                    type="button"
+                    onClick={handleGoogleAuth}
+                    disabled={isGoogleSubmitting}
+                    aria-label="Continue with Google"
+                    className="w-full py-2.5 px-4 rounded-2xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2.5 shadow-sm transition-all cursor-pointer active:scale-98 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {isGoogleSubmitting ? (
+                      <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin shrink-0" />
+                    ) : (
+                      <GoogleGIcon />
+                    )}
+                    <span>{isGoogleSubmitting ? 'Connecting with Google...' : 'Continue with Google'}</span>
+                  </button>
+                </>
+              )}
             </div>
           ) : (
             /* ========================================================================= */
-            /* VIEW 2: CREATE ACCOUNT / SIGN UP SCREEN (WITH EMAIL OTP VERIFICATION) */
+            /* VIEW 2: CREATE ACCOUNT / SIGN UP SCREEN (CLIENT REGISTRATION ONLY) */
             /* ========================================================================= */
             <div>
               {/* Pending Quote Service Notice */}
@@ -1260,7 +1403,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       {pendingQuoteService}
                     </p>
                     <p className="text-[11px] text-slate-600 mt-0.5 leading-tight">
-                      Create your account to submit and track this quotation.
+                      Create your client account to submit and track this quotation.
                     </p>
                   </div>
                 </div>
@@ -1269,35 +1412,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               {/* STEP 1: Registration Details Form */}
               {signUpStep === 'form' ? (
                 <div>
-                  {/* Role Picker in Sign Up — Only Client | Technician */}
-                  <div className="mb-3">
-                    <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100/90 rounded-2xl">
-                      <button
-                        type="button"
-                        onClick={() => setRegRole('client')}
-                        className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                          regRole === 'client'
-                            ? 'bg-white text-[#0066FF] shadow-sm'
-                            : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                      >
-                        Client
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setRegRole('technician')}
-                        className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                          regRole === 'technician'
-                            ? 'bg-white text-[#0066FF] shadow-sm'
-                            : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                      >
-                        Technician
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Error Alert in Step 1 */}
                   {signupErrorMessage && (
                     <div className="mb-3.5 p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex flex-col gap-2 animate-in fade-in">
                       <div className="flex items-start gap-2">
@@ -1323,7 +1437,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     </div>
                   )}
 
-                  {/* Sign Up Form */}
                   <form onSubmit={handleSignUpSubmit} className="space-y-3">
                     {/* Full Name */}
                     <div className="relative">
@@ -1361,21 +1474,36 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       />
                     </div>
 
-                    {/* Mobile Number */}
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                        <Phone className="w-4 h-4" />
+                    {/* Mobile Number with Country Code */}
+                    <div className="flex gap-2">
+                      <div className="w-20 shrink-0">
+                        <select
+                          value={regCountryCode}
+                          onChange={(e) => setRegCountryCode(e.target.value)}
+                          className="w-full py-2.5 px-2 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-bold text-slate-700 focus:bg-white focus:border-[#0066FF] outline-none"
+                        >
+                          <option value="+91">🇮🇳 +91</option>
+                          <option value="+1">🇺🇸 +1</option>
+                          <option value="+44">🇬🇧 +44</option>
+                          <option value="+971">🇦🇪 +971</option>
+                          <option value="+65">🇸🇬 +65</option>
+                        </select>
                       </div>
-                      <input
-                        type="tel"
-                        value={regMobile}
-                        onChange={(e) => {
-                          setRegMobile(e.target.value);
-                          if (signupErrorMessage) setSignupErrorMessage(null);
-                        }}
-                        placeholder="Mobile Number (Optional)"
-                        className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
-                      />
+                      <div className="relative flex-1">
+                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                          <Phone className="w-4 h-4" />
+                        </div>
+                        <input
+                          type="tel"
+                          value={regMobile}
+                          onChange={(e) => {
+                            setRegMobile(e.target.value.replace(/\D/g, '').slice(0, 10));
+                            if (signupErrorMessage) setSignupErrorMessage(null);
+                          }}
+                          placeholder="Mobile Number"
+                          className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
+                        />
+                      </div>
                     </div>
 
                     {/* Password */}
@@ -1387,9 +1515,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                         type={regShowPassword ? 'text' : 'password'}
                         value={regPassword}
                         onChange={(e) => setRegPassword(e.target.value)}
-                        placeholder="Create Password (min 6 characters)"
+                        placeholder="Password (minimum 8–12 characters)"
                         required
-                        minLength={6}
+                        minLength={8}
                         className="w-full pl-10 pr-10 py-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
                       />
                       <button
@@ -1419,18 +1547,33 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                         onClick={() => setRegShowConfirmPassword(!regShowConfirmPassword)}
                         className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
                       >
-                        {regShowConfirmPassword ? (
-                          <EyeOff className="w-4 h-4" />
-                        ) : (
-                          <Eye className="w-4 h-4" />
-                        )}
+                        {regShowConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
 
-                    {/* Sign Up Submit */}
+                    {/* Terms & Privacy Policy Checkbox */}
+                    <div className="pt-1">
+                      <label className="flex items-start gap-2 cursor-pointer select-none text-left">
+                        <input
+                          type="checkbox"
+                          checked={regAgreeTerms}
+                          onChange={(e) => {
+                            setRegAgreeTerms(e.target.checked);
+                            if (signupErrorMessage) setSignupErrorMessage(null);
+                          }}
+                          required
+                          className="w-4 h-4 mt-0.5 rounded text-[#0066FF] focus:ring-[#0066FF] border-slate-300 shrink-0"
+                        />
+                        <span className="text-[11px] sm:text-xs text-slate-600 leading-snug">
+                          I agree to the <a href="#terms" className="text-[#0066FF] font-semibold hover:underline">Terms of Service</a> and <a href="#privacy" className="text-[#0066FF] font-semibold hover:underline">Privacy Policy</a>.
+                        </span>
+                      </label>
+                    </div>
+
+                    {/* Sign Up Submit Button */}
                     <button
                       type="submit"
-                      disabled={regIsSubmitting || isSendingOtp}
+                      disabled={regIsSubmitting || isSendingOtp || !regAgreeTerms}
                       className="w-full py-3.5 rounded-2xl bg-[#0066FF] hover:bg-[#0052cc] text-white font-bold text-sm shadow-lg shadow-blue-500/25 active:scale-98 transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer mt-1"
                     >
                       {isSendingOtp ? (
@@ -1440,7 +1583,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                         </>
                       ) : (
                         <>
-                          <span>Verify Email & Sign Up</span>
+                          <span>Create Account & Verify Email</span>
                           <ArrowRight className="w-4 h-4" />
                         </>
                       )}
@@ -1475,7 +1618,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               ) : (
                 /* STEP 2: Interactive 6-Digit Email OTP Verification Screen */
                 <div className="animate-in fade-in slide-in-from-right-3 duration-200">
-                  {/* Back to Edit Button */}
                   <button
                     type="button"
                     onClick={() => {
@@ -1488,7 +1630,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     <span>Change Details / Email</span>
                   </button>
 
-                  {/* Top Badge & Mail Highlight */}
                   <div className="text-center mb-3">
                     <div className="w-12 h-12 rounded-2xl bg-blue-50 text-[#0066FF] flex items-center justify-center mx-auto mb-2 border border-blue-100 shadow-xs">
                       <MailCheck className="w-6 h-6" />
@@ -1502,15 +1643,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     </p>
                   </div>
 
-                  {/* Spam / Junk Helper Note */}
                   <div className="p-3 bg-amber-50/90 border border-amber-200/90 rounded-2xl text-[11px] text-amber-900 flex items-start gap-2 text-left mb-3 shadow-xs">
                     <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                     <span>
-                      <strong>Didn't see the email?</strong> Please check your <strong>Spam / Junk / Promotions</strong> folder. Emails may take 15–30s to arrive.
+                      <strong>Didn't see the email?</strong> Please check your <strong>Spam / Junk / Promotions</strong> folder.
                     </span>
                   </div>
 
-                  {/* OTP Error Message */}
                   {otpError && (
                     <div className="mb-3.5 p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
                       <AlertCircle className="w-4 h-4 shrink-0" />
@@ -1518,12 +1657,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     </div>
                   )}
 
-                  {/* Android & Mobile Touch-Optimized 6-Digit OTP Input */}
+                  {/* 6-Digit Visual OTP Boxes with Single Overlay Input */}
                   <div
                     className="relative my-3 cursor-text"
                     onClick={() => otpInputRef.current?.focus()}
                   >
-                    {/* Transparent Full-Width Single Input for Native Android Keyboards & SMS/Email Autofill */}
                     <input
                       ref={otpInputRef}
                       type="tel"
@@ -1536,12 +1674,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                         const clean = e.target.value.replace(/\D/g, '').slice(0, 6);
                         setOtpValue(clean);
                         setOtpError(null);
+                        if (clean.length === 6) {
+                          handleVerifySignupOtp(clean);
+                        }
                       }}
                       className="absolute inset-0 w-full h-full opacity-0 z-20 cursor-text"
                       style={{ fontSize: '16px' }}
                       autoFocus
                     />
-                    {/* 6 Visual Stylized Digit Display Boxes */}
                     <div className="flex items-center justify-between gap-1.5 sm:gap-2 pointer-events-none">
                       {[0, 1, 2, 3, 4, 5].map((idx) => {
                         const char = otpValue[idx] || '';
@@ -1628,18 +1768,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         </div>
       </div>
 
-      {/* Bottom Bar: 3 Badges with Vertical Dividers (Safe Lifts | Reliable Solutions | Engineered for Excellence) */}
+      {/* Bottom Trust Badges */}
       <div className="relative z-10 w-full py-5 px-4 flex items-center justify-center">
         <div className="flex items-center gap-4 sm:gap-8 text-white/90 drop-shadow text-xs sm:text-sm font-semibold">
-          {/* Badge 1: Safe Lifts */}
           <div className="flex items-center gap-2">
-            <svg
-              className="w-4 h-4 text-sky-300"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
+            <svg className="w-4 h-4 text-sky-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="4" y="2" width="16" height="20" rx="2" />
               <line x1="12" y1="2" x2="12" y2="22" />
               <polyline points="7 6 9 4 11 6" />
@@ -1647,18 +1780,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             </svg>
             <span>Safe Lifts</span>
           </div>
-
           <div className="h-4 w-[1px] bg-white/30" />
-
-          {/* Badge 2: Reliable Solutions */}
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-sky-300" />
             <span>Reliable Solutions</span>
           </div>
-
           <div className="h-4 w-[1px] bg-white/30" />
-
-          {/* Badge 3: Engineered for Excellence */}
           <div className="flex items-center gap-2">
             <Settings className="w-4 h-4 text-sky-300" />
             <span>Engineered for Excellence</span>
@@ -1667,12 +1794,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       </div>
 
       {/* ========================================================================= */}
-      {/* FORGOT PASSWORD MODAL (FIREBASE AUTH + EMAIL OTP VERIFICATION) */}
+      {/* FORGOT PASSWORD MODAL */}
       {/* ========================================================================= */}
       {isForgotPasswordOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/75 backdrop-blur-md animate-in fade-in duration-200">
           <div className="w-full max-w-md bg-white rounded-[28px] shadow-2xl border border-slate-100 p-6 sm:p-8 relative">
-            {/* Close Modal */}
             <button
               onClick={() => {
                 setIsForgotPasswordOpen(false);
@@ -1685,7 +1811,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               <X className="w-5 h-5" />
             </button>
 
-            {/* STEP 1: Enter Email & Request Reset Code */}
             {forgotStep === 'email' && (
               <div className="animate-in fade-in duration-150">
                 <div className="w-12 h-12 rounded-2xl bg-blue-50 text-[#0066FF] flex items-center justify-center mb-3 border border-blue-100 shadow-xs">
@@ -1693,10 +1818,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 </div>
                 <h3 className="text-xl font-bold text-[#0b2545]">Reset Your Password</h3>
                 <p className="text-xs text-slate-500 mt-1 mb-4 leading-relaxed">
-                  Enter your registered email address. We'll send a 6-digit OTP code and official Firebase password reset link to your inbox.
+                  Enter your registered email address. We'll send a 6-digit OTP verification code to reset your password.
                 </p>
 
-                {/* Error Alert */}
                 {forgotError && (
                   <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
                     <AlertCircle className="w-4 h-4 shrink-0" />
@@ -1732,7 +1856,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       </>
                     ) : (
                       <>
-                        <span>Send Reset Code & Link</span>
+                        <span>Send Reset Code</span>
                         <ArrowRight className="w-4 h-4" />
                       </>
                     )}
@@ -1741,7 +1865,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               </div>
             )}
 
-            {/* STEP 2: Enter 6-digit OTP & New Password */}
             {forgotStep === 'otp_reset' && (
               <div className="animate-in fade-in slide-in-from-right-3 duration-200">
                 <button
@@ -1761,22 +1884,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   Enter the 6-digit code sent to <strong className="text-slate-800">{forgotIdentifier}</strong> and create your new password.
                 </p>
 
-                {firebaseResetSent && (
-                  <div className="mb-3 p-2.5 rounded-xl bg-blue-50 border border-blue-200 text-[#0066FF] text-[11px] flex items-center gap-2">
-                    <MailCheck className="w-4 h-4 shrink-0 text-[#0066FF]" />
-                    <span>Firebase recovery email also dispatched to your inbox.</span>
-                  </div>
-                )}
-
-                {/* Spam / Junk Helper Note */}
-                <div className="p-3 bg-amber-50/90 border border-amber-200/90 rounded-2xl text-[11px] text-amber-900 flex items-start gap-2 text-left mb-3 shadow-xs">
-                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                  <span>
-                    <strong>Didn't receive email?</strong> Check your <strong>Spam / Junk / Promotions</strong> folder. Emails may take 15–30s to arrive.
-                  </span>
-                </div>
-
-                {/* Error Alert */}
                 {forgotError && (
                   <div className="mb-3 p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
                     <AlertCircle className="w-4 h-4 shrink-0" />
@@ -1785,7 +1892,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 )}
 
                 <form onSubmit={handleVerifyForgotOtpAndReset} className="space-y-3.5">
-                  {/* Android-Optimized Single Overlay 6-Digit OTP Input */}
                   <div>
                     <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
                       6-Digit Verification Code
@@ -1794,7 +1900,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       className="relative my-1 cursor-text"
                       onClick={() => forgotOtpInputRef.current?.focus()}
                     >
-                      {/* Transparent Full-Width Single Input */}
                       <input
                         ref={forgotOtpInputRef}
                         type="tel"
@@ -1812,7 +1917,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                         style={{ fontSize: '16px' }}
                         autoFocus
                       />
-                      {/* 6 Visual Stylized Digit Display Boxes */}
                       <div className="flex items-center justify-between gap-1.5 sm:gap-2 pointer-events-none">
                         {[0, 1, 2, 3, 4, 5].map((idx) => {
                           const char = forgotOtpValue[idx] || '';
@@ -1836,7 +1940,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     </div>
                   </div>
 
-                  {/* New Password */}
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                       <Lock className="w-4 h-4" />
@@ -1845,9 +1948,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       type={forgotShowPassword ? 'text' : 'password'}
                       value={forgotNewPassword}
                       onChange={(e) => setForgotNewPassword(e.target.value)}
-                      placeholder="New Password (min 6 characters)"
+                      placeholder="New Password (min 8 characters)"
                       required
-                      minLength={6}
+                      minLength={8}
                       className="w-full pl-10 pr-10 py-2.5 rounded-2xl border border-slate-200 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] outline-none"
                     />
                     <button
@@ -1859,7 +1962,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     </button>
                   </div>
 
-                  {/* Confirm New Password */}
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                       <Lock className="w-4 h-4" />
@@ -1881,7 +1983,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     </button>
                   </div>
 
-                  {/* Resend Timer */}
                   <div className="flex items-center justify-between text-xs text-slate-500 pt-0.5">
                     <span>Didn't get the code?</span>
                     {canResendForgotOtp ? (
@@ -1898,7 +1999,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     )}
                   </div>
 
-                  {/* Submit Button */}
                   <button
                     type="submit"
                     disabled={isResettingPassword || forgotOtpValue.length !== 6}
@@ -1920,7 +2020,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               </div>
             )}
 
-            {/* STEP 3: Success Confirmation */}
             {forgotStep === 'success' && (
               <div className="text-center py-4 animate-in zoom-in-95 duration-200">
                 <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-3 shadow-sm">
@@ -1947,16 +2046,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         </div>
       )}
 
-      {/* Interactive Google OAuth 2.0 Identity Modal (Clients only) */}
+      {/* Google OAuth Modal */}
       <GoogleAuthModal
         isOpen={isGoogleModalOpen}
         onClose={() => setIsGoogleModalOpen(false)}
-        targetRoleHint={view === 'signup' ? regRole : 'client'}
+        targetRoleHint="client"
         onSuccess={() => {
           if (onClose) onClose();
         }}
       />
-
     </div>
   );
 };
