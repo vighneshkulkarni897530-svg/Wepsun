@@ -202,11 +202,13 @@ export const AppContent: React.FC = () => {
     const isExplicitLogout = localStorage.getItem('wepsun_explicit_logout') === 'true';
     if (isExplicitLogout) return true;
 
-    const token = localStorage.getItem('wepsun_access_token');
-    const refresh = localStorage.getItem('wepsun_refresh_token');
+    const token = localStorage.getItem('wepsun_access_token') || sessionStorage.getItem('wepsun_access_token');
+    const refresh = localStorage.getItem('wepsun_refresh_token') || sessionStorage.getItem('wepsun_refresh_token');
+    const cachedSession = localStorage.getItem('wepsun_user_session');
 
-    // If no tokens exist at all, unauthenticated -> show login
-    if (!token && !refresh) {
+    // If no tokens or session exist at all, unauthenticated -> show login
+    if (!token && !refresh && !cachedSession) {
+      if (PUBLIC_HASHES.includes(hash)) return false;
       return true;
     }
 
@@ -214,7 +216,7 @@ export const AppContent: React.FC = () => {
       return false;
     }
 
-    // Default to false while session restoration completes to prevent login flicker
+    // Default to false while session restoration completes to prevent login screen flashing
     return false;
   });
   const [isPublicFeedbackPage, setIsPublicFeedbackPage] = useState(false);
@@ -346,8 +348,21 @@ export const AppContent: React.FC = () => {
         return;
       }
 
-      // 4. Unauthenticated Navigation: strictly display Sign In
+      // 4. Unauthenticated Navigation: strictly display Sign In only if no valid session exists
       if (!isAuthenticated && !isAuthLoading) {
+        const hasStoredTokens = !!(
+          localStorage.getItem('wepsun_access_token') ||
+          localStorage.getItem('wepsun_refresh_token') ||
+          localStorage.getItem('wepsun_user_session')
+        );
+        const isExplicit = localStorage.getItem('wepsun_explicit_logout') === 'true';
+
+        // If tokens exist and not explicitly logged out, retain view while session restores/reconnects
+        if (hasStoredTokens && !isExplicit) {
+          setIsFullLoginPage(false);
+          return;
+        }
+
         if (!hash || !PUBLIC_HASHES.includes(hash)) {
           window.history.replaceState(null, '', '#login');
           setCurrentHash('login');

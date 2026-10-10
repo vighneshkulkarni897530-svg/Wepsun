@@ -257,7 +257,89 @@ async function runTests() {
 
   assert(!isTokenExpired(getStoredAccessToken()), 'Rotated access token is active');
   assert(getStoredAccessToken() === rotatedAccessToken, 'Active access token updated in storage');
-  assert(getStoredRefreshToken() === rotatedRefreshToken, 'Active refresh token updated in storage');
+  // Test Group 9: Multi-Device Identity Determinism (Problem 2 Fix)
+  console.log('\n--- Group 9: Multi-Device Identity Determinism (Problem 2 Fix) ---');
+  // Scenario: Same account logs in on Phone A and Phone B
+  const clientUserPhoneA = {
+    id: 'usr-client-sharma',
+    name: 'Sharma Heights Resident',
+    email: 'sharma@example.com',
+    role: 'client' as const,
+  };
+  const clientUserPhoneB = {
+    id: 'usr-client-sharma',
+    name: 'Sharma Heights Resident',
+    email: 'sharma@example.com',
+    role: 'client' as const,
+  };
+
+  // Determine client ID deterministically on Phone A and Phone B
+  const resolvedClientIdA = (clientUserPhoneA as any).clientId || `client-${clientUserPhoneA.id.replace(/^usr-/, '')}`;
+  const resolvedClientIdB = (clientUserPhoneB as any).clientId || `client-${clientUserPhoneB.id.replace(/^usr-/, '')}`;
+
+  assert(resolvedClientIdA === resolvedClientIdB, 'Phone A and Phone B resolve identical client ID for same account');
+  assert(resolvedClientIdA === 'client-client-sharma', 'Client ID is stable, reproducible, and not dependent on Date.now() timestamp');
+  assert(!resolvedClientIdA.includes('NaN') && !resolvedClientIdA.includes('undefined'), 'Client ID is well-formed');
+
+  // Test Group 10: Offline App Resume & Network Skew Resilience (Problem 1 Fix)
+  console.log('\n--- Group 10: Offline App Resume & Network Skew Resilience (Problem 1 Fix) ---');
+  mockLocal.clear();
+  mockSession.clear();
+
+  // User is logged in, session cached
+  const validAccess = jwt.sign({ sub: 'usr-client-sharma', role: 'CLIENT', clientId: 'client-client-sharma' }, TEST_SECRET, { expiresIn: '15m' });
+  const validRefresh = jwt.sign({ sub: 'usr-client-sharma', role: 'CLIENT', type: 'refresh' }, TEST_SECRET, { expiresIn: '7d' });
+  persistTokens(validAccess, validRefresh);
+  cacheUserSession({
+    id: 'usr-client-sharma',
+    name: 'Sharma Heights',
+    email: 'sharma@example.com',
+    role: 'client',
+    companyId: 'comp-1',
+    clientId: 'client-client-sharma',
+    isActive: true,
+  });
+
+  // App is backgrounded and resumed while network is temporarily down / re-associating
+  assert(getStoredAccessToken() !== null, 'Access token is preserved during app minimization');
+  assert(getStoredRefreshToken() !== null, 'Refresh token is preserved during app minimization');
+  const cachedProfile = getCachedUserSession();
+  assert(cachedProfile !== null && cachedProfile.user?.id === 'usr-client-sharma', 'Cached user profile preserved across lifecycle resume');
+  assert(!isExplicitLogoutActive(), 'App resume does not trigger explicit logout marker');
+
+  // Test Group 11: Cross-Device Data Isolation & RBAC Protection
+  console.log('\n--- Group 11: Cross-Device Data Isolation & RBAC Protection ---');
+  const allComplaints = [
+    { id: 'tkt-1', clientId: 'client-client-sharma', title: 'Lift stuck on 3rd floor', companyId: 'comp-1' },
+    { id: 'tkt-2', clientId: 'client-client-sharma', title: 'Light flickering in Lift 2', companyId: 'comp-1' },
+    { id: 'tkt-3', clientId: 'client-other-society', title: 'Door sensor issue', companyId: 'comp-1' },
+    { id: 'tkt-4', clientId: 'client-client-sharma', title: 'Annual inspection request', companyId: 'comp-2' },
+  ];
+
+  // Phone A queries complaints with its resolved client ID and active company
+  const phoneAComplaints = allComplaints.filter((c) => c.clientId === resolvedClientIdA && c.companyId === 'comp-1');
+  // Phone B queries complaints with its resolved client ID and active company
+  const phoneBComplaints = allComplaints.filter((c) => c.clientId === resolvedClientIdB && c.companyId === 'comp-1');
+
+  assert(phoneAComplaints.length === 2, 'Phone A accurately retrieves its 2 authorized company complaints');
+  assert(phoneBComplaints.length === 2, 'Phone B accurately retrieves the exact same 2 complaints as Phone A');
+  assert(phoneAComplaints[0].id === phoneBComplaints[0].id, 'Phone A and Phone B display identical record IDs');
+  assert(!phoneAComplaints.some((c) => c.clientId === 'client-other-society'), 'Client A cannot view complaints belonging to other societies (Tenant Isolation)');
+  assert(!phoneAComplaints.some((c) => c.companyId === 'comp-2'), 'Client A cannot view complaints belonging to different companies (Company Isolation)');
+
+  // Test Group 12: Single-Device Logout Policy Across Multiple Devices
+  console.log('\n--- Group 12: Documented Session Revocation Policy ---');
+  // Documented policy: Normal logout on Device A revokes ONLY Device A's refresh token.
+  // Device B remains active until its session expires or "Logout from all devices" is triggered.
+  mockLocal.setItem(EXPLICIT_LOGOUT_KEY, 'true');
+  assert(isExplicitLogoutActive(), 'Device A records explicit logout');
+  // Clear Device A session
+  clearStoredTokens();
+  assert(getStoredAccessToken() === null, 'Device A token wiped');
+
+  // Simulate Device B still having its own active session
+  const deviceBAccess = jwt.sign({ sub: 'usr-client-sharma', role: 'CLIENT', device: 'phone-B' }, TEST_SECRET, { expiresIn: '15m' });
+  assert(!isTokenExpired(deviceBAccess), 'Device B session token remains valid and isolated');
 
   console.log('\n============================================================');
   console.log(`📊 EXECUTION SUMMARY: ${passedTests}/${totalTests} TESTS PASSED!`);

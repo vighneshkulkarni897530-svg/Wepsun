@@ -271,8 +271,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             role: userRole,
             companyId: authData.user.companyId || 'comp-1',
             branchId: authData.user.branchId,
-            clientId: authData.user.clientId || (userRole === 'client' ? 'client-' + Date.now() : undefined),
-            technicianId: authData.user.technicianId || (userRole === 'technician' ? 'tech-' + Date.now() : undefined),
+            clientId: authData.user.clientId || (userRole === 'client' ? `client-${authData.user.id.replace(/^usr-/, '')}` : undefined),
+            technicianId: authData.user.technicianId || (userRole === 'technician' ? `tech-${authData.user.id.replace(/^usr-/, '')}` : undefined),
             avatar: authData.user.avatarUrl || authData.user.avatar,
             isActive: true,
           };
@@ -864,7 +864,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 role: 'client',
                 companyId: authData.user.companyId || 'comp-1',
                 branchId: authData.user.branchId,
-                clientId: authData.user.clientId || 'client-' + Date.now(),
+                clientId: authData.user.clientId || `client-${authData.user.id.replace(/^usr-/, '')}`,
                 avatar: authData.user.avatarUrl || profile?.picture,
                 isActive: true,
               };

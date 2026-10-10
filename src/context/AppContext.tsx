@@ -653,6 +653,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
           setCurrentRoleState(result.role);
           setIsAuthenticated(true);
+          // Authoritative cross-device database synchronization on app resume/restore
+          syncWithServer(true).catch(() => {});
         } else {
           setIsAuthenticated(false);
         }
@@ -738,15 +740,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
-    // Auto-assign distinct client or technician ID if missing
+    // Auto-assign distinct client or technician ID if missing (deterministic across devices)
     if (userObj.role === 'client') {
       if (!userObj.clientId) {
-        userObj.clientId = 'client-' + (userObj.id ? userObj.id.replace('usr-', '') : Date.now());
+        userObj.clientId = 'client-' + (userObj.id ? userObj.id.replace(/^usr-/, '') : 'default');
       }
     }
     if (userObj.role === 'technician') {
       if (!userObj.technicianId) {
-        userObj.technicianId = 'tech-' + (userObj.id ? userObj.id.replace('usr-', '') : Date.now());
+        userObj.technicianId = 'tech-' + (userObj.id ? userObj.id.replace(/^usr-/, '') : 'default');
       }
     }
 
@@ -996,6 +998,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     cacheUserSession(finalUser, finalUser.role, isMasterAdminSessionValid());
     setIsAuthenticated(true);
     localStorage.removeItem('wepsun_explicit_logout');
+
+    // Authoritative Server Data Synchronization across devices on login
+    setTimeout(() => {
+      syncWithServer(true).catch(() => {});
+    }, 50);
 
     showToast(
       'success',
@@ -1896,13 +1903,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       details: `Created complaint ${newComplaint.ticketNumber} for lift ${newComplaint.liftNumber}. Priority: ${newComplaint.priority}`,
     });
 
-    // Cloud Database Persistence
-    apiService.createComplaint(newComplaint, {
-      companyId: newComplaint.companyId,
-      branchId: newComplaint.branchId,
-      userRole: currentRole,
-      userId: activeUserId,
-    }).catch((err) => console.warn('[AppContext] Background createComplaint API sync:', err));
+    // Cloud Database Persistence & Authoritative Server Record Adoption
+    apiService
+      .createComplaint(newComplaint, {
+        companyId: newComplaint.companyId,
+        branchId: newComplaint.branchId,
+        userRole: currentRole,
+        userId: activeUserId,
+      })
+      .then((res) => {
+        if (res && res.success && res.data) {
+          const serverRec = res.data;
+          setComplaints((prev) =>
+            prev.map((c) =>
+              c.id === newComplaint.id || c.ticketNumber === newComplaint.ticketNumber
+                ? {
+                    ...c,
+                    ...serverRec,
+                    id: serverRec.id || c.id,
+                    ticketNumber: serverRec.ticketNumber || c.ticketNumber,
+                  }
+                : c
+            )
+          );
+        }
+      })
+      .catch((err) => console.warn('[AppContext] Background createComplaint API sync:', err));
 
     addNotification({
       type: newComplaint.isEmergency ? 'emergency_breakdown' : 'complaint_assigned',

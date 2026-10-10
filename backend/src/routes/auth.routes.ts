@@ -50,6 +50,219 @@ function sanitizeUser(user: any) {
   };
 }
 
+/**
+ * Guarantees that a Client account has a permanent Client entity, Building,
+ * and authorized Lift records persisted in the backend database.
+ * This guarantees that all devices (Phone A, Phone B, Web) resolve the exact
+ * same client ID and have real database equipment to raise complaints against.
+ */
+async function ensureClientAccountWithEquipment(user: any): Promise<string | null> {
+  if (!user) return null;
+  const roleStr = String(user.role || '').toUpperCase();
+  if (roleStr !== 'CLIENT') return null;
+
+  const companyId = user.companyId || 'comp-1';
+  const branchId = user.branchId || 'br-mum-1';
+  let clientId = user.clientId;
+
+  try {
+    let clientRec = clientId
+      ? await prisma.client.findUnique({ where: { id: clientId } })
+      : await prisma.client.findFirst({
+          where: {
+            companyId,
+            email: { equals: user.email, mode: 'insensitive' as const },
+          },
+        });
+
+    if (!clientRec) {
+      clientRec = await prisma.client.create({
+        data: {
+          companyId,
+          name: (user.name || 'WEPSUN Client') + ' Property',
+          contactPerson: user.name || 'Resident Representative',
+          email: user.email,
+          phone: user.phone || '+91 98200 00000',
+          billingAddress: 'Palm Beach Road, Sector 19, Vashi',
+        },
+      });
+    }
+
+    clientId = clientRec.id;
+    if (user.id && user.clientId !== clientId) {
+      try {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { clientId },
+        });
+      } catch {}
+      user.clientId = clientId;
+    }
+
+    // Ensure Client has at least 1 Building in database
+    let building = await prisma.building.findFirst({
+      where: { companyId, clientId },
+    });
+    if (!building) {
+      building = await prisma.building.create({
+        data: {
+          companyId,
+          branchId,
+          clientId,
+          name: `${user.name || 'Client'} Heights`,
+          address: 'Palm Beach Road, Sector 19, Vashi',
+          city: 'Navi Mumbai',
+          pinCode: '400703',
+          contactPerson: user.name || 'Society Manager',
+          contactPhone: user.phone || '+91 98200 12345',
+          totalLifts: 2,
+        },
+      });
+    }
+
+    // Ensure at least 1 Lift exists for this building & client
+    const existingLifts = await prisma.lift.findMany({
+      where: { companyId, clientId },
+      take: 2,
+    });
+
+    if (existingLifts.length === 0) {
+      try {
+        await prisma.lift.createMany({
+          data: [
+            {
+              companyId,
+              branchId,
+              buildingId: building.id,
+              clientId,
+              permanentLiftId: 'WPS-MUM-001',
+              brand: 'WEPSUN Gearless PMSM',
+              model: 'AeroGlide-V3',
+              type: 'PASSENGER',
+              capacityPersons: 10,
+              capacityKg: 680,
+              speedMps: 1.5,
+              floors: 'G + 14 Floors',
+              stops: 15,
+              machineType: 'GEARLESS_PMSM',
+              motorKw: 7.5,
+              controllerBrand: 'Monarch NICE 3000+',
+              doorOperator: 'Fermator VVVF4+',
+              currentStatus: 'OPERATIONAL',
+              locationDetails: 'Wing A - Passenger Elevator',
+            },
+            {
+              companyId,
+              branchId,
+              buildingId: building.id,
+              clientId,
+              permanentLiftId: 'WPS-MUM-002',
+              brand: 'WEPSUN Heavy Duty',
+              model: 'CargoMaster-Pro',
+              type: 'FREIGHT_GOODS',
+              capacityPersons: 15,
+              capacityKg: 1020,
+              speedMps: 1.0,
+              floors: 'G + 14 Floors',
+              stops: 15,
+              machineType: 'GEARED_TRACTION',
+              motorKw: 11.0,
+              controllerBrand: 'Step F5021',
+              doorOperator: 'Wittur Hydra',
+              currentStatus: 'OPERATIONAL',
+              locationDetails: 'Service Core - Goods/Stretcher Elevator',
+            },
+          ],
+        });
+      } catch (liftErr) {
+        console.warn('[AuthRoute] Lift auto-provisioning notice:', liftErr);
+      }
+    }
+  } catch (err) {
+    console.warn('[AuthRoute] ensureClientAccountWithEquipment notice:', err);
+  }
+
+  // Synchronize mockDb in-memory catalog for offline testing & demo fallback
+  try {
+    if (clientId) {
+      let mockClient = db.clients.find(
+        (c: any) => c.id === clientId || (c.email && c.email.toLowerCase() === user.email?.toLowerCase())
+      );
+      if (!mockClient) {
+        mockClient = {
+          id: clientId,
+          companyId,
+          name: (user.name || 'WEPSUN Client') + ' Property',
+          contactPerson: user.name || 'Resident Representative',
+          email: user.email,
+          phone: user.phone || '+91 98200 00000',
+          billingAddress: 'Palm Beach Road, Sector 19, Vashi',
+          createdAt: new Date().toISOString(),
+        } as any;
+        db.clients.push(mockClient);
+      }
+
+      let mockBld = db.buildings.find((b: any) => b.clientId === clientId);
+      if (!mockBld) {
+        mockBld = {
+          id: 'bld-' + clientId,
+          companyId,
+          branchId,
+          clientId,
+          name: `${user.name || 'Client'} Heights`,
+          address: 'Palm Beach Road, Sector 19, Vashi',
+          city: 'Navi Mumbai',
+          pinCode: '400703',
+          contactPerson: user.name || 'Society Manager',
+          contactPhone: user.phone || '+91 98200 12345',
+          totalLifts: 2,
+        } as any;
+        db.buildings.push(mockBld);
+      }
+
+      const hasMockLifts = db.lifts.some((l: any) => l.clientId === clientId);
+      if (!hasMockLifts) {
+        db.lifts.push(
+          {
+            id: 'lift-' + clientId + '-1',
+            companyId,
+            branchId,
+            buildingId: mockBld.id,
+            clientId,
+            liftNumber: 'WPS-MUM-001',
+            brand: 'WEPSUN Gearless PMSM',
+            model: 'AeroGlide-V3',
+            type: 'Passenger',
+            capacityPersons: 10,
+            capacityKg: 680,
+            currentStatus: 'operational',
+            buildingName: mockBld.name,
+            clientName: user.name,
+          } as any,
+          {
+            id: 'lift-' + clientId + '-2',
+            companyId,
+            branchId,
+            buildingId: mockBld.id,
+            clientId,
+            liftNumber: 'WPS-MUM-002',
+            brand: 'WEPSUN Heavy Duty',
+            model: 'CargoMaster-Pro',
+            type: 'Freight / Goods',
+            capacityPersons: 15,
+            capacityKg: 1020,
+            currentStatus: 'operational',
+            buildingName: mockBld.name,
+            clientName: user.name,
+          } as any
+        );
+      }
+    }
+  } catch {}
+
+  return clientId;
+}
+
 // GET /api/auth/demo-users — Public Directory of All Enterprise Demo Logins
 router.get('/demo-users', async (_req, res: Response): Promise<void> => {
   try {
@@ -987,36 +1200,8 @@ router.post('/login', authLimiter, async (req: AuthenticatedRequest, res: Respon
     }
 
     // Ensure client or technician role has valid identity linkage
-    if (user.role === 'CLIENT' && !user.clientId) {
-      try {
-        let clientRec = await prisma.client.findFirst({
-          where: {
-            companyId: user.companyId,
-            email: { equals: user.email, mode: 'insensitive' as const },
-          },
-        });
-        if (!clientRec) {
-          clientRec = await prisma.client.create({
-            data: {
-              companyId: user.companyId,
-              branchId: user.branchId || 'br-mum-1',
-              name: user.name + ' Property',
-              contactPerson: user.name,
-              email: user.email,
-              phone: user.phone || '+91 98200 00000',
-              billingAddress: 'Registered Office',
-              status: 'active',
-            },
-          });
-        }
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { clientId: clientRec.id },
-        });
-        user.clientId = clientRec.id;
-      } catch (linkErr) {
-        console.warn('[AuthRoute] Client auto-link notice on password login:', linkErr);
-      }
+    if (user.role === 'CLIENT' || String(user.role).toUpperCase() === 'CLIENT') {
+      await ensureClientAccountWithEquipment(user);
     } else if (user.role === 'TECHNICIAN' && !user.technicianId) {
       try {
         let techRec = await prisma.technician.findFirst({
@@ -1454,37 +1639,9 @@ router.get('/me', requireAuth, async (req: AuthenticatedRequest, res: Response):
       return;
     }
 
-    // Auto-link client identity if missing
-    if (user.role === 'CLIENT' && !user.clientId) {
-      try {
-        let clientRec = await prisma.client.findFirst({
-          where: {
-            companyId: user.companyId || 'comp-1',
-            email: { equals: user.email, mode: 'insensitive' as const },
-          },
-        });
-        if (!clientRec) {
-          clientRec = await prisma.client.create({
-            data: {
-              companyId: user.companyId || 'comp-1',
-              branchId: user.branchId || 'br-mum-1',
-              name: user.name + ' Property',
-              contactPerson: user.name,
-              email: user.email,
-              phone: user.phone || '+91 98200 00000',
-              billingAddress: 'Registered Office',
-              status: 'active',
-            },
-          });
-        }
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { clientId: clientRec.id },
-        });
-        user.clientId = clientRec.id;
-      } catch (err) {
-        console.warn('[AuthRoute] /me client auto-link notice:', err);
-      }
+    // Auto-link client identity and ensure persistent equipment in database
+    if (user.role === 'CLIENT' || String(user.role).toUpperCase() === 'CLIENT') {
+      await ensureClientAccountWithEquipment(user);
     }
 
     // Role-based permissions mapping
@@ -1698,16 +1855,43 @@ router.post('/verify-otp', authLimiter, async (req: AuthenticatedRequest, res: R
       return;
     }
 
-    // OTP Verified! Create account in Database
-    const assignedRole = (role || 'CLIENT').toUpperCase();
-    const newUserId = 'usr-' + (assignedRole.toLowerCase() === 'client' ? 'client-' : assignedRole.toLowerCase() === 'technician' ? 'tech-' : 'admin-') + Date.now();
-    const passwordHash = password ? await hashPassword(password) : await hashPassword('Wepsun@' + Date.now());
-
+    // OTP Verified! Check if account already exists or create new account in Database
     let user: any = null;
-    let clientId: string | undefined = undefined;
-    let technicianId: string | undefined = undefined;
-
     try {
+      user = await prisma.user.findFirst({
+        where: { email: { equals: cleanEmail, mode: 'insensitive' as const } },
+        include: { company: true, branch: true },
+      });
+    } catch {
+      user = null;
+    }
+    if (!user) {
+      user = db.users.find((u) => u.email.toLowerCase() === cleanEmail);
+    }
+
+    if (user) {
+      // Existing user verified: update password if supplied
+      if (password) {
+        const newHash = await hashPassword(password);
+        try {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { passwordHash: newHash },
+          });
+        } catch {}
+        user.passwordHash = newHash;
+      }
+      if (user.role === 'CLIENT' || String(user.role).toUpperCase() === 'CLIENT') {
+        await ensureClientAccountWithEquipment(user);
+      }
+    } else {
+      const assignedRole = (role || 'CLIENT').toUpperCase();
+      const newUserId = 'usr-' + (assignedRole.toLowerCase() === 'client' ? 'client-' : assignedRole.toLowerCase() === 'technician' ? 'tech-' : 'admin-') + Date.now();
+      const passwordHash = password ? await hashPassword(password) : await hashPassword('Wepsun@' + Date.now());
+
+      let clientId: string | undefined = undefined;
+      let technicianId: string | undefined = undefined;
+
       if (assignedRole === 'CLIENT') {
         try {
           const clientRec = await prisma.client.create({
@@ -1722,7 +1906,7 @@ router.post('/verify-otp', authLimiter, async (req: AuthenticatedRequest, res: R
           });
           clientId = clientRec.id;
         } catch {
-          clientId = undefined;
+          clientId = 'client-' + newUserId.replace('usr-', '');
         }
       } else if (assignedRole === 'TECHNICIAN') {
         try {
@@ -1739,44 +1923,50 @@ router.post('/verify-otp', authLimiter, async (req: AuthenticatedRequest, res: R
           });
           technicianId = techRec.id;
         } catch {
-          technicianId = undefined;
+          technicianId = 'tech-' + newUserId.replace('usr-', '');
         }
       }
 
-      user = await prisma.user.create({
-        data: {
+      try {
+        user = await prisma.user.create({
+          data: {
+            id: newUserId,
+            name: displayName || cleanEmail.split('@')[0],
+            email: cleanEmail,
+            phone: phone || '+91 98200 00000',
+            role: assignedRole as any,
+            companyId: companyId,
+            passwordHash,
+            isActive: true,
+            authProvider: 'email_otp',
+            clientId,
+            technicianId,
+          },
+          include: { company: true, branch: true },
+        });
+      } catch {
+        // In-memory fallback
+        user = {
           id: newUserId,
           name: displayName || cleanEmail.split('@')[0],
           email: cleanEmail,
           phone: phone || '+91 98200 00000',
-          role: assignedRole as any,
+          role: assignedRole,
           companyId: companyId,
+          branchId: null,
+          clientId,
+          technicianId,
           passwordHash,
           isActive: true,
           authProvider: 'email_otp',
-          clientId,
-          technicianId,
-        },
-        include: { company: true, branch: true },
-      });
-    } catch {
-      // In-memory fallback
-      user = {
-        id: newUserId,
-        name: displayName || cleanEmail.split('@')[0],
-        email: cleanEmail,
-        phone: phone || '+91 98200 00000',
-        role: assignedRole,
-        companyId: companyId,
-        branchId: null,
-        clientId,
-        technicianId,
-        passwordHash,
-        isActive: true,
-        authProvider: 'email_otp',
-        tokenVersion: 0,
-      };
-      db.users.push(user);
+          tokenVersion: 0,
+        };
+        db.users.push(user);
+      }
+
+      if (user.role === 'CLIENT' || String(user.role).toUpperCase() === 'CLIENT') {
+        await ensureClientAccountWithEquipment(user);
+      }
     }
 
     // Generate JWT Access Token & Refresh Session

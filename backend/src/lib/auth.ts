@@ -92,6 +92,24 @@ export function hashToken(token: string): string {
 /**
  * Create a new user session and store hashed refresh token in database
  */
+// Fallback memory store for sessions when running offline or with demo/mock user profiles
+const memorySessions = new Map<string, {
+  id: string;
+  userId: string;
+  companyId: string;
+  tokenHash: string;
+  userAgent?: string | null;
+  ipAddress?: string | null;
+  expiresAt: Date;
+  isRevoked: boolean;
+  revokedAt?: Date | null;
+  createdAt: Date;
+  lastUsedAt?: Date | null;
+}>();
+
+/**
+ * Create a new user session and store hashed refresh token in database
+ */
 export async function createSession(
   userId: string,
   companyId: string,
@@ -101,11 +119,27 @@ export async function createSession(
   const rawRefreshToken = generateRefreshTokenString();
   const tokenHash = hashToken(rawRefreshToken);
   const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRES_DAYS * 24 * 60 * 60 * 1000);
+  const sessionId = 'sess_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+  // Store in memory cache
+  memorySessions.set(tokenHash, {
+    id: sessionId,
+    userId,
+    companyId,
+    tokenHash,
+    userAgent: userAgent || null,
+    ipAddress: ipAddress || null,
+    expiresAt,
+    isRevoked: false,
+    createdAt: new Date(),
+    lastUsedAt: new Date(),
+  });
 
   try {
     await Promise.race([
       prisma.userSession.create({
         data: {
+          id: sessionId,
           userId,
           companyId,
           tokenHash,
@@ -115,17 +149,17 @@ export async function createSession(
           isRevoked: false,
         },
       }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('DB Timeout')), 400)),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('DB Timeout')), 500)),
     ]);
   } catch {
-    // If DB offline or timed out, non-blocking fallback
+    // If DB offline, foreign key mismatch (demo profile), or timed out, memorySessions retains active session
   }
 
   return { refreshToken: rawRefreshToken, expiresAt };
 }
 
 /**
- * Validate refresh token and rotate (Single-Use Rotation)
+ * Validate refresh token and rotate (Single-Use Rotation with Grace Window for Race Conditions)
  */
 export async function rotateSession(
   rawRefreshToken: string,
@@ -141,15 +175,60 @@ export async function rotateSession(
       include: { user: true },
     });
   } catch {
-    return null;
+    session = null;
+  }
+
+  if (!session) {
+    session = memorySessions.get(incomingHash) || null;
   }
 
   if (!session) {
     return null;
   }
 
-  // Detect replay attack: If a revoked token is re-submitted, revoke all sessions for that user!
+  // Grace Period Handling: If session was revoked within 30 seconds, treat as concurrent refresh / retry
   if (session.isRevoked) {
+    const revokedAtTime = session.revokedAt ? new Date(session.revokedAt).getTime() : 0;
+    const isWithinGracePeriod = Date.now() - revokedAtTime < 30000;
+
+    if (isWithinGracePeriod) {
+      let resolvedUser = session.user;
+      if (!resolvedUser) {
+        try {
+          resolvedUser = await prisma.user.findUnique({ where: { id: session.userId } });
+        } catch {
+          resolvedUser = null;
+        }
+      }
+      if (!resolvedUser) {
+        const { db } = await import('../data/mockDb.js');
+        resolvedUser = db.users.find((u) => u.id === session.userId);
+      }
+
+      if (resolvedUser && (resolvedUser.isActive ?? true)) {
+        const payload: JwtUserPayload = {
+          sub: resolvedUser.id,
+          email: resolvedUser.email,
+          role: resolvedUser.role,
+          companyId: resolvedUser.companyId,
+          branchId: resolvedUser.branchId,
+          clientId: resolvedUser.clientId,
+          technicianId: resolvedUser.technicianId,
+          tokenVersion: resolvedUser.tokenVersion || 0,
+        };
+        const accessToken = generateAccessToken(payload);
+        return {
+          user: resolvedUser,
+          tokens: {
+            accessToken,
+            refreshToken: rawRefreshToken,
+            expiresIn: 900,
+          },
+        };
+      }
+    }
+
+    // Outside grace period: True replay attack detected -> Revoke all sessions for that user
     try {
       await revokeAllUserSessions(session.userId);
     } catch {
@@ -168,22 +247,46 @@ export async function rotateSession(
     } catch {
       // Non-blocking
     }
+    if (memorySessions.has(incomingHash)) {
+      const s = memorySessions.get(incomingHash)!;
+      s.isRevoked = true;
+      s.revokedAt = new Date();
+    }
     return null;
   }
 
-  const user = session.user;
-  if (!user || !user.isActive) {
+  let user = session.user;
+  if (!user) {
+    try {
+      user = await prisma.user.findUnique({ where: { id: session.userId } });
+    } catch {
+      user = null;
+    }
+  }
+  if (!user) {
+    const { db } = await import('../data/mockDb.js');
+    user = db.users.find((u) => u.id === session.userId);
+  }
+
+  if (!user || user.isActive === false) {
     return null;
   }
 
-  // 1. Revoke the old session
+  // 1. Revoke the old session with timestamp for grace window tracking
+  const revokeTimestamp = new Date();
   try {
     await prisma.userSession.update({
       where: { id: session.id },
-      data: { isRevoked: true, revokedAt: new Date(), lastUsedAt: new Date() },
+      data: { isRevoked: true, revokedAt: revokeTimestamp, lastUsedAt: revokeTimestamp },
     });
   } catch {
     // Non-blocking
+  }
+  if (memorySessions.has(incomingHash)) {
+    const s = memorySessions.get(incomingHash)!;
+    s.isRevoked = true;
+    s.revokedAt = revokeTimestamp;
+    s.lastUsedAt = revokeTimestamp;
   }
 
   // 2. Issue rotated new refresh token & session
@@ -198,7 +301,7 @@ export async function rotateSession(
     branchId: user.branchId,
     clientId: user.clientId,
     technicianId: user.technicianId,
-    tokenVersion: user.tokenVersion,
+    tokenVersion: user.tokenVersion || 0,
   };
   const accessToken = generateAccessToken(payload);
 
@@ -217,30 +320,52 @@ export async function rotateSession(
  */
 export async function revokeSessionByToken(rawRefreshToken: string): Promise<boolean> {
   const tokenHash = hashToken(rawRefreshToken);
+  let revoked = false;
+
+  if (memorySessions.has(tokenHash)) {
+    const s = memorySessions.get(tokenHash)!;
+    s.isRevoked = true;
+    s.revokedAt = new Date();
+    revoked = true;
+  }
+
   try {
     const result = await prisma.userSession.updateMany({
       where: { tokenHash, isRevoked: false },
       data: { isRevoked: true, revokedAt: new Date() },
     });
-    return result.count > 0;
+    if (result.count > 0) revoked = true;
   } catch {
-    return false;
+    // Non-blocking
   }
+
+  return revoked;
 }
 
 /**
  * Revoke all active sessions for a user (Logout all devices / Password change)
  */
 export async function revokeAllUserSessions(userId: string): Promise<number> {
+  let count = 0;
+  for (const [, s] of memorySessions.entries()) {
+    if (s.userId === userId && !s.isRevoked) {
+      s.isRevoked = true;
+      s.revokedAt = new Date();
+      count++;
+    }
+  }
+
   try {
     const result = await prisma.userSession.updateMany({
       where: { userId, isRevoked: false },
       data: { isRevoked: true, revokedAt: new Date() },
     });
-    return result.count;
+    count += result.count;
   } catch {
-    return 0;
+    // Non-blocking
   }
+
+  return count;
 }
 
 /**

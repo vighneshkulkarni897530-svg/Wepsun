@@ -320,8 +320,18 @@ export function clearMasterAdminFlag(): void {
   sessionStorage.removeItem(MASTER_EXPIRY_KEY);
 }
 
+// Single-flight promise mutex to prevent concurrent refresh race conditions
+let activeRefreshPromise: Promise<{
+  success: boolean;
+  accessToken?: string;
+  refreshToken?: string;
+  error?: string;
+}> | null = null;
+
 /**
  * Transparently refresh tokens using the backend /auth/refresh endpoint
+ * Protected by single-flight mutex to eliminate race conditions between
+ * multiple simultaneous API calls or background lifecycle triggers.
  */
 export async function refreshActiveSession(): Promise<{
   success: boolean;
@@ -329,49 +339,61 @@ export async function refreshActiveSession(): Promise<{
   refreshToken?: string;
   error?: string;
 }> {
-  const refreshToken = getStoredRefreshToken();
-  if (!refreshToken) {
-    return { success: false, error: 'No refresh token available' };
+  if (activeRefreshPromise) {
+    return activeRefreshPromise;
   }
 
-  try {
-    const baseUrl = getApiBaseUrl();
-    const res = await fetch(`${baseUrl}/auth/refresh`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-client-version': '2.0.0',
-      },
-      body: JSON.stringify({ refreshToken }),
-    });
-
-    if (res.status === 401 || res.status === 403) {
-      // Refresh token is revoked, expired, or invalid
-      clearStoredTokens();
-      clearMasterAdminFlag();
-      return { success: false, error: 'Session has expired or was revoked' };
+  activeRefreshPromise = (async () => {
+    const refreshToken = getStoredRefreshToken();
+    if (!refreshToken) {
+      return { success: false, error: 'No refresh token available' };
     }
 
-    if (!res.ok) {
-      return { success: false, error: `HTTP ${res.status}: Failed to refresh session` };
-    }
+    try {
+      const baseUrl = getApiBaseUrl();
+      const res = await fetch(`${baseUrl}/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-client-version': '2.0.0',
+        },
+        body: JSON.stringify({ refreshToken }),
+      });
 
-    const json = await res.json();
-    if (json.success && json.data?.accessToken) {
-      const newAccess = json.data.accessToken;
-      const newRefresh = json.data.refreshToken || refreshToken;
-      persistTokens(newAccess, newRefresh);
-      return {
-        success: true,
-        accessToken: newAccess,
-        refreshToken: newRefresh,
-      };
-    }
+      if (res.status === 401 || res.status === 403) {
+        // Refresh token is genuinely revoked, expired, or invalid
+        clearStoredTokens();
+        clearMasterAdminFlag();
+        return { success: false, error: 'Session has expired or was revoked' };
+      }
 
-    return { success: false, error: json.message || 'Token refresh failed' };
-  } catch (err: any) {
-    return { success: false, error: err.message || 'Network error during token refresh' };
-  }
+      if (!res.ok) {
+        // Server temporary error (5xx or other). DO NOT wipe tokens on server temporary outage!
+        return { success: false, error: `HTTP ${res.status}: Failed to refresh session` };
+      }
+
+      const json = await res.json();
+      if (json.success && json.data?.accessToken) {
+        const newAccess = json.data.accessToken;
+        const newRefresh = json.data.refreshToken || refreshToken;
+        persistTokens(newAccess, newRefresh);
+        return {
+          success: true,
+          accessToken: newAccess,
+          refreshToken: newRefresh,
+        };
+      }
+
+      return { success: false, error: json.message || 'Token refresh failed' };
+    } catch (err: any) {
+      // Network failure / offline. DO NOT clear tokens!
+      return { success: false, error: err.message || 'Network error during token refresh' };
+    } finally {
+      activeRefreshPromise = null;
+    }
+  })();
+
+  return activeRefreshPromise;
 }
 
 /**
@@ -447,8 +469,11 @@ export async function restoreAuthenticatedSession(): Promise<RestoredSessionResu
       const refreshResult = await refreshActiveSession();
       if (refreshResult.success && refreshResult.accessToken) {
         accessToken = refreshResult.accessToken;
-      } else {
-        // Refresh token failed or revoked
+      } else if (
+        refreshResult.error &&
+        (refreshResult.error.includes('expired') || refreshResult.error.includes('revoked'))
+      ) {
+        // Refresh token genuinely revoked or expired on backend
         clearStoredTokens();
         clearMasterAdminFlag();
         return {
@@ -457,8 +482,21 @@ export async function restoreAuthenticatedSession(): Promise<RestoredSessionResu
           role: 'client',
           accessToken: null,
           isMasterAdmin: false,
-          message: refreshResult.error || 'Authentication session expired. Please sign in again.',
+          message: refreshResult.error,
         };
+      } else {
+        // Transient network error on resume / cold boot: DO NOT LOG USER OUT!
+        const cached = getCachedUserSession();
+        if (cached && cached.user) {
+          return {
+            status: 'offline',
+            user: cached.user,
+            role: cached.role,
+            accessToken: accessToken || 'cached-token',
+            isMasterAdmin: cached.isMasterAdmin && isMasterAdminSessionValid(),
+            message: 'Operating in resilient offline cached session mode.',
+          };
+        }
       }
     } else {
       // Access token expired and no refresh token
@@ -500,8 +538,8 @@ export async function restoreAuthenticatedSession(): Promise<RestoredSessionResu
         role: userRole,
         companyId: serverUser.companyId || 'comp-1',
         branchId: serverUser.branchId || undefined,
-        clientId: serverUser.clientId || (userRole === 'client' ? 'client-' + Date.now() : undefined),
-        technicianId: serverUser.technicianId || (userRole === 'technician' ? 'tech-' + Date.now() : undefined),
+        clientId: serverUser.clientId || (userRole === 'client' ? `client-${serverUser.id.replace(/^usr-/, '')}` : undefined),
+        technicianId: serverUser.technicianId || (userRole === 'technician' ? `tech-${serverUser.id.replace(/^usr-/, '')}` : undefined),
         avatar: serverUser.avatarUrl || serverUser.avatar || '',
         isActive: serverUser.isActive ?? true,
       };
@@ -626,9 +664,8 @@ export async function restoreAuthenticatedSession(): Promise<RestoredSessionResu
         phone: cached?.user?.phone || '',
         role: fallbackRole,
         companyId: claims.companyId || 'comp-1',
-        branchId: claims.branchId || undefined,
-        clientId: claims.clientId || (fallbackRole === 'client' ? 'client-' + Date.now() : undefined),
-        technicianId: claims.technicianId || (fallbackRole === 'technician' ? 'tech-' + Date.now() : undefined),
+        clientId: claims.clientId || (fallbackRole === 'client' ? `client-${claims.sub.replace(/^usr-/, '')}` : undefined),
+        technicianId: claims.technicianId || (fallbackRole === 'technician' ? `tech-${claims.sub.replace(/^usr-/, '')}` : undefined),
         isActive: true,
       };
 

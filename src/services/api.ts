@@ -88,6 +88,19 @@ export function setTokens(accessToken: string, refreshToken?: string): void {
   }
   localStorage.removeItem('wepsun_explicit_logout');
   sessionStorage.removeItem('wepsun_explicit_logout');
+
+  // Mirror tokens to Android Keystore / iOS Keychain via native Preferences
+  try {
+    if (Capacitor.isNativePlatform()) {
+      import('@capacitor/preferences').then(({ Preferences }) => {
+        Preferences.set({ key: TOKEN_KEY, value: accessToken }).catch(() => {});
+        if (refreshToken) {
+          Preferences.set({ key: REFRESH_TOKEN_KEY, value: refreshToken }).catch(() => {});
+        }
+        Preferences.remove({ key: 'wepsun_explicit_logout' }).catch(() => {});
+      }).catch(() => {});
+    }
+  } catch {}
 }
 
 export function clearTokens(): void {
@@ -96,6 +109,15 @@ export function clearTokens(): void {
   localStorage.removeItem(REFRESH_TOKEN_KEY);
   sessionStorage.removeItem(TOKEN_KEY);
   sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+
+  try {
+    if (Capacitor.isNativePlatform()) {
+      import('@capacitor/preferences').then(({ Preferences }) => {
+        Preferences.remove({ key: TOKEN_KEY }).catch(() => {});
+        Preferences.remove({ key: REFRESH_TOKEN_KEY }).catch(() => {});
+      }).catch(() => {});
+    }
+  } catch {}
 }
 
 export interface ApiRequestOptions extends RequestInit {
@@ -178,8 +200,13 @@ export async function tryRefreshToken(): Promise<string | null> {
       body: JSON.stringify({ refreshToken }),
     });
 
-    if (!res.ok) {
+    if (res.status === 401 || res.status === 403) {
       clearTokens();
+      return null;
+    }
+
+    if (!res.ok) {
+      // Temporary network/server status: do not clear tokens
       return null;
     }
 
@@ -189,7 +216,7 @@ export async function tryRefreshToken(): Promise<string | null> {
       return data.data.accessToken;
     }
   } catch {
-    // Network or server error
+    // Network or server error - do not wipe tokens
   }
   return null;
 }
