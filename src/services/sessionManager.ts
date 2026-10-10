@@ -175,7 +175,12 @@ export function clearCachedUserSession(): void {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(USER_SESSION_KEY);
   sessionStorage.removeItem(USER_SESSION_KEY);
+  localStorage.removeItem(STORAGE_PREFIX + 'currentUser');
+  localStorage.removeItem(STORAGE_PREFIX + 'role');
+  localStorage.removeItem(STORAGE_PREFIX + 'userId');
+  localStorage.removeItem(ROLE_KEY);
   nativePrefRemove(USER_SESSION_KEY);
+  nativePrefRemove(ROLE_KEY);
 }
 
 /**
@@ -248,8 +253,22 @@ export function cacheUserSession(user: User, role: UserRole = user.role || 'clie
 export function getCachedUserSession(): { user: User | null; role: UserRole; isMasterAdmin: boolean } | null {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = localStorage.getItem(USER_SESSION_KEY);
-    if (!raw) return null;
+    let raw = localStorage.getItem(USER_SESSION_KEY) || sessionStorage.getItem(USER_SESSION_KEY);
+    if (!raw) {
+      const uRaw = localStorage.getItem(STORAGE_PREFIX + 'currentUser');
+      if (uRaw) {
+        const u = JSON.parse(uRaw);
+        if (u && u.id) {
+          const r = (localStorage.getItem(STORAGE_PREFIX + 'role') || u.role || 'client') as UserRole;
+          return {
+            user: u,
+            role: r,
+            isMasterAdmin: r === 'master_admin' && isMasterAdminSessionValid(),
+          };
+        }
+      }
+      return null;
+    }
     const parsed = JSON.parse(raw);
     if (parsed && parsed.user) {
       return {
@@ -434,7 +453,9 @@ export async function restoreAuthenticatedSession(): Promise<RestoredSessionResu
   if (!accessToken && !refreshToken) {
     const nativeAccess = await nativePrefGet(TOKEN_KEY);
     const nativeRefresh = await nativePrefGet(REFRESH_TOKEN_KEY);
-    if (nativeAccess || nativeRefresh) {
+    const nativeSession = await nativePrefGet(USER_SESSION_KEY);
+    const nativeRole = await nativePrefGet(ROLE_KEY);
+    if (nativeAccess || nativeRefresh || nativeSession) {
       if (nativeAccess) {
         accessToken = nativeAccess;
         if (typeof window !== 'undefined') {
@@ -448,6 +469,12 @@ export async function restoreAuthenticatedSession(): Promise<RestoredSessionResu
           localStorage.setItem(REFRESH_TOKEN_KEY, nativeRefresh);
           sessionStorage.setItem(REFRESH_TOKEN_KEY, nativeRefresh);
         }
+      }
+      if (nativeSession && typeof window !== 'undefined') {
+        localStorage.setItem(USER_SESSION_KEY, nativeSession);
+      }
+      if (nativeRole && typeof window !== 'undefined') {
+        localStorage.setItem(ROLE_KEY, nativeRole);
       }
     }
   }
@@ -496,6 +523,43 @@ export async function restoreAuthenticatedSession(): Promise<RestoredSessionResu
             isMasterAdmin: cached.isMasterAdmin && isMasterAdminSessionValid(),
             message: 'Operating in resilient offline cached session mode.',
           };
+        }
+
+        // If cached is empty, decode claims from refreshToken or accessToken
+        const tokenToDecode = accessToken || refreshToken;
+        if (tokenToDecode) {
+          const claims = decodeJwtPayload(tokenToDecode);
+          if (claims && claims.sub) {
+            const fallbackRole: UserRole =
+              claims.role?.toLowerCase() === 'technician'
+                ? 'technician'
+                : claims.role?.toLowerCase() === 'master_admin' && isMasterAdminSessionValid()
+                ? 'master_admin'
+                : 'client';
+
+            const offlineUser: User = {
+              id: claims.sub,
+              name: claims.name || 'WEPSUN User',
+              email: claims.email || '',
+              phone: claims.phone || '',
+              role: fallbackRole,
+              companyId: claims.companyId || 'comp-1',
+              clientId: claims.clientId || (fallbackRole === 'client' ? `client-${claims.sub.replace(/^usr-/, '')}` : undefined),
+              technicianId: claims.technicianId || (fallbackRole === 'technician' ? `tech-${claims.sub.replace(/^usr-/, '')}` : undefined),
+              isActive: true,
+            };
+
+            cacheUserSession(offlineUser, fallbackRole, fallbackRole === 'master_admin');
+
+            return {
+              status: 'offline',
+              user: offlineUser,
+              role: fallbackRole,
+              accessToken: accessToken || refreshToken,
+              isMasterAdmin: fallbackRole === 'master_admin',
+              message: 'Operating in resilient offline cached session mode.',
+            };
+          }
         }
       }
     } else {
@@ -633,22 +697,23 @@ export async function restoreAuthenticatedSession(): Promise<RestoredSessionResu
     console.warn('[SessionManager] /auth/me call unreachable:', err);
   }
 
-  // 3. Resilient Offline Mode: If backend is temporarily unreachable but access token is valid
+  // 3. Resilient Offline Mode: If backend is temporarily unreachable
   const cached = getCachedUserSession();
-  if (cached && cached.user && accessToken && !isTokenExpired(accessToken, 0)) {
+  if (cached && cached.user) {
     return {
       status: 'offline',
       user: cached.user,
       role: cached.role,
-      accessToken,
+      accessToken: accessToken || refreshToken || 'cached-token',
       isMasterAdmin: cached.isMasterAdmin && isMasterAdminSessionValid(),
       message: 'Running in offline cached session mode.',
     };
   }
 
   // If token is decodeable and we can extract user claims safely
-  if (accessToken && !isTokenExpired(accessToken, 0)) {
-    const claims = decodeJwtPayload(accessToken);
+  const tokenToDecode = accessToken || refreshToken;
+  if (tokenToDecode) {
+    const claims = decodeJwtPayload(tokenToDecode);
     if (claims && claims.sub) {
       const fallbackRole: UserRole =
         claims.role?.toLowerCase() === 'technician'
@@ -659,9 +724,9 @@ export async function restoreAuthenticatedSession(): Promise<RestoredSessionResu
 
       const offlineUser: User = {
         id: claims.sub,
-        name: claims.name || (cached?.user?.name) || 'WEPSUN User',
-        email: claims.email || (cached?.user?.email) || '',
-        phone: cached?.user?.phone || '',
+        name: claims.name || 'WEPSUN User',
+        email: claims.email || '',
+        phone: claims.phone || '',
         role: fallbackRole,
         companyId: claims.companyId || 'comp-1',
         clientId: claims.clientId || (fallbackRole === 'client' ? `client-${claims.sub.replace(/^usr-/, '')}` : undefined),
@@ -669,18 +734,42 @@ export async function restoreAuthenticatedSession(): Promise<RestoredSessionResu
         isActive: true,
       };
 
+      cacheUserSession(offlineUser, fallbackRole, fallbackRole === 'master_admin');
+
       return {
         status: 'offline',
         user: offlineUser,
         role: fallbackRole,
-        accessToken,
+        accessToken: accessToken || refreshToken,
         isMasterAdmin: fallbackRole === 'master_admin',
         message: 'Operating in offline mode with cached authorization.',
       };
     }
   }
 
-  // Fallback to expired
+  // If a refresh token is still present, keep session alive in offline state
+  if (refreshToken && !isTokenExpired(refreshToken, 0)) {
+    const fallbackUser: User = {
+      id: 'usr-offline',
+      name: 'WEPSUN User',
+      email: '',
+      phone: '',
+      role: 'client',
+      companyId: 'comp-1',
+      clientId: 'client-offline',
+      isActive: true,
+    };
+    return {
+      status: 'offline',
+      user: fallbackUser,
+      role: 'client',
+      accessToken: refreshToken,
+      isMasterAdmin: false,
+      message: 'Maintaining offline session while reconnecting to WEPSUN servers.',
+    };
+  }
+
+  // Fallback to expired strictly when session has no valid refresh token or cached identity
   clearStoredTokens();
   clearMasterAdminFlag();
   return {

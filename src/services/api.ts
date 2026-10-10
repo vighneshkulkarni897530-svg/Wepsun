@@ -10,7 +10,7 @@ const STORAGE_API_URL_KEY = 'wepsun_custom_api_url';
 const TOKEN_KEY = 'wepsun_access_token';
 const REFRESH_TOKEN_KEY = 'wepsun_refresh_token';
 
-const DEFAULT_CLOUD_API_URL = 'https://wepsun.onrender.com/api';
+const DEFAULT_CLOUD_API_URL = 'http://192.168.1.111:5000/api';
 
 // Guarantee window.Capacitor global availability
 if (typeof window !== 'undefined' && !(window as any).Capacitor) {

@@ -204,7 +204,10 @@ export const AppContent: React.FC = () => {
 
     const token = localStorage.getItem('wepsun_access_token') || sessionStorage.getItem('wepsun_access_token');
     const refresh = localStorage.getItem('wepsun_refresh_token') || sessionStorage.getItem('wepsun_refresh_token');
-    const cachedSession = localStorage.getItem('wepsun_user_session');
+    const cachedSession =
+      localStorage.getItem('wepsun_user_session') ||
+      sessionStorage.getItem('wepsun_user_session') ||
+      localStorage.getItem('wepsun_lift_saas_v2_currentUser');
 
     // If no tokens or session exist at all, unauthenticated -> show login
     if (!token && !refresh && !cachedSession) {
@@ -353,7 +356,8 @@ export const AppContent: React.FC = () => {
         const hasStoredTokens = !!(
           localStorage.getItem('wepsun_access_token') ||
           localStorage.getItem('wepsun_refresh_token') ||
-          localStorage.getItem('wepsun_user_session')
+          localStorage.getItem('wepsun_user_session') ||
+          localStorage.getItem('wepsun_lift_saas_v2_currentUser')
         );
         const isExplicit = localStorage.getItem('wepsun_explicit_logout') === 'true';
 
@@ -692,7 +696,7 @@ export const AppContent: React.FC = () => {
     );
   }
 
-  if (isFullLoginPage) {
+  if (isFullLoginPage && !isAuthenticated) {
     const hash = currentHash;
 
     const defaultRole: 'technician' | 'client' = hash.includes('technician')

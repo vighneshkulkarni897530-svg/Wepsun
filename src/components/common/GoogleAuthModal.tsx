@@ -197,20 +197,40 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
         if (existingUser) {
           userRecord = existingUser;
         } else {
-          const newUid = 'usr-google-' + Date.now();
+          const deterministicSuffix = emailClean.replace(/[^a-z0-9]/g, '_');
+          const newUid = 'usr-google-' + deterministicSuffix;
           userRecord = {
             id: newUid,
             name: displayName,
             email: emailClean,
             role: finalRole,
             companyId: 'comp-1',
-            clientId: finalRole === 'client' ? 'client-' + Date.now() : undefined,
-            technicianId: finalRole === 'technician' ? 'tech-' + Date.now() : undefined,
+            clientId: finalRole === 'client' ? `client-${deterministicSuffix}` : undefined,
+            technicianId: finalRole === 'technician' ? `tech-${deterministicSuffix}` : undefined,
             avatar: defaultAvatar,
             companyName: `${displayName}'s Enterprise`,
             isActive: true,
             createdAt: new Date().toISOString(),
           };
+        }
+
+        // Generate and persist offline tokens so app resume preserves session
+        try {
+          const payload = {
+            sub: userRecord.id,
+            email: userRecord.email,
+            role: String(userRecord.role || finalRole).toUpperCase(),
+            companyId: userRecord.companyId || 'comp-1',
+            clientId: userRecord.clientId,
+            technicianId: userRecord.technicianId,
+            exp: Math.floor(Date.now() / 1000) + (7 * 24 * 3600),
+          };
+          const base64Payload = btoa(unescape(encodeURIComponent(JSON.stringify(payload)))).replace(/=/g, '');
+          const localAccess = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${base64Payload}.wepsun_local_sig`;
+          const localRefresh = `refresh_offline_${userRecord.id}`;
+          setTokens(localAccess, localRefresh);
+        } catch {
+          // Non-blocking
         }
       }
 

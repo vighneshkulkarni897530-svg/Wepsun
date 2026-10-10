@@ -624,9 +624,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (isExplicitLogout) return false;
     const token = getAccessToken();
     const refresh = getRefreshToken();
-    if (!token && !refresh) return false;
+    const cached = getCachedUserSession();
+    if (!token && !refresh && (!cached || !cached.user)) return false;
     if (token && !isTokenExpired(token, 0)) return true;
     if (refresh) return true;
+    if (cached && cached.user) return true;
     return false;
   });
 

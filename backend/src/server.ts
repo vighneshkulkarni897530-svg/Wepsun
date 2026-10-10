@@ -232,7 +232,7 @@ const HOST = '0.0.0.0';
 const server = app.listen(PORT, HOST, () => {
   console.log(`⚡ WEPSUN Backend API Server listening on port ${PORT} (host: ${HOST})`);
   console.log(`📡 Local Health Check: http://localhost:${PORT}/api/health`);
-  console.log(`📱 Wi-Fi LAN Health Check: http://192.168.1.9:${PORT}/api/health`);
+  console.log(`📱 Wi-Fi LAN Health Check: http://192.168.1.111:${PORT}/api/health`);
   console.log(`🌐 API Base URL: http://localhost:${PORT}/api`);
 });
 

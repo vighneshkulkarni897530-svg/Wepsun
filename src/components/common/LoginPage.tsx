@@ -742,6 +742,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       });
 
       if (res.success && res.user) {
+        if (res.tokens?.accessToken) {
+          setTokens(res.tokens.accessToken, res.tokens.refreshToken);
+        }
         const userRole: UserRole = 'client';
         const finalUser: UserRecord = {
           id: res.user.id,
@@ -751,7 +754,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           role: userRole,
           companyId: res.user.companyId || 'comp-1',
           branchId: res.user.branchId,
-          clientId: res.user.clientId || 'client-' + Date.now(),
+          clientId: res.user.clientId || `client-${res.user.id.replace(/^usr-/, '')}`,
           avatar: res.user.avatar || '',
           isActive: true,
         };
