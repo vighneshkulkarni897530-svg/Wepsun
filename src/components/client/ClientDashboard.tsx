@@ -47,7 +47,6 @@ import elevatorLobbyImg from '../../assets/elevator-lobby.jpg';
 import { ClientFeedbackModal } from './ClientFeedbackModal';
 import { QuotationApprovalView } from './QuotationApprovalView';
 import { BusinessEnquiryModal } from './BusinessEnquiryModal';
-import { LiftPassportModal } from '../common/LiftPassportModal';
 import { ServiceReportModal } from '../common/ServiceReportModal';
 
 export type ClientDashboardTab =
@@ -131,7 +130,6 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
   const [isRenewalModalOpen, setIsRenewalModalOpen] = useState(false);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
   const [isEnquiryModalOpen, setIsEnquiryModalOpen] = useState(false);
-  const [selectedLiftForPassport, setSelectedLiftForPassport] = useState<Lift | null>(null);
   const [selectedReport, setSelectedReport] = useState<ServiceReport | null>(null);
   const [accessDeniedMessage, setAccessDeniedMessage] = useState<string | null>(null);
 
@@ -178,16 +176,6 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
   const clientQuotations = clientScopedQuotations;
   const clientReports = clientScopedReports;
   const clientNotifications = clientScopedNotifications;
-
-  const handleOpenLiftPassport = (lift: Lift) => {
-    if (!verifyClientAccess(lift.clientId)) {
-      showToast('error', 'Access Denied', 'You are not authorized to view this information.');
-      setAccessDeniedMessage(`Access Denied – You are not authorized to view information for lift ${lift.liftNumber}.`);
-      setTimeout(() => setAccessDeniedMessage(null), 4000);
-      return;
-    }
-    setSelectedLiftForPassport(lift);
-  };
 
   const handleOpenServiceReport = (report: any) => {
     if (!verifyClientAccess(report.clientId)) {
@@ -399,7 +387,6 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
             <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 shadow-sm">
               <ClientLiftsView
                 lifts={clientLifts}
-                onOpenPassport={(lift) => handleOpenLiftPassport(lift)}
                 onRaiseComplaint={(liftId) => setIsRaiseModalOpen(true)}
               />
             </div>
@@ -412,11 +399,6 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
                 complaints={clientComplaints}
                 onOpenRaiseModal={() => setIsRaiseModalOpen(true)}
                 onOpenEmergencyModal={() => setIsEmergencyModalOpen(true)}
-                onOpenPassportModal={(liftId) => {
-                  const target = clientLifts.find((l) => l.id === liftId);
-                  if (target) handleOpenLiftPassport(target);
-                  else showToast('error', 'Access Denied', 'You are not authorized to view this information.');
-                }}
               />
             </div>
           )}
@@ -938,12 +920,7 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
         }}
       />
 
-      <LiftPassportModal
-        lift={selectedLiftForPassport}
-        isOpen={!!selectedLiftForPassport}
-        onClose={() => setSelectedLiftForPassport(null)}
-        onRaiseTicket={() => setIsRaiseModalOpen(true)}
-      />
+
 
       <ClientAmcRenewalModal
         isOpen={isRenewalModalOpen}

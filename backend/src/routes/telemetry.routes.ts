@@ -99,6 +99,19 @@ router.get('/live/:liftId', requireAuth, async (req: AuthenticatedRequest, res: 
       lift = db.lifts.find((l) => l.id === liftId);
     }
 
+    if (!lift) {
+      res.status(404).json({ success: false, message: 'Lift not found', code: 'NOT_FOUND' });
+      return;
+    }
+
+    if (req.user!.role?.toUpperCase() === 'CLIENT') {
+      const clientId = req.user!.clientId;
+      if (!clientId || lift.clientId !== clientId) {
+        res.status(403).json({ success: false, message: 'Access Denied – You do not have permission to view telemetry for this lift.', code: 'FORBIDDEN_OBJECT' });
+        return;
+      }
+    }
+
     const state = getOrCreateTelemetryState(liftId);
 
     // Apply subtle realistic micro-fluctuations
@@ -139,6 +152,14 @@ router.post('/dispatch-call', requireAuth, async (req: AuthenticatedRequest, res
     if (targetFloor === undefined || targetFloor === null) {
       res.status(400).json({ success: false, message: 'Target floor is required.' });
       return;
+    }
+
+    if (req.user!.role?.toUpperCase() === 'CLIENT') {
+      const targetLift = await prisma.lift.findUnique({ where: { id: liftId } });
+      if (!targetLift || !req.user!.clientId || targetLift.clientId !== req.user!.clientId) {
+        res.status(403).json({ success: false, message: 'Access Denied – You can only dispatch calls for your own lifts.', code: 'FORBIDDEN_OBJECT' });
+        return;
+      }
     }
 
     const state = getOrCreateTelemetryState(liftId);

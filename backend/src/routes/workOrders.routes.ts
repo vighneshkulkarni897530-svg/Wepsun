@@ -12,6 +12,16 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
     const isSuper = user.role === 'SUPER_ADMIN';
     const companyId = isSuper ? (req.query.companyId as string) || user.companyId || 'comp-1' : user.companyId || 'comp-1';
     const isTechnician = user.role === 'TECHNICIAN';
+    const isClient = user.role === 'CLIENT';
+
+    if (isClient && !user.clientId) {
+      res.json({ success: true, count: 0, data: [] });
+      return;
+    }
+    if (isTechnician && !user.technicianId) {
+      res.json({ success: true, count: 0, data: [] });
+      return;
+    }
 
     let list: any[] = [];
 
@@ -20,7 +30,8 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
         where: {
           companyId,
           ...(user.branchId ? { branchId: user.branchId } : {}),
-          ...(isTechnician && user.technicianId ? { technicianId: user.technicianId } : {}),
+          ...(isTechnician ? { technicianId: user.technicianId! } : {}),
+          ...(isClient ? { OR: [{ clientId: user.clientId! }, { lift: { clientId: user.clientId! } }] } : {}),
         },
         include: {
           lift: { include: { building: true, client: true } },
@@ -35,8 +46,11 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
       if (user.branchId) {
         list = list.filter((w) => w.branchId === user.branchId);
       }
-      if (isTechnician && user.technicianId) {
+      if (isTechnician) {
         list = list.filter((w) => w.technicianId === user.technicianId);
+      }
+      if (isClient) {
+        list = list.filter((w) => w.clientId === user.clientId);
       }
     }
 
@@ -76,9 +90,18 @@ router.get('/:id', requireAuth, async (req: AuthRequest, res: Response): Promise
     }
 
     // Role-specific check
-    if (user.role === 'TECHNICIAN' && user.technicianId && wo.technicianId !== user.technicianId) {
-      res.status(403).json({ success: false, message: 'Access denied: you are not assigned to this work order', code: 'FORBIDDEN' });
-      return;
+    if (user.role === 'TECHNICIAN') {
+      if (!user.technicianId || wo.technicianId !== user.technicianId) {
+        res.status(403).json({ success: false, message: 'Access denied: you are not assigned to this work order', code: 'FORBIDDEN' });
+        return;
+      }
+    }
+    if (user.role === 'CLIENT') {
+      const matchesClient = (wo.clientId && wo.clientId === user.clientId) || (wo.lift?.clientId && wo.lift.clientId === user.clientId);
+      if (!user.clientId || !matchesClient) {
+        res.status(403).json({ success: false, message: 'Access Denied – You are not authorized to view this work order.', code: 'FORBIDDEN' });
+        return;
+      }
     }
 
     res.json({ success: true, data: wo });
@@ -98,6 +121,14 @@ router.post('/', requireAuth, requireRole(['SUPER_ADMIN', 'COMPANY_ADMIN', 'SERV
 
     const workOrderNumber = `WO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
+    let targetClientId: string | null = null;
+    if (liftId) {
+      try {
+        const lift = await prisma.lift.findUnique({ where: { id: liftId } });
+        if (lift) targetClientId = lift.clientId;
+      } catch {}
+    }
+
     let newWO: any = null;
 
     try {
@@ -105,6 +136,8 @@ router.post('/', requireAuth, requireRole(['SUPER_ADMIN', 'COMPANY_ADMIN', 'SERV
         data: {
           companyId,
           branchId,
+          clientId: targetClientId,
+          createdById: user.id || user.sub,
           workOrderNumber,
           liftId: liftId || (await prisma.lift.findFirst({ where: { companyId } }))?.id || '',
           technicianId: technicianId || null,
@@ -124,6 +157,7 @@ router.post('/', requireAuth, requireRole(['SUPER_ADMIN', 'COMPANY_ADMIN', 'SERV
         id: `wo-${Date.now()}`,
         companyId,
         branchId,
+        clientId: targetClientId,
         workOrderNumber,
         status: 'scheduled',
         createdAt: new Date().toISOString(),
@@ -146,6 +180,14 @@ router.patch('/:id', requireAuth, requireRole(['SUPER_ADMIN', 'COMPANY_ADMIN', '
     const isSuper = user.role === 'SUPER_ADMIN';
     const companyId = isSuper ? (req.query.companyId as string) || user.companyId || 'comp-1' : user.companyId || 'comp-1';
     const { status, technicianId, remarks } = req.body;
+
+    if (user.role === 'TECHNICIAN') {
+      const existing = await prisma.workOrder.findFirst({ where: { id, companyId } });
+      if (!existing || !user.technicianId || existing.technicianId !== user.technicianId) {
+        res.status(403).json({ success: false, message: 'Access denied: you are not assigned to this work order', code: 'FORBIDDEN' });
+        return;
+      }
+    }
 
     let updated = null;
 

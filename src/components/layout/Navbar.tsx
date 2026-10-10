@@ -1,14 +1,10 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
-  QrCode,
   AlertTriangle,
   GitBranch,
   User,
 } from 'lucide-react';
-import { Lift } from '../../types';
-import { QrScannerModal } from '../common/QrScannerModal';
-import { LiftPassportModal } from '../common/LiftPassportModal';
 
 interface NavbarProps {
   onOpenRaiseComplaint?: () => void;
@@ -24,8 +20,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenRaiseComplaint }) => {
     tenantLifts,
   } = useApp();
 
-  const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
-  const [selectedLiftForPassport, setSelectedLiftForPassport] = useState<Lift | null>(null);
+
 
   const criticalCount = tenantComplaints.filter(
     (c) => (c.isEmergency || c.priority === 'critical') && c.status !== 'closed'
@@ -62,13 +57,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenRaiseComplaint }) => {
 
           {/* Center Actions / QR & Emergency */}
           <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              onClick={() => setIsQrScannerOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors"
-            >
-              <QrCode className="w-3.5 h-3.5 text-[#1976D2]" />
-              <span className="hidden sm:inline">Scan Lift QR</span>
-            </button>
+
 
             {onOpenRaiseComplaint && (
               <button
@@ -122,20 +111,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenRaiseComplaint }) => {
         </div>
       </header>
 
-      {/* QR Scanner Modal */}
-      <QrScannerModal
-        isOpen={isQrScannerOpen}
-        onClose={() => setIsQrScannerOpen(false)}
-        onScanLift={(lift) => setSelectedLiftForPassport(lift)}
-      />
-
-      {/* Lift Passport Modal */}
-      <LiftPassportModal
-        lift={selectedLiftForPassport}
-        isOpen={!!selectedLiftForPassport}
-        onClose={() => setSelectedLiftForPassport(null)}
-        onRaiseTicket={onOpenRaiseComplaint}
-      />
     </>
   );
 };

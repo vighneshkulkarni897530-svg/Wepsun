@@ -110,7 +110,7 @@ export const SystemFlowchartViewer: React.FC = () => {
       color: 'border-blue-500 bg-blue-50 text-blue-700',
       steps: [
         'Login / Mobile Dashboard',
-        'View Registered Lifts & Digital Passports',
+        'View Registered Lifts & Equipment Specifications',
         'Raise Complaint or 24/7 Emergency SOS',
         'Live Real-time Status Tracker',
         'Review Service History, AMC & Quotations',
@@ -194,7 +194,7 @@ export const SystemFlowchartViewer: React.FC = () => {
       color: 'border-indigo-500 bg-indigo-50 text-indigo-700',
       steps: [
         'ISO-compliant Service Reports (PDF Download)',
-        'Lift Digital Passport & QR Profile',
+        'Lift Technical Specifications & Equipment History',
         'Executive Dashboards & Live SLA KPIs',
         'Complaint Breakdown & MTTR Analytics',
         'AMC Expiry & Revenue Forecast Radar',
@@ -203,15 +203,15 @@ export const SystemFlowchartViewer: React.FC = () => {
     },
     {
       id: 8,
-      title: '8. Public QR Lift Passport',
-      badge: 'Public SOS',
+      title: '8. 24/7 Emergency Support',
+      badge: '24/7 Control',
       color: 'border-emerald-500 bg-emerald-50 text-emerald-700',
       steps: [
-        'Scan Physical QR Code Sticker on Lift Cabin / Frame',
-        'Secure Tokenized URL Validation (Zero Login Required)',
-        'View Safe Lift Profile (Last Serviced, Next PM Date)',
+        'Direct 24/7 Hotline Connection (+91 98201 55432)',
         'One-Tap Emergency Breakdown / SOS Call Trigger',
-        'Direct 24/7 Hotline Connection to WEPSUN Control Center',
+        'Immediate Field Engineer Emergency Dispatch',
+        'Rapid Passenger Rescue & Control Room Escalation',
+        'Real-Time Ticket Tracking & Safety Verification',
       ],
     },
   ];
@@ -372,7 +372,7 @@ export const SystemFlowchartViewer: React.FC = () => {
           <div className="p-4 rounded-2xl bg-cyan-50/80 border border-cyan-200 text-center space-y-1.5 flex flex-col items-center">
             <Layers className="w-6 h-6 text-[#00A896]" />
             <span className="font-bold text-xs text-slate-900 block">5. Elevator Fleet</span>
-            <span className="text-[10px] text-slate-500">Digital Passport & QR Code</span>
+            <span className="text-[10px] text-slate-500">Fleet Specifications & Directory</span>
           </div>
         </div>
       </div>
@@ -434,7 +434,7 @@ export const SystemFlowchartViewer: React.FC = () => {
             </div>
             <div>
               <h2 className="text-base font-bold text-[#263238]">End-to-End Operational Workflow</h2>
-              <p className="text-xs text-slate-500">Interactive lifecycle stages from complaint to invoice & QR passport</p>
+              <p className="text-xs text-slate-500">Interactive lifecycle stages from complaint to invoice & maintenance resolution</p>
             </div>
           </div>
 

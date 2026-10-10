@@ -70,26 +70,32 @@ export function setApiBaseUrl(url: string): void {
 
 export function getAccessToken(): string | null {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem(TOKEN_KEY);
+  return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
 }
 
 export function getRefreshToken(): string | null {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem(REFRESH_TOKEN_KEY);
+  return localStorage.getItem(REFRESH_TOKEN_KEY) || sessionStorage.getItem(REFRESH_TOKEN_KEY);
 }
 
 export function setTokens(accessToken: string, refreshToken?: string): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem(TOKEN_KEY, accessToken);
+  sessionStorage.setItem(TOKEN_KEY, accessToken);
   if (refreshToken) {
     localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+    sessionStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
   }
+  localStorage.removeItem('wepsun_explicit_logout');
+  sessionStorage.removeItem('wepsun_explicit_logout');
 }
 
 export function clearTokens(): void {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
+  sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
 export interface ApiRequestOptions extends RequestInit {
@@ -160,7 +166,7 @@ function onRefreshed(token: string) {
   refreshSubscribers = [];
 }
 
-async function tryRefreshToken(): Promise<string | null> {
+export async function tryRefreshToken(): Promise<string | null> {
   const refreshToken = getRefreshToken();
   if (!refreshToken) return null;
 
@@ -299,8 +305,8 @@ export async function apiFetch<T = any>(
     const friendlyErrorMessage = isOffline
       ? 'Device is currently offline. Please check your internet connection.'
       : isTimeout
-      ? 'Server connection took longer than expected. Please wait a moment and tap again.'
-      : err.message || 'Network connection to backend API failed.';
+        ? 'Server connection took longer than expected. Please wait a moment and tap again.'
+        : err.message || 'Network connection to backend API failed.';
 
     return {
       success: false,
@@ -382,14 +388,13 @@ export const apiService = {
   getCompanies: (options?: ApiRequestOptions) => apiFetch('/companies', options),
   getBranches: (options?: ApiRequestOptions) => apiFetch('/companies/branches', options),
 
-  // Lifts & Digital Passports
+  // Lifts & Equipment Directory
   getLifts: (options?: ApiRequestOptions) => apiFetch('/lifts', options),
   getLiftById: (id: string, options?: ApiRequestOptions) => apiFetch(`/lifts/${id}`, options),
   createLift: (payload: any, options?: ApiRequestOptions) =>
     apiFetch('/lifts', { method: 'POST', body: JSON.stringify(payload), ...options }),
   updateLiftStatus: (id: string, currentStatus: string, options?: ApiRequestOptions) =>
     apiFetch(`/lifts/${id}/status`, { method: 'PATCH', body: JSON.stringify({ currentStatus }), ...options }),
-  getPublicLiftByToken: (token: string) => apiFetch(`/qr/lift/${token}`, { skipAuth: true }),
 
   // Complaints & Breakdown Tickets
   getComplaints: (options?: ApiRequestOptions) => apiFetch('/complaints', options),

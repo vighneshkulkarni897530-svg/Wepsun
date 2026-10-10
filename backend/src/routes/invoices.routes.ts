@@ -13,6 +13,11 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
     const companyId = isSuper ? (req.query.companyId as string) || user.companyId || 'comp-1' : user.companyId || 'comp-1';
     const isClient = user.role === 'CLIENT';
 
+    if (isClient && !user.clientId) {
+      res.json({ success: true, count: 0, data: [] });
+      return;
+    }
+
     let list: any[] = [];
 
     try {
@@ -20,7 +25,7 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
         where: {
           companyId,
           ...(user.branchId ? { branchId: user.branchId } : {}),
-          ...(isClient && user.clientId ? { clientId: user.clientId } : {}),
+          ...(isClient ? { clientId: user.clientId! } : {}),
         },
         include: {
           client: true,
@@ -35,7 +40,7 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
       if (user.branchId) {
         list = list.filter((i) => i.branchId === user.branchId);
       }
-      if (isClient && user.clientId) {
+      if (isClient) {
         list = list.filter((i) => i.clientId === user.clientId);
       }
     }
@@ -76,9 +81,11 @@ router.get('/:id', requireAuth, async (req: AuthRequest, res: Response): Promise
     }
 
     // Client ownership check
-    if (user.role === 'CLIENT' && user.clientId && invoice.clientId !== user.clientId) {
-      res.status(403).json({ success: false, message: 'Access Denied – You are not authorized to view this information.', code: 'FORBIDDEN' });
-      return;
+    if (user.role === 'CLIENT') {
+      if (!user.clientId || invoice.clientId !== user.clientId) {
+        res.status(403).json({ success: false, message: 'Access Denied – You are not authorized to view this information.', code: 'FORBIDDEN' });
+        return;
+      }
     }
 
     res.json({ success: true, data: invoice });
@@ -110,8 +117,10 @@ router.post('/:id/pay', requireAuth, requireRole(['CLIENT', 'ACCOUNTS', 'SUPER_A
           throw new Error('Invoice not found');
         }
 
-        if (user.role === 'CLIENT' && user.clientId && inv.clientId !== user.clientId) {
-          throw new Error('Access Denied – You are not authorized to view this information.');
+        if (user.role === 'CLIENT') {
+          if (!user.clientId || inv.clientId !== user.clientId) {
+            throw new Error('Access Denied – You are not authorized to view this information.');
+          }
         }
 
         const payAmount = Number(amount || inv.grandTotal);

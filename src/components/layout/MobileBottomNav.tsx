@@ -3,7 +3,6 @@ import {
   LayoutDashboard,
   HardHat,
   AlertTriangle,
-  QrCode,
   FileText,
   User,
   ShieldCheck,
@@ -19,14 +18,12 @@ import { triggerHaptic } from '../../services/nativeApp';
 interface MobileBottomNavProps {
   activeTab: NavTabId | string;
   setActiveTab: (tab: NavTabId) => void;
-  onOpenQrScanner: () => void;
   onOpenEmergencyModal: () => void;
 }
 
 export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   activeTab,
   setActiveTab,
-  onOpenQrScanner,
   onOpenEmergencyModal,
 }) => {
   const { currentRole, complaints } = useApp();
@@ -39,13 +36,8 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
 
   const handleCenterAction = () => {
     triggerHaptic('heavy');
-    if (currentRole === 'client') {
-      window.location.hash = 'emergency';
-      onOpenEmergencyModal();
-    } else {
-      window.location.hash = 'qr-scanner';
-      onOpenQrScanner();
-    }
+    window.location.hash = 'emergency';
+    onOpenEmergencyModal();
   };
 
   // Active complaints count for badge
@@ -172,27 +164,16 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           </button>
         )}
 
-        {/* Prominent Center Action Button (QR Scan for Tech/Admin, SOS Breakdown for Client) */}
+        {/* Prominent Center Action Button (Emergency Breakdown SOS) */}
         <div className="flex-1 flex justify-center -mt-5">
-          {isClient ? (
-            <button
-              type="button"
-              onClick={handleCenterAction}
-              aria-label="Report emergency breakdown"
-              className="w-13 h-13 rounded-full bg-gradient-to-tr from-red-600 via-rose-500 to-amber-500 text-white p-3 shadow-lg shadow-red-500/40 border-2 border-slate-900 flex items-center justify-center active:scale-90 transition-transform animate-pulse cursor-pointer"
-            >
-              <PhoneCall className="w-6 h-6 animate-bounce" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleCenterAction}
-              aria-label="Scan Lift QR Passport"
-              className="w-13 h-13 rounded-full bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-500 text-white p-3 shadow-lg shadow-blue-500/40 border-2 border-slate-900 flex items-center justify-center active:scale-90 transition-transform cursor-pointer"
-            >
-              <QrCode className="w-6 h-6" />
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={handleCenterAction}
+            aria-label="Report emergency breakdown"
+            className="w-13 h-13 rounded-full bg-gradient-to-tr from-red-600 via-rose-500 to-amber-500 text-white p-3 shadow-lg shadow-red-500/40 border-2 border-slate-900 flex items-center justify-center active:scale-90 transition-transform animate-pulse cursor-pointer"
+          >
+            <PhoneCall className="w-6 h-6 animate-bounce" />
+          </button>
         </div>
 
         {/* Role-Specific Right Tab 1 */}

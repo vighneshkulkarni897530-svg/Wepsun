@@ -10,6 +10,12 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response): P
   try {
     const companyId = req.user!.companyId;
     const isClient = req.user!.role?.toUpperCase() === 'CLIENT';
+    const clientId = req.user!.clientId;
+
+    if (isClient && !clientId) {
+      res.json({ success: true, count: 0, data: [] });
+      return;
+    }
 
     let list: any[] = [];
 
@@ -18,7 +24,7 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response): P
         where: {
           companyId,
           ...(req.branchId ? { branchId: req.branchId } : {}),
-          ...(isClient && req.user!.clientId ? { clientId: req.user!.clientId } : {}),
+          ...(isClient ? { clientId: clientId! } : {}),
         },
         include: {
           client: true,
@@ -34,8 +40,8 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response): P
       if (req.branchId) {
         list = list.filter((a) => a.branchId === req.branchId);
       }
-      if (isClient && req.user!.clientId) {
-        list = list.filter((a) => a.clientId === req.user!.clientId);
+      if (isClient) {
+        list = list.filter((a) => a.clientId === clientId);
       }
     }
 
@@ -50,6 +56,31 @@ router.get('/expiring-renewals', requireAuth, async (req: AuthenticatedRequest, 
   try {
     const companyId = req.user!.companyId || 'comp-1';
     const isClient = req.user!.role?.toUpperCase() === 'CLIENT';
+    const clientId = req.user!.clientId;
+
+    if (isClient && !clientId) {
+      res.json({
+        success: true,
+        data: {
+          summary: {
+            totalExpiringCount: 0,
+            criticalCount: 0,
+            warningCount: 0,
+            upcomingCount: 0,
+            expiredCount: 0,
+            totalAtRiskValue: 0,
+            totalProjectedRenewalValue: 0,
+            averageEscalationRate: 8.0,
+          },
+          contracts: [],
+          critical: [],
+          warning: [],
+          upcoming: [],
+          expired: [],
+        },
+      });
+      return;
+    }
 
     let allContracts: any[] = [];
 
@@ -58,7 +89,7 @@ router.get('/expiring-renewals', requireAuth, async (req: AuthenticatedRequest, 
         where: {
           companyId,
           ...(req.branchId ? { branchId: req.branchId } : {}),
-          ...(isClient && req.user!.clientId ? { clientId: req.user!.clientId } : {}),
+          ...(isClient ? { clientId: clientId! } : {}),
         },
         include: {
           client: true,
@@ -72,7 +103,7 @@ router.get('/expiring-renewals', requireAuth, async (req: AuthenticatedRequest, 
     } catch {
       allContracts = db.amcContracts.filter((a) => a.companyId === companyId);
       if (req.branchId) allContracts = allContracts.filter((a) => a.branchId === req.branchId);
-      if (isClient && req.user!.clientId) allContracts = allContracts.filter((a) => a.clientId === req.user!.clientId);
+      if (isClient) allContracts = allContracts.filter((a) => a.clientId === clientId);
     }
 
     const now = Date.now();
@@ -169,13 +200,18 @@ router.get('/:id', requireAuth, async (req: AuthenticatedRequest, res: Response)
       return;
     }
 
-    if (req.user!.role?.toUpperCase() === 'CLIENT' && req.user!.clientId && contract.clientId !== req.user!.clientId) {
-      res.status(403).json({
-        success: false,
-        message: 'Access Denied – You are not authorized to view this information.',
-        code: 'FORBIDDEN_OBJECT',
-      });
-      return;
+    const isClient = req.user!.role?.toUpperCase() === 'CLIENT';
+    const clientId = req.user!.clientId;
+
+    if (isClient) {
+      if (!clientId || contract.clientId !== clientId) {
+        res.status(403).json({
+          success: false,
+          message: 'Access Denied – You are not authorized to view this information.',
+          code: 'FORBIDDEN_OBJECT',
+        });
+        return;
+      }
     }
 
     res.json({ success: true, data: contract });
@@ -491,6 +527,12 @@ router.post('/accept-and-renew', requireAuth, async (req: AuthenticatedRequest, 
 
         if (!existing) throw new Error('Contract not found');
 
+        const isClient = req.user!.role?.toUpperCase() === 'CLIENT';
+        const clientId = req.user!.clientId;
+        if (isClient && (!clientId || existing.clientId !== clientId)) {
+          throw new Error('Access Denied – You are not authorized to renew this contract.');
+        }
+
         const newStartDate = new Date(existing.endDate);
         const newEndDate = new Date(newStartDate);
         newEndDate.setFullYear(newEndDate.getFullYear() + Number(tenureYears));
@@ -602,10 +644,21 @@ router.post('/:id/renew', requireAuth, async (req: AuthenticatedRequest, res: Re
     const id = req.params.id as string;
     const { newEndDate, agreedAmount, digitalSignature, signatoryName } = req.body;
     
+    const isClient = req.user!.role?.toUpperCase() === 'CLIENT';
+    const clientId = req.user!.clientId;
+
+    if (isClient) {
+      const existing = await prisma.amcContract.findFirst({ where: { id, companyId } });
+      if (!existing || !clientId || existing.clientId !== clientId) {
+        res.status(403).json({ success: false, message: 'Access Denied – You are not authorized to renew this contract.', code: 'FORBIDDEN_OBJECT' });
+        return;
+      }
+    }
+
     let updated: any = null;
     try {
       await prisma.amcContract.updateMany({
-        where: { id, companyId },
+        where: { id, companyId, ...(isClient ? { clientId: clientId! } : {}) },
         data: {
           ...(newEndDate ? { endDate: new Date(newEndDate), status: 'active' } : { status: 'active' }),
           ...(agreedAmount ? { totalAmount: Number(agreedAmount) } : {}),

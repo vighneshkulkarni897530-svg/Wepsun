@@ -480,7 +480,7 @@ export const AdminBuildingsView: React.FC<AdminBuildingsViewProps> = ({ onNaviga
               </div>
               <div>
                 <h3 className="text-base font-bold font-display text-slate-900">Add Elevator Unit</h3>
-                <p className="text-xs text-slate-500">Register new lift shaft & initialize Digital Passport</p>
+                <p className="text-xs text-slate-500">Register new lift shaft & configure specifications</p>
               </div>
             </div>
 

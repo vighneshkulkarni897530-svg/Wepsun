@@ -150,8 +150,8 @@ export interface Lift {
   activeAmcId?: string;
   lastPmDate: string;
   nextPmDate: string;
-  qrCodeData: string;
-  qrToken?: string; // Secure token for public QR scanning
+  qrCodeData?: string;
+  qrToken?: string;
   safetyCertificateNumber: string;
   safetyCertificateExpiry: string;
   locationDetails: string; // e.g., "Wing A - Passenger Lift 1"
@@ -651,13 +651,13 @@ export interface BusinessEnquiry {
   societyOrBuilding: string;
   city: string;
   enquiryType:
-    | 'Turnkey Lift Installation'
-    | 'Annual Maintenance Contract (AMC)'
-    | 'Emergency Breakdown Service'
-    | 'Lift Modernization & Refurbishment'
-    | 'Annual Safety Audit & Compliance'
-    | 'Spare Parts & Component Replacement'
-    | string;
+  | 'Turnkey Lift Installation'
+  | 'Annual Maintenance Contract (AMC)'
+  | 'Emergency Breakdown Service'
+  | 'Lift Modernization & Refurbishment'
+  | 'Annual Safety Audit & Compliance'
+  | 'Spare Parts & Component Replacement'
+  | string;
   numberOfLifts: number;
   numberOfFloors: number;
   message: string;
@@ -868,15 +868,15 @@ export interface TechNotificationItem {
   id: string;
   technicianId: string;
   type:
-    | 'job_assigned'
-    | 'job_rescheduled'
-    | 'emergency_call'
-    | 'client_clarification'
-    | 'job_reminder'
-    | 'parts_issued'
-    | 'job_completion'
-    | 'otp_confirmation'
-    | 'service_report_generated';
+  | 'job_assigned'
+  | 'job_rescheduled'
+  | 'emergency_call'
+  | 'client_clarification'
+  | 'job_reminder'
+  | 'parts_issued'
+  | 'job_completion'
+  | 'otp_confirmation'
+  | 'service_report_generated';
   title: string;
   message: string;
   timestamp: string;

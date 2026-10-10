@@ -24,8 +24,6 @@ import { CustomerFeedbackManager } from './components/admin/CustomerFeedbackMana
 import { ClientDashboard } from './components/client/ClientDashboard';
 import { TechnicianDashboard } from './components/technician/TechnicianDashboard';
 import { RaiseComplaintModal } from './components/client/RaiseComplaintModal';
-import { QrScannerModal } from './components/common/QrScannerModal';
-import { LiftPassportModal } from './components/common/LiftPassportModal';
 import { LoginModal } from './components/common/LoginModal';
 import { LoginPage } from './components/common/LoginPage';
 import { LandingPage } from './components/common/LandingPage';
@@ -123,7 +121,6 @@ const TECH_ALLOWED_TABS = [
   'notifications',
   'profile',
   'pm_checklist',
-  'qr-scanner',
   'settings',
   'edit-profile',
   'profile-edit',
@@ -188,7 +185,6 @@ export const AppContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavTabId>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
-  const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [currentHash, setCurrentHash] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -203,28 +199,22 @@ export const AppContent: React.FC = () => {
     const rawHash = window.location.hash.toLowerCase().replace('#', '');
     const hash = rawHash.split('?')[0];
 
+    const isExplicitLogout = localStorage.getItem('wepsun_explicit_logout') === 'true';
+    if (isExplicitLogout) return true;
+
     const token = localStorage.getItem('wepsun_access_token');
-    const hasValidToken = Boolean(token && token.split('.').length === 3);
+    const refresh = localStorage.getItem('wepsun_refresh_token');
 
-    // If unauthenticated: any private route redirects to login
-    if (!hasValidToken) {
-      if (!PUBLIC_HASHES.includes(hash)) {
-        window.history.replaceState(null, '', '#login');
-        return true;
-      }
+    // If no tokens exist at all, unauthenticated -> show login
+    if (!token && !refresh) {
       return true;
     }
 
-    const path = window.location.pathname.toLowerCase();
-    if ((path.startsWith('/admin') || path.startsWith('/dashboard')) && !isMasterAdminAuthenticated()) {
-      window.history.replaceState(null, '', '/#login-technician');
-      return true;
+    if (hash === 'feedback-form' || hash === 'rate-service' || hash === 'customer-review' || hash === 'public-feedback' || hash === 'rate') {
+      return false;
     }
 
-    if (!hash || PUBLIC_HASHES.includes(hash)) {
-      return true;
-    }
-
+    // Default to false while session restoration completes to prevent login flicker
     return false;
   });
   const [isPublicFeedbackPage, setIsPublicFeedbackPage] = useState(false);
@@ -233,15 +223,14 @@ export const AppContent: React.FC = () => {
     const rawHash = typeof window !== 'undefined' ? window.location.hash.toLowerCase().replace('#', '').split('?')[0] : '';
     return rawHash === 'splash' || rawHash === 'animation' || rawHash === 'logo-reveal';
   });
-  const [selectedLiftForPassport, setSelectedLiftForPassport] = useState<Lift | null>(null);
 
   React.useEffect(() => {
     const handleHashChange = () => {
-      const path = window.location.pathname.toLowerCase();
       const rawHash = window.location.hash.toLowerCase().replace('#', '');
       const hash = rawHash.split('?')[0];
       setCurrentHash(hash);
       
+      // 1. Splash animation hash
       if (hash === 'splash' || hash === 'animation' || hash === 'logo-reveal') {
         setIsSplashPage(true);
         setIsFullLoginPage(false);
@@ -250,128 +239,121 @@ export const AppContent: React.FC = () => {
       }
       setIsSplashPage(false);
 
-      // Unauthenticated protection: strictly redirect any private route to #login
-      if (!isAuthenticated && !isAuthLoading) {
-        const isPublicHash = PUBLIC_HASHES.includes(hash);
-        const isPrivatePath = path.startsWith('/dashboard') || path.startsWith('/profile') || path.startsWith('/settings') || path.startsWith('/admin');
-
-        if (isPrivatePath || (!isPublicHash && hash !== '')) {
-          window.history.replaceState(null, '', '#login');
-          setCurrentHash('login');
-          setIsFullLoginPage(true);
-          setIsPublicFeedbackPage(false);
-          return;
-        }
-      }
-
-      // Default landing page is Login Page
-      if (!hash || PUBLIC_HASHES.includes(hash)) {
-        if (hash === 'feedback-form' || hash === 'rate-service' || hash === 'customer-review' || hash === 'public-feedback' || hash === 'rate') {
-          setIsFullLoginPage(false);
-          setIsPublicFeedbackPage(true);
-          return;
-        }
-        setIsFullLoginPage(true);
-        setIsPublicFeedbackPage(false);
-        return;
-      }
-
-      // If accessing private route while unauthenticated
-      if (!isAuthenticated && !isAuthLoading) {
-        window.history.replaceState(null, '', '#login');
-        setCurrentHash('login');
-        setIsFullLoginPage(true);
-        setIsPublicFeedbackPage(false);
-        return;
-      }
-
-      const isClientRole = currentRole === 'client';
-      const isTechRole = currentRole === 'technician';
-      const isClientTab = CLIENT_ALLOWED_TABS.includes(hash);
-      const isTechTab = TECH_ALLOWED_TABS.includes(hash);
-
-      // Route Protection: Prevent unauthorized access to Admin-exclusive views
-      const isForbiddenAdminRoute =
-        !isMasterAdminAuthenticated() &&
-        (ADMIN_EXCLUSIVE_TABS.includes(hash) ||
-         hash === 'admin' ||
-         hash === 'admin-dashboard' ||
-         hash.startsWith('dashboard/') ||
-         hash.startsWith('admin/') ||
-         (!isClientRole && !isTechRole && !isClientTab && !isTechTab && ADMIN_PROTECTED_TABS.includes(hash)));
-
-      if (isForbiddenAdminRoute) {
-        window.history.replaceState(null, '', '#login-technician');
-        setCurrentHash('login-technician');
-        setIsFullLoginPage(true);
-        setIsPublicFeedbackPage(false);
-        showToast('warning', 'Master Authentication Required', 'Please enter your authorized Master ID to access the Admin Dashboard.');
-        return;
-      }
-
+      // 2. Public Feedback forms are always accessible
       if (hash === 'feedback-form' || hash === 'rate-service' || hash === 'customer-review' || hash === 'public-feedback' || hash === 'rate') {
         setIsFullLoginPage(false);
         setIsPublicFeedbackPage(true);
-      } else if (hash === 'emergency' || hash === 'emergency-breakdown' || hash === 'raise-complaint') {
-        setIsFullLoginPage(false);
-        setIsPublicFeedbackPage(false);
-        setIsEmergencyModalOpen(true);
-      } else if (hash === 'lift-passport' || hash === 'digital-passport') {
-        setIsFullLoginPage(false);
-        setIsPublicFeedbackPage(false);
-        setSelectedLiftForPassport(lifts[0] || null);
-      } else if (hash === 'qr-code' || hash === 'qr-scanner' || hash === 'qr') {
-        setIsFullLoginPage(false);
-        setIsPublicFeedbackPage(false);
-        setIsQrScannerOpen(true);
-      } else {
-        setIsFullLoginPage(false);
-        setIsPublicFeedbackPage(false);
-        // Sync activeTab
-        if (
-          [
-            'dashboard',
-            'home',
-            'jobs',
-            'flowchart',
-            'complaints',
-            'service_jobs',
-            'work_orders',
-            'pm',
-            'amc',
-            'lifts',
-            'quotations',
-            'inventory',
-            'technicians',
-            'feedback',
-            'companies',
-            'branches',
-            'buildings',
-            'clients',
-            'invoices',
-            'reports',
-            'analytics',
-            'notifications',
-            'settings',
-            'edit_profile',
-            'design_system',
-            'history',
-            'payments',
-            'profile',
-            'parts',
-            'client_lift',
-            'service_history',
-            'checkin_checkout',
-            'diagnosis',
-            'photos',
-            'signature_otp',
-            'service_report',
-          ].includes(hash)
-        ) {
-          setActiveTab(hash as NavTabId);
-        } else if (hash === 'edit-profile' || hash === 'profile-edit') {
-          setActiveTab('edit_profile');
+        return;
+      }
+      setIsPublicFeedbackPage(false);
+
+      // 3. Authenticated Automatic Session Navigation
+      if (isAuthenticated) {
+        // If accessing root or public auth routes while authenticated: navigate directly to authorized dashboard
+        if (!hash || PUBLIC_HASHES.includes(hash)) {
+          const defaultTab: NavTabId =
+            currentRole === 'client'
+              ? 'home'
+              : currentRole === 'technician'
+              ? 'jobs'
+              : isMasterAdminAuthenticated()
+              ? 'dashboard'
+              : 'home';
+
+          window.history.replaceState(null, '', `#${defaultTab}`);
+          setCurrentHash(defaultTab);
+          setActiveTab(defaultTab);
+          setIsFullLoginPage(false);
+          return;
         }
+
+        const isClientRole = currentRole === 'client';
+        const isTechRole = currentRole === 'technician';
+        const isClientTab = CLIENT_ALLOWED_TABS.includes(hash);
+        const isTechTab = TECH_ALLOWED_TABS.includes(hash);
+
+        // Route Protection: Prevent unauthorized access to Admin-exclusive views
+        const isForbiddenAdminRoute =
+          !isMasterAdminAuthenticated() &&
+          (ADMIN_EXCLUSIVE_TABS.includes(hash) ||
+           hash === 'admin' ||
+           hash === 'admin-dashboard' ||
+           hash.startsWith('dashboard/') ||
+           hash.startsWith('admin/') ||
+           (!isClientRole && !isTechRole && !isClientTab && !isTechTab && ADMIN_PROTECTED_TABS.includes(hash)));
+
+        if (isForbiddenAdminRoute) {
+          const fallback = currentRole === 'client' ? 'home' : 'jobs';
+          window.history.replaceState(null, '', `#${fallback}`);
+          setCurrentHash(fallback);
+          setActiveTab(fallback as NavTabId);
+          setIsFullLoginPage(false);
+          showToast('warning', 'Master Authentication Required', 'Please enter your authorized Master ID to access the Admin Dashboard.');
+          return;
+        }
+
+        if (hash === 'emergency' || hash === 'emergency-breakdown' || hash === 'raise-complaint') {
+          setIsFullLoginPage(false);
+          setIsEmergencyModalOpen(true);
+        } else {
+          setIsFullLoginPage(false);
+          // Sync activeTab
+          if (
+            [
+              'dashboard',
+              'home',
+              'jobs',
+              'flowchart',
+              'complaints',
+              'service_jobs',
+              'work_orders',
+              'pm',
+              'amc',
+              'lifts',
+              'quotations',
+              'inventory',
+              'technicians',
+              'feedback',
+              'companies',
+              'branches',
+              'buildings',
+              'clients',
+              'invoices',
+              'reports',
+              'analytics',
+              'notifications',
+              'settings',
+              'edit_profile',
+              'design_system',
+              'history',
+              'payments',
+              'profile',
+              'parts',
+              'client_lift',
+              'service_history',
+              'checkin_checkout',
+              'diagnosis',
+              'photos',
+              'signature_otp',
+              'service_report',
+            ].includes(hash)
+          ) {
+            setActiveTab(hash as NavTabId);
+          } else if (hash === 'edit-profile' || hash === 'profile-edit') {
+            setActiveTab('edit_profile');
+          }
+        }
+        return;
+      }
+
+      // 4. Unauthenticated Navigation: strictly display Sign In
+      if (!isAuthenticated && !isAuthLoading) {
+        if (!hash || !PUBLIC_HASHES.includes(hash)) {
+          window.history.replaceState(null, '', '#login');
+          setCurrentHash('login');
+        }
+        setIsFullLoginPage(true);
+        return;
       }
     };
 
@@ -393,10 +375,6 @@ export const AppContent: React.FC = () => {
             onNavigateTab={(tab) => {
               setActiveTab(tab as NavTabId);
               window.location.hash = tab;
-            }}
-            onOpenQrScanner={() => {
-              setIsQrScannerOpen(true);
-              window.location.hash = 'qr-scanner';
             }}
           />
         </div>
@@ -658,12 +636,22 @@ export const AppContent: React.FC = () => {
           setIsStartupSplashActive(false);
           if (isSplashPage) {
             setIsSplashPage(false);
-            const rawH = window.location.hash.toLowerCase().replace('#', '').split('?')[0];
-            if (rawH === 'splash' || rawH === 'animation' || rawH === 'logo-reveal') {
-              const savedRole = localStorage.getItem('wepsun_role') || currentRole;
-              const target = savedRole === 'client' ? 'home' : savedRole === 'technician' ? 'jobs' : 'dashboard';
-              window.location.hash = target;
+          }
+          const rawH = window.location.hash.toLowerCase().replace('#', '').split('?')[0];
+          if (!rawH || rawH === 'splash' || rawH === 'animation' || rawH === 'logo-reveal' || rawH === 'landing' || rawH === 'login') {
+            if (isAuthenticated) {
+              const target =
+                currentRole === 'client'
+                  ? 'home'
+                  : currentRole === 'technician'
+                  ? 'jobs'
+                  : isMasterAdminAuthenticated()
+                  ? 'dashboard'
+                  : 'home';
+              window.history.replaceState(null, '', `#${target}`);
+              setCurrentHash(target);
               setActiveTab(target as NavTabId);
+              setIsFullLoginPage(false);
             }
           }
         }}
@@ -675,12 +663,13 @@ export const AppContent: React.FC = () => {
   if (isAuthLoading) {
     return (
       <div className="min-h-screen bg-[#071325] flex flex-col items-center justify-center p-4">
+        {renderSplashOverlay()}
         <div className="flex flex-col items-center gap-4 animate-in fade-in duration-300">
           <GeometricBlueWLogo className="w-16 h-13 animate-pulse" />
           <div className="flex items-center gap-2.5">
             <div className="w-4 h-4 border-2 border-sky-400 border-t-transparent rounded-full animate-spin" />
             <span className="text-sm font-semibold text-slate-300 tracking-wide">
-              Verifying secure session...
+              Restoring your session...
             </span>
           </div>
         </div>
@@ -786,7 +775,6 @@ export const AppContent: React.FC = () => {
         {/* Top Full-Width Dark Navy Header Bar */}
         <Header
           onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
-          onOpenQrScanner={() => setIsQrScannerOpen(true)}
           onOpenRaiseComplaint={() => setIsEmergencyModalOpen(true)}
           onOpenLoginModal={() => setIsLoginModalOpen(true)}
           onNavigateTab={setActiveTab}
@@ -837,28 +825,7 @@ export const AppContent: React.FC = () => {
         {/* Modern WepSun Modal & Pop-up System */}
         <WepsunModalContainer />
 
-        {/* QR Scanner Modal */}
-        <QrScannerModal
-          isOpen={isQrScannerOpen}
-          onClose={() => {
-            setIsQrScannerOpen(false);
-            if (window.location.hash.includes('qr-scanner') || window.location.hash.includes('qr-code')) {
-              window.location.hash = activeTab || 'dashboard';
-            }
-          }}
-          onScanLift={(lift) => setSelectedLiftForPassport(lift)}
-        />
 
-        {/* Lift Passport Modal */}
-        <LiftPassportModal
-          lift={selectedLiftForPassport}
-          isOpen={!!selectedLiftForPassport}
-          onClose={() => setSelectedLiftForPassport(null)}
-          onRaiseTicket={() => {
-            setIsEmergencyModalOpen(true);
-            window.location.hash = 'emergency';
-          }}
-        />
 
         {/* Emergency Breakdown Modal */}
         <RaiseComplaintModal
@@ -885,10 +852,6 @@ export const AppContent: React.FC = () => {
             setActiveTab={(tab) => {
               setActiveTab(tab);
               window.location.hash = tab;
-            }}
-            onOpenQrScanner={() => {
-              setIsQrScannerOpen(true);
-              window.location.hash = 'qr-scanner';
             }}
             onOpenEmergencyModal={() => {
               setIsEmergencyModalOpen(true);

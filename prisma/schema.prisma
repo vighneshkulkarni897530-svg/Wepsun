@@ -273,6 +273,8 @@ model User {
   technician          Technician? @relation(fields: [technicianId], references: [id], onDelete: SetNull)
   sessions            UserSession[]
   passwordResetTokens PasswordResetToken[]
+  createdComplaints   Complaint[]
+  feedbacks           CustomerFeedback[]
 
   @@index([companyId, role])
   @@map("users")
@@ -297,6 +299,10 @@ model Client {
   amcContracts   AmcContract[]
   quotations     Quotation[]
   invoices       Invoice[]
+  complaints     Complaint[]
+  workOrders     WorkOrder[]
+  serviceReports ServiceReport[]
+  feedbacks      CustomerFeedback[]
 
   @@index([companyId])
   @@map("clients")
@@ -450,6 +456,8 @@ model Complaint {
   reportedAt           DateTime          @default(now())
   assignedAt           DateTime?
   assignedTechnicianId String?
+  clientId             String?
+  createdById          String?
   technicianEta        String?
   checkInTime          DateTime?
   checkOutTime         DateTime?
@@ -469,12 +477,16 @@ model Complaint {
   branch               Branch            @relation(fields: [branchId], references: [id], onDelete: Cascade)
   lift                 Lift              @relation(fields: [liftId], references: [id], onDelete: Cascade)
   assignedTechnician   Technician?       @relation(fields: [assignedTechnicianId], references: [id], onDelete: SetNull)
+  client               Client?           @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  createdBy            User?             @relation(fields: [createdById], references: [id], onDelete: SetNull)
   serviceReport        ServiceReport?
   gpsCheckIns          GPSCheckIn[]
   workOrders           WorkOrder[]
   timelineEntries      ComplaintTimeline[]
 
   @@index([companyId, status, priority])
+  @@index([companyId, clientId])
+  @@index([companyId, createdById])
   @@map("complaints")
 }
 
@@ -707,6 +719,7 @@ model WorkOrder {
   id              String            @id @default(uuid())
   companyId       String
   branchId        String
+  clientId        String?
   workOrderNumber String            @unique // e.g. "WO-2026-0045"
   quotationId     String?
   complaintId     String?
@@ -726,6 +739,7 @@ model WorkOrder {
   updatedAt       DateTime          @updatedAt
 
   company         Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  client          Client?           @relation(fields: [clientId], references: [id], onDelete: SetNull)
   quotation       Quotation?        @relation(fields: [quotationId], references: [id], onDelete: SetNull)
   complaint       Complaint?        @relation(fields: [complaintId], references: [id], onDelete: SetNull)
   lift            Lift              @relation(fields: [liftId], references: [id], onDelete: Cascade)
@@ -733,6 +747,7 @@ model WorkOrder {
   invoice         Invoice?          @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
 
   @@index([companyId, status])
+  @@index([companyId, clientId])
   @@map("work_orders")
 }
 
@@ -849,6 +864,7 @@ model ServiceReport {
   id                          String      @id @default(uuid())
   companyId                   String
   branchId                    String
+  clientId                    String?
   reportNumber                String      @unique // e.g. "WPS-SR-000182"
   ticketId                    String      @unique
   liftId                      String
@@ -871,11 +887,13 @@ model ServiceReport {
   createdAt                   DateTime    @default(now())
 
   company                     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  client                      Client?     @relation(fields: [clientId], references: [id], onDelete: SetNull)
   complaint                   Complaint   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   lift                        Lift        @relation(fields: [liftId], references: [id], onDelete: Cascade)
   technician                  Technician  @relation(fields: [technicianId], references: [id], onDelete: Cascade)
 
   @@index([companyId, liftId, serviceDate])
+  @@index([companyId, clientId])
   @@map("service_reports")
 }
 
@@ -907,6 +925,8 @@ model AuditLog {
 model CustomerFeedback {
   id             String    @id @default(uuid())
   companyId      String
+  clientId       String?
+  userId         String?
   clientName     String
   clientPhone    String?
   buildingName   String
@@ -929,8 +949,11 @@ model CustomerFeedback {
   updatedAt      DateTime  @updatedAt
 
   company        Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  client         Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  user           User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([companyId, overallRating, createdAt])
+  @@index([companyId, clientId])
   @@map("customer_feedbacks")
 }
 

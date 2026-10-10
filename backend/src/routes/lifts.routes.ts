@@ -6,11 +6,16 @@ import { requireAuth, requireRole, AuthenticatedRequest } from '../middleware/au
 const router = Router();
 
 // GET /api/lifts — List lifts with tenant and object-level isolation
-router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const companyId = req.user!.companyId;
     const isClient = req.user!.role?.toUpperCase() === 'CLIENT';
     const clientId = req.user!.clientId;
+
+    if (isClient && !clientId) {
+      res.json({ success: true, count: 0, data: [] });
+      return;
+    }
 
     let list: any[] = [];
 
@@ -19,7 +24,7 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response) =>
         where: {
           companyId,
           ...(req.branchId ? { branchId: req.branchId } : {}),
-          ...(isClient && clientId ? { clientId } : {}),
+          ...(isClient ? { clientId: clientId! } : {}),
         },
         include: {
           building: true,
@@ -33,7 +38,7 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response) =>
       if (req.branchId) {
         list = list.filter((l) => l.branchId === req.branchId);
       }
-      if (isClient && clientId) {
+      if (isClient) {
         list = list.filter((l) => l.clientId === clientId);
       }
     }
@@ -48,6 +53,8 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response) =>
 router.get('/:id', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const companyId = req.user!.companyId;
+    const isClient = req.user!.role?.toUpperCase() === 'CLIENT';
+    const clientId = req.user!.clientId;
     const id = req.params.id as string;
     let lift: any = null;
 
@@ -76,13 +83,15 @@ router.get('/:id', requireAuth, async (req: AuthenticatedRequest, res: Response)
     }
 
     // Object-level check for Client
-    if (req.user!.role?.toUpperCase() === 'CLIENT' && req.user!.clientId && lift.clientId !== req.user!.clientId) {
-      res.status(403).json({
-        success: false,
-        message: 'Access Denied – You are not authorized to view this information.',
-        code: 'FORBIDDEN_OBJECT',
-      });
-      return;
+    if (isClient) {
+      if (!clientId || lift.clientId !== clientId) {
+        res.status(403).json({
+          success: false,
+          message: 'Access Denied – You are not authorized to view this information.',
+          code: 'FORBIDDEN_OBJECT',
+        });
+        return;
+      }
     }
 
     res.json({ success: true, data: lift });

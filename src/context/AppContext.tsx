@@ -59,6 +59,15 @@ import {
   INITIAL_APP_NOTIFICATIONS,
 } from '../data/initialData';
 import { apiService, checkServerHealth, clearTokens, getAccessToken, getRefreshToken } from '../services/api';
+import {
+  restoreAuthenticatedSession,
+  terminateSession,
+  cacheUserSession,
+  isMasterAdminSessionValid,
+  registerSessionLifecycle,
+  isTokenExpired,
+  getCachedUserSession,
+} from '../services/sessionManager';
 import { getNetworkStatus, subscribeNetworkStatus } from '../services/nativeApp';
 import { playNotificationSound, isSoundEnabled as getSoundPref, setSoundEnabled } from '../utils/notificationSound';
 
@@ -78,7 +87,7 @@ interface AppContextType {
   branches: Branch[];
   activeBranchId: string;
   setActiveBranchId: (id: string) => void;
-  
+
   currentRole: UserRole;
   setCurrentRole: (role: UserRole) => void;
   currentUser: User;
@@ -151,7 +160,7 @@ interface AppContextType {
   rejectQuotation: (quoteId: string, reason?: string) => void;
   requestQuoteClarification: (quoteId: string, notes: string) => void;
   requestPmReschedule: (liftId: string, preferredDate: string, timeSlot: string, reason: string) => void;
-  
+
   // Centralized Notification System
   notifications: AppNotification[];
   roleNotifications: AppNotification[];
@@ -298,7 +307,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const isMasterAuth =
       typeof window !== 'undefined' &&
       (localStorage.getItem('wepsun_master_authenticated') === 'true' ||
-       sessionStorage.getItem('wepsun_master_authenticated') === 'true');
+        sessionStorage.getItem('wepsun_master_authenticated') === 'true');
 
     const savedRole = localStorage.getItem(STORAGE_PREFIX + 'role') as UserRole;
     if (savedRole === 'company_admin' || savedRole === 'master_admin' || savedRole === 'super_admin') {
@@ -314,7 +323,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const isMasterAuth =
       typeof window !== 'undefined' &&
       (localStorage.getItem('wepsun_master_authenticated') === 'true' ||
-       sessionStorage.getItem('wepsun_master_authenticated') === 'true');
+        sessionStorage.getItem('wepsun_master_authenticated') === 'true');
     const savedUserId = localStorage.getItem(STORAGE_PREFIX + 'userId');
     if (savedUserId && (savedUserId.includes('admin') || savedUserId.includes('master')) && !isMasterAuth) {
       return 'usr-client-priya';
@@ -322,8 +331,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return savedUserId || 'usr-client-priya';
   });
 
-  const [activeClientId, setActiveClientId] = useState<string>('client-1');
-  const [activeTechnicianId, setActiveTechnicianId] = useState<string>('tech-1');
+  const [activeClientId, setActiveClientId] = useState<string>(() => {
+    return localStorage.getItem(STORAGE_PREFIX + 'clientId') || '';
+  });
+  const [activeTechnicianId, setActiveTechnicianId] = useState<string>(() => {
+    return localStorage.getItem(STORAGE_PREFIX + 'technicianId') || '';
+  });
   const [users, setUsers] = useState<User[]>(() => {
     return safeStorageParse(STORAGE_PREFIX + 'users', INITIAL_USERS);
   });
@@ -512,95 +525,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         userRole: currentRole,
       });
 
-      if (serverData.lifts && Array.isArray(serverData.lifts) && serverData.lifts.length > 0) {
-        setLifts((prev) => {
-          const map = new Map(prev.map((l) => [l.id, l]));
-          serverData.lifts.forEach((sl: any) => {
-            const existing = map.get(sl.id) || (sl.permanentLiftId ? prev.find(l => l.liftNumber === sl.permanentLiftId) : null);
-            map.set(sl.id, { ...(existing || {}), ...sl, liftNumber: sl.permanentLiftId || sl.liftNumber || existing?.liftNumber || 'LIFT' });
-          });
-          return Array.from(map.values());
-        });
+      if (serverData.lifts !== null && Array.isArray(serverData.lifts)) {
+        setLifts(serverData.lifts.map((sl: any) => ({
+          ...sl,
+          liftNumber: sl.permanentLiftId || sl.liftNumber || 'LIFT',
+          buildingName: sl.building?.name || sl.buildingName || 'Complex',
+        })));
       }
 
-      if (serverData.complaints && Array.isArray(serverData.complaints) && serverData.complaints.length > 0) {
-        setComplaints((prev) => {
-          const map = new Map(prev.map((c) => [c.id, c]));
-          serverData.complaints.forEach((sc: any) => {
-            map.set(sc.id, { ...(map.get(sc.id) || {}), ...sc });
-          });
-          return Array.from(map.values());
-        });
+      if (serverData.complaints !== null && Array.isArray(serverData.complaints)) {
+        setComplaints(serverData.complaints);
       }
 
-      if (serverData.workOrders && Array.isArray(serverData.workOrders) && serverData.workOrders.length > 0) {
-        setWorkOrders((prev) => {
-          const map = new Map(prev.map((w) => [w.id, w]));
-          serverData.workOrders.forEach((sw: any) => {
-            map.set(sw.id, { ...(map.get(sw.id) || {}), ...sw });
-          });
-          return Array.from(map.values());
-        });
+      if (serverData.workOrders !== null && Array.isArray(serverData.workOrders)) {
+        setWorkOrders(serverData.workOrders);
       }
 
-      if (serverData.amcContracts && Array.isArray(serverData.amcContracts) && serverData.amcContracts.length > 0) {
-        setAmcContracts((prev) => {
-          const map = new Map(prev.map((a) => [a.id, a]));
-          serverData.amcContracts.forEach((sa: any) => {
-            map.set(sa.id, { ...(map.get(sa.id) || {}), ...sa });
-          });
-          return Array.from(map.values());
-        });
+      if (serverData.amcContracts !== null && Array.isArray(serverData.amcContracts)) {
+        setAmcContracts(serverData.amcContracts);
       }
 
-      if (serverData.quotations && Array.isArray(serverData.quotations) && serverData.quotations.length > 0) {
-        setQuotations((prev) => {
-          const map = new Map(prev.map((q) => [q.id, q]));
-          serverData.quotations.forEach((sq: any) => {
-            map.set(sq.id, { ...(map.get(sq.id) || {}), ...sq });
-          });
-          return Array.from(map.values());
-        });
+      if (serverData.quotations !== null && Array.isArray(serverData.quotations)) {
+        setQuotations(serverData.quotations);
       }
 
-      if (serverData.invoices && Array.isArray(serverData.invoices) && serverData.invoices.length > 0) {
-        setInvoices((prev) => {
-          const map = new Map(prev.map((i) => [i.id, i]));
-          serverData.invoices.forEach((si: any) => {
-            map.set(si.id, { ...(map.get(si.id) || {}), ...si });
-          });
-          return Array.from(map.values());
-        });
+      if (serverData.invoices !== null && Array.isArray(serverData.invoices)) {
+        setInvoices(serverData.invoices);
       }
 
-      if (serverData.inventory && Array.isArray(serverData.inventory) && serverData.inventory.length > 0) {
-        setInventory((prev) => {
-          const map = new Map(prev.map((i) => [i.id, i]));
-          serverData.inventory.forEach((si: any) => {
-            map.set(si.id, { ...(map.get(si.id) || {}), ...si });
-          });
-          return Array.from(map.values());
-        });
+      if (serverData.inventory !== null && Array.isArray(serverData.inventory)) {
+        setInventory(serverData.inventory);
       }
 
-      if (serverData.technicians && Array.isArray(serverData.technicians) && serverData.technicians.length > 0) {
-        setTechnicians((prev) => {
-          const map = new Map(prev.map((t) => [t.id, t]));
-          serverData.technicians.forEach((st: any) => {
-            map.set(st.id, { ...(map.get(st.id) || {}), ...st });
-          });
-          return Array.from(map.values());
-        });
+      if (serverData.technicians !== null && Array.isArray(serverData.technicians)) {
+        setTechnicians(serverData.technicians);
       }
 
-      if (serverData.feedbacks && Array.isArray(serverData.feedbacks) && serverData.feedbacks.length > 0) {
-        setFeedbacks((prev) => {
-          const map = new Map(prev.map((f) => [f.id, f]));
-          serverData.feedbacks.forEach((sf: any) => {
-            map.set(sf.id, { ...(map.get(sf.id) || {}), ...sf });
-          });
-          return Array.from(map.values());
-        });
+      if (serverData.feedbacks !== null && Array.isArray(serverData.feedbacks)) {
+        setFeedbacks(serverData.feedbacks);
       }
 
       setSyncStatus('synced');
@@ -634,7 +596,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const isMasterAuth =
       typeof window !== 'undefined' &&
       (localStorage.getItem('wepsun_master_authenticated') === 'true' ||
-       sessionStorage.getItem('wepsun_master_authenticated') === 'true');
+        sessionStorage.getItem('wepsun_master_authenticated') === 'true');
 
     const saved = safeStorageParse<User | null>(STORAGE_PREFIX + 'currentUser', null);
     if (saved) {
@@ -656,71 +618,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return INITIAL_USERS.find((u) => u.role === 'client') || INITIAL_USERS[2] || INITIAL_USERS[0];
   });
 
-  // Helper to verify cryptographic JWT structure and expiration
-  const isTokenValid = (token: string | null): boolean => {
-    if (!token) return false;
-    try {
-      const parts = token.split('.');
-      if (parts.length !== 3) return false;
-      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-      if (payload.exp && payload.exp * 1000 < Date.now()) {
-        return false;
-      }
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
+    const isExplicitLogout = localStorage.getItem('wepsun_explicit_logout') === 'true';
+    if (isExplicitLogout) return false;
     const token = getAccessToken();
-    return isTokenValid(token);
+    const refresh = getRefreshToken();
+    if (!token && !refresh) return false;
+    if (token && !isTokenExpired(token, 0)) return true;
+    if (refresh) return true;
+    return false;
   });
 
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
 
-  // Authenticate session against backend API on application startup
+  // Authenticate session against backend API and restore state on application startup
   useEffect(() => {
     let isMounted = true;
-    const validateSession = async () => {
-      const token = getAccessToken();
-      if (!token || !isTokenValid(token)) {
-        if (isMounted) {
-          setIsAuthenticated(false);
-          setIsAuthLoading(false);
-        }
-        return;
-      }
-
+    const validateAndRestoreSession = async () => {
       try {
-        const res = await apiService.getMe();
+        const result = await restoreAuthenticatedSession();
         if (!isMounted) return;
-        if (res && res.success && res.data?.user) {
-          const user = res.data.user;
-          const userRole = (user.role || 'client').toLowerCase() as UserRole;
-          setCurrentUserState((prev) => ({
-            ...prev,
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            phone: user.phone || '',
-            role: userRole,
-            companyId: user.companyId || 'comp-1',
-            branchId: user.branchId,
-            clientId: user.clientId,
-            technicianId: user.technicianId,
-            avatar: user.avatarUrl || user.avatar,
-            isActive: true,
-          }));
-          setCurrentRoleState(userRole);
+
+        if (result.status === 'restored' || result.status === 'offline') {
+          if (result.user) {
+            setCurrentUserState(result.user);
+            setActiveUserId(result.user.id);
+            if (result.user.clientId) {
+              setActiveClientId(result.user.clientId);
+            }
+            if (result.user.technicianId) {
+              setActiveTechnicianId(result.user.technicianId);
+            }
+          }
+          setCurrentRoleState(result.role);
           setIsAuthenticated(true);
         } else {
-          clearTokens();
           setIsAuthenticated(false);
         }
-      } catch {
-        // If server is unreachable offline but local token is valid, preserve auth
+      } catch (err) {
+        console.warn('[AppContext] Session restoration error:', err);
+        if (isMounted) {
+          const cached = getCachedUserSession();
+          if (cached && cached.user) {
+            setIsAuthenticated(true);
+          } else {
+            setIsAuthenticated(false);
+          }
+        }
       } finally {
         if (isMounted) {
           setIsAuthLoading(false);
@@ -728,10 +673,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     };
 
-    validateSession();
+    validateAndRestoreSession();
+
+    // Register foreground & background lifecycle listener
+    const cleanupLifecycle = registerSessionLifecycle({
+      onSessionRevoked: (msg) => {
+        if (isMounted) {
+          setIsAuthenticated(false);
+          if (msg) showToast('warning', 'Session Ended', msg);
+        }
+      },
+      onSessionRefreshed: () => {
+        // Transparent token refresh succeeded in background
+      },
+    });
 
     return () => {
       isMounted = false;
+      cleanupLifecycle();
     };
   }, []);
 
@@ -1023,6 +982,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setActiveBranchIdState(finalUser.branchId);
       localStorage.setItem(STORAGE_PREFIX + 'branchId', finalUser.branchId);
     }
+    if (finalUser.clientId) {
+      localStorage.setItem(STORAGE_PREFIX + 'clientId', finalUser.clientId);
+    } else {
+      localStorage.removeItem(STORAGE_PREFIX + 'clientId');
+    }
+    if (finalUser.technicianId) {
+      localStorage.setItem(STORAGE_PREFIX + 'technicianId', finalUser.technicianId);
+    } else {
+      localStorage.removeItem(STORAGE_PREFIX + 'technicianId');
+    }
+
+    cacheUserSession(finalUser, finalUser.role, isMasterAdminSessionValid());
+    setIsAuthenticated(true);
+    localStorage.removeItem('wepsun_explicit_logout');
 
     showToast(
       'success',
@@ -1035,7 +1008,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (role === currentRole && currentUser.role === role) return;
     setCurrentRoleState(role);
     localStorage.setItem(STORAGE_PREFIX + 'role', role);
-    
+
     // Check if current user is already of this role
     if (currentUser.role === role) {
       return;
@@ -1269,38 +1242,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const isMasterAuthenticated = useMemo(() => {
     if (typeof window === 'undefined') return false;
-    const isMasterAuth =
-      sessionStorage.getItem('wepsun_master_authenticated') === 'true' ||
-      localStorage.getItem('wepsun_master_authenticated') === 'true';
-    return Boolean(isMasterAuth);
-  }, []);
+    if (!isAuthenticated) return false;
+    return isMasterAdminSessionValid();
+  }, [isAuthenticated, currentRole]);
 
   const logout = useCallback(async () => {
-    try {
-      const refreshToken = getRefreshToken();
-      await apiService.logout(refreshToken || undefined).catch(() => {});
-    } catch {
-      // Non-blocking
-    }
+    await terminateSession();
     clearTokens();
     if (typeof window !== 'undefined') {
-      sessionStorage.removeItem('wepsun_master_authenticated');
-      sessionStorage.removeItem('wepsun_role');
-      sessionStorage.removeItem('wepsun_lift_saas_v2_role');
-      sessionStorage.removeItem('wepsun_userId');
-      sessionStorage.removeItem('wepsun_lift_saas_v2_userId');
-
-      localStorage.removeItem('wepsun_master_authenticated');
-      localStorage.removeItem('wepsun_role');
-      localStorage.removeItem('wepsun_userId');
-      localStorage.removeItem(STORAGE_PREFIX + 'role');
-      localStorage.removeItem(STORAGE_PREFIX + 'userId');
-      localStorage.removeItem(STORAGE_PREFIX + 'currentUser');
-
       const clientUser = INITIAL_USERS.find((u) => u.role === 'client') || INITIAL_USERS[2];
-      setCurrentUserState(clientUser);
+      setCurrentUserState({
+        ...clientUser,
+        clientId: undefined,
+        technicianId: undefined,
+        name: '',
+        email: '',
+      });
       setCurrentRoleState('client');
-      setActiveUserId(clientUser.id);
+      setActiveUserId('');
+      setActiveClientId('');
+      setActiveTechnicianId('');
+
+      setBuildings([]);
+      setLifts([]);
+      setComplaints([]);
+      setPmRecords([]);
+      setAmcContracts([]);
+      setQuotations([]);
+      setWorkOrders([]);
+      setInvoices([]);
+      setServiceReports([]);
+      setFeedbacks([]);
+      setClientNotifications([]);
+      setAppNotifications([]);
+      setGpsCheckIns([]);
 
       setIsAuthenticated(false);
 
@@ -1475,8 +1450,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem(STORAGE_PREFIX + 'clientProfiles', JSON.stringify(clientProfiles));
   }, [clientProfiles]);
 
-  // Strict Client-Scoped Isolation Helpers (Zero Cross-Client Data Leakage)
-  const effectiveClientId = currentUser.clientId || activeClientId || 'client-1';
+  const effectiveClientId = currentUser.clientId || activeClientId || '';
 
   const clientProfile: ClientProfile = useMemo(() => {
     return (
@@ -1636,12 +1610,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         prev.map((t) =>
           t.id === activeTechnicianId
             ? {
-                ...t,
-                name: userData.name || t.name,
-                email: userData.email || t.email,
-                phone: userData.phone || t.phone,
-                avatar: userData.avatar || t.avatar,
-              }
+              ...t,
+              name: userData.name || t.name,
+              email: userData.email || t.email,
+              phone: userData.phone || t.phone,
+              avatar: userData.avatar || t.avatar,
+            }
             : t
         )
       );
@@ -1666,12 +1640,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         prev.map((u) =>
           u.technicianId === techId || u.id === techId
             ? {
-                ...u,
-                name: data.name || u.name,
-                email: data.email || u.email,
-                phone: data.phone || u.phone,
-                avatar: data.avatar || u.avatar,
-              }
+              ...u,
+              name: data.name || u.name,
+              email: data.email || u.email,
+              phone: data.phone || u.phone,
+              avatar: data.avatar || u.avatar,
+            }
             : u
         )
       );
@@ -1705,15 +1679,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       prev.map((u) =>
         u.id === currentUser.id || u.clientId === effectiveClientId
           ? {
-              ...u,
-              name: profileData.contactPerson || profileData.companyName || u.name,
-              email: profileData.email || u.email,
-              phone: profileData.phone || u.phone,
-              avatar: profileData.logo || u.avatar,
-              address: profileData.address || u.address,
-              city: profileData.city || u.city,
-              companyName: profileData.companyName || u.companyName,
-            }
+            ...u,
+            name: profileData.contactPerson || profileData.companyName || u.name,
+            email: profileData.email || u.email,
+            phone: profileData.phone || u.phone,
+            avatar: profileData.logo || u.avatar,
+            address: profileData.address || u.address,
+            city: profileData.city || u.city,
+            companyName: profileData.companyName || u.companyName,
+          }
           : u
       )
     );
@@ -1738,10 +1712,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       prev.map((q) =>
         q.id === quoteId
           ? {
-              ...q,
-              status: 'rejected',
-              clientFeedback: reason || 'Rejected by client',
-            }
+            ...q,
+            status: 'rejected',
+            clientFeedback: reason || 'Rejected by client',
+          }
           : q
       )
     );
@@ -1753,10 +1727,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       prev.map((q) =>
         q.id === quoteId
           ? {
-              ...q,
-              status: 'clarification_requested',
-              clarificationNotes: notes,
-            }
+            ...q,
+            status: 'clarification_requested',
+            clarificationNotes: notes,
+          }
           : q
       )
     );
@@ -1872,10 +1846,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       liftNumber: complaintData.liftNumber || targetLift?.liftNumber || 'LIFT-00',
       buildingId: complaintData.buildingId || targetLift?.buildingId || '',
       buildingName: complaintData.buildingName || targetLift?.buildingName || '',
-      clientId: complaintData.clientId || targetLift?.clientId || activeClientId,
-      clientName: complaintData.clientName || targetLift?.clientName || 'Valued Society',
-      clientPhone: complaintData.clientPhone || targetLift?.clientPhone || '',
-      clientEmail: complaintData.clientEmail || '',
+      clientId: complaintData.clientId || targetLift?.clientId || currentUser.clientId || activeClientId || '',
+      clientName: complaintData.clientName || targetLift?.clientName || currentUser.companyName || currentUser.name || 'Valued Society',
+      clientPhone: complaintData.clientPhone || targetLift?.clientPhone || currentUser.phone || '',
+      clientEmail: complaintData.clientEmail || currentUser.email || '',
       issueType: complaintData.issueType || 'lift_not_moving',
       title: complaintData.title || 'Lift Breakdown Reported',
       description: complaintData.description || '',
@@ -2326,6 +2300,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: reportId,
       companyId: complaint?.companyId || activeCompanyId,
       branchId: complaint?.branchId || 'br-thn-1',
+      clientId: complaint?.clientId || lift?.clientId || currentUser.clientId || activeClientId || '',
       reportNumber,
       ticketId,
       ticketNumber: complaint?.ticketNumber || 'TKT-000',
@@ -2407,10 +2382,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         prev.map((l) =>
           l.id === lift.id
             ? {
-                ...l,
-                currentStatus: data.liftOperatingStatus === 'Shut Down (Parts Pending)' ? 'breakdown' : 'operational',
-                lastPmDate: new Date().toISOString().split('T')[0],
-              }
+              ...l,
+              currentStatus: data.liftOperatingStatus === 'Shut Down (Parts Pending)' ? 'breakdown' : 'operational',
+              lastPmDate: new Date().toISOString().split('T')[0],
+            }
             : l
         )
       );
@@ -2421,11 +2396,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       prev.map((t) =>
         t.id === tech.id
           ? {
-              ...t,
-              currentStatus: 'available',
-              activeJobId: undefined,
-              totalResolved: t.totalResolved + 1,
-            }
+            ...t,
+            currentStatus: 'available',
+            activeJobId: undefined,
+            totalResolved: t.totalResolved + 1,
+          }
           : t
       )
     );
@@ -2488,11 +2463,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         prev.map((l) =>
           l.id === recordData.liftId
             ? {
-                ...l,
-                lastPmDate: newRecord.date,
-                nextPmDate: newRecord.nextPmDate,
-                currentStatus: newRecord.overallStatus === 'critical_issues' ? 'inspection_required' : 'operational',
-              }
+              ...l,
+              lastPmDate: newRecord.date,
+              nextPmDate: newRecord.nextPmDate,
+              currentStatus: newRecord.overallStatus === 'critical_issues' ? 'inspection_required' : 'operational',
+            }
             : l
         )
       );
@@ -2541,10 +2516,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       liftId: quoteData.liftId || '',
       liftNumber: quoteData.liftNumber || '',
       buildingName: quoteData.buildingName || '',
-      clientId: quoteData.clientId || activeClientId,
-      clientName: quoteData.clientName || 'Valued Society',
-      clientEmail: quoteData.clientEmail || '',
-      clientPhone: quoteData.clientPhone || '',
+      clientId: quoteData.clientId || (currentRole === 'client' ? (currentUser.clientId || effectiveClientId) : (activeClientId || '')),
+      clientName: quoteData.clientName || (currentRole === 'client' ? (currentUser.companyName || currentUser.name || 'Valued Society') : 'Valued Society'),
+      clientEmail: quoteData.clientEmail || (currentRole === 'client' ? currentUser.email : ''),
+      clientPhone: quoteData.clientPhone || (currentRole === 'client' ? (currentUser.phone || '') : ''),
       subject: quoteData.subject || 'Lift Repair & Spare Parts Quotation',
       items: quoteData.items || [],
       subtotal,
@@ -2590,10 +2565,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       prev.map((q) =>
         q.id === quoteId
           ? {
-              ...q,
-              status,
-              clarificationNotes: notes || q.clarificationNotes,
-            }
+            ...q,
+            status,
+            clarificationNotes: notes || q.clarificationNotes,
+          }
           : q
       )
     );
@@ -2731,8 +2706,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       liftId: orderData.liftId || '',
       liftNumber: orderData.liftNumber || '',
       buildingName: orderData.buildingName || '',
-      clientId: orderData.clientId || activeClientId,
-      clientName: orderData.clientName || '',
+      clientId: orderData.clientId || (currentRole === 'client' ? (currentUser.clientId || effectiveClientId) : (activeClientId || '')),
+      clientName: orderData.clientName || (currentRole === 'client' ? (currentUser.companyName || currentUser.name || '') : ''),
       technicianId: orderData.technicianId,
       technicianName: orderData.technicianName,
       title: orderData.title || 'Field Work Order',
@@ -2777,12 +2752,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       prev.map((inv) =>
         inv.id === invoiceId
           ? {
-              ...inv,
-              status: 'paid',
-              paidAmount: inv.grandTotal,
-              paymentMethod: method,
-              transactionId: txId,
-            }
+            ...inv,
+            status: 'paid',
+            paidAmount: inv.grandTotal,
+            paymentMethod: method,
+            transactionId: txId,
+          }
           : inv
       )
     );
@@ -2837,11 +2812,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       companyId: liftData.companyId || activeCompanyId,
       branchId: liftData.branchId || (activeBranchId !== 'all' ? activeBranchId : 'br-thn-1'),
       liftNumber,
-      buildingId: liftData.buildingId || 'bld-1',
-      buildingName: liftData.buildingName || 'Greenwood Heights CHS',
-      clientId: liftData.clientId || 'client-1',
-      clientName: liftData.clientName || 'Greenwood Heights Society',
-      clientPhone: liftData.clientPhone || '+91 98210 99881',
+      buildingId: liftData.buildingId || (buildings.length > 0 ? buildings[0].id : 'bld-1'),
+      buildingName: liftData.buildingName || (buildings.length > 0 ? buildings[0].name : 'Primary Premises'),
+      clientId: liftData.clientId || (currentRole === 'client' ? (currentUser.clientId || effectiveClientId) : (activeClientId || '')),
+      clientName: liftData.clientName || (currentRole === 'client' ? (currentUser.companyName || currentUser.name || 'Valued Client') : 'Valued Client'),
+      clientPhone: liftData.clientPhone || (currentRole === 'client' ? (currentUser.phone || '+91 98200 00000') : '+91 98200 00000'),
       brand: liftData.brand || 'WEPSUN MRL Traction',
       model: liftData.model || 'WEP-MAX 3000 Eco',
       type: liftData.type || 'Passenger',
@@ -2925,8 +2900,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       pinCode: buildingData.pinCode || '400001',
       contactPerson: buildingData.contactPerson || 'Building Secretary / Manager',
       contactPhone: buildingData.contactPhone || '+91 98200 00000',
-      clientId: buildingData.clientId || activeClientId,
-      clientName: buildingData.clientName || 'Client / Society Organization',
+      clientId: buildingData.clientId || (currentRole === 'client' ? (currentUser.clientId || effectiveClientId) : (activeClientId || '')),
+      clientName: buildingData.clientName || (currentRole === 'client' ? (currentUser.companyName || currentUser.name || 'Client / Society Organization') : 'Client / Society Organization'),
       totalLifts: buildingData.totalLifts || 0,
       liftIds: buildingData.liftIds || [],
       lat: buildingData.lat || 19.076,
@@ -2979,8 +2954,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       companyId: activeCompanyId,
       branchId: activeBranchId !== 'all' ? activeBranchId : 'br-thn-1',
       contractNumber,
-      clientId: contractData.clientId || activeClientId,
-      clientName: contractData.clientName || 'Valued Society',
+      clientId: contractData.clientId || (currentRole === 'client' ? (currentUser.clientId || effectiveClientId) : (activeClientId || '')),
+      clientName: contractData.clientName || (currentRole === 'client' ? (currentUser.companyName || currentUser.name || 'Valued Society') : 'Valued Society'),
       buildingId: contractData.buildingId || 'bld-1',
       buildingName: contractData.buildingName || 'Greenwood Heights CHS',
       liftIds: contractData.liftIds || ['lift-1'],
@@ -3089,7 +3064,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setServiceReports((prev) =>
       prev.map((r) => (r.ticketId === ticketId ? { ...r, clientRating: rating, clientFeedback: feedback } : r))
     );
-    
+
     // Also create a feedback item
     const targetComp = complaints.find(c => c.id === ticketId);
     if (targetComp) {
@@ -3123,7 +3098,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       liftId: feedbackData.liftId || '',
       liftNumber: feedbackData.liftNumber || 'WPS-LIFT-01',
       buildingName: feedbackData.buildingName || 'Building Complex',
-      clientId: feedbackData.clientId || activeClientId,
+      clientId: feedbackData.clientId || (currentRole === 'client' ? (currentUser.clientId || effectiveClientId) : (activeClientId || '')),
       clientName: feedbackData.clientName || currentUser.name || 'Valued Client',
       clientPhone: feedbackData.clientPhone || currentUser.phone,
       technicianId: feedbackData.technicianId,
@@ -3181,14 +3156,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       prev.map((fb) =>
         fb.id === feedbackId
           ? {
-              ...fb,
-              status: 'action_taken',
-              adminReply: {
-                message: replyMessage,
-                repliedBy: currentUser.name || 'Service Manager',
-                repliedAt: new Date().toISOString(),
-              },
-            }
+            ...fb,
+            status: 'action_taken',
+            adminReply: {
+              message: replyMessage,
+              repliedBy: currentUser.name || 'Service Manager',
+              repliedAt: new Date().toISOString(),
+            },
+          }
           : fb
       )
     );

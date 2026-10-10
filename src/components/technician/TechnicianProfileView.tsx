@@ -22,6 +22,7 @@ import {
   Camera,
   Car,
   FileBadge,
+  LogOut,
 } from 'lucide-react';
 import { Technician, TechnicianJob, InventoryItem } from '../../types';
 import { useApp } from '../../context/AppContext';
@@ -40,7 +41,7 @@ export const TechnicianProfileView: React.FC<TechnicianProfileViewProps> = ({
   inventory,
   showToast,
 }) => {
-  const { currentUser, updateTechnicianProfile } = useApp();
+  const { currentUser, updateTechnicianProfile, showLogoutModal, logout } = useApp();
 
   const [isEditing, setIsEditing] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -179,6 +180,14 @@ export const TechnicianProfileView: React.FC<TechnicianProfileViewProps> = ({
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
               <span>{isSyncing ? 'Syncing...' : 'Sync Cloud Data'}</span>
+            </button>
+
+            <button
+              onClick={() => showLogoutModal(() => logout())}
+              className="px-3.5 py-2 rounded-xl bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+            >
+              <LogOut className="w-3.5 h-3.5 text-rose-600" />
+              <span>Log Out</span>
             </button>
           </div>
         </div>

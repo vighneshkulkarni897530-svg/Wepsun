@@ -11,7 +11,6 @@ import {
   UserCheck,
   CreditCard,
   Globe2,
-  QrCode,
   AlertTriangle,
   RotateCcw,
   Palette,
@@ -44,7 +43,6 @@ import { GoogleAuthModal } from '../common/GoogleAuthModal';
 
 interface HeaderProps {
   onToggleSidebar: () => void;
-  onOpenQrScanner?: () => void;
   onOpenRaiseComplaint?: () => void;
   onOpenLoginModal?: () => void;
   onNavigateTab?: (tab: NavTabId) => void;
@@ -52,7 +50,6 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({
   onToggleSidebar,
-  onOpenQrScanner,
   onOpenRaiseComplaint,
   onOpenLoginModal,
   onNavigateTab,

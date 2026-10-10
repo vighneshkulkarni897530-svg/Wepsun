@@ -291,7 +291,7 @@ export const DesignSystemShowcase: React.FC = () => {
               </div>
               <div className="md:w-2/3">
                 <h3 className="text-sm sm:text-base font-semibold text-slate-900">
-                  Elevator Passport #ELEV-001 — Passenger Unit A
+                  Elevator Spec Sheet #ELEV-001 — Passenger Unit A
                 </h3>
               </div>
             </div>

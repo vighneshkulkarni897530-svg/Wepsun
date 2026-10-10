@@ -3,7 +3,6 @@ import {
   Layers,
   Search,
   Plus,
-  QrCode,
   ShieldCheck,
   AlertTriangle,
   Building,
@@ -18,8 +17,6 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { Lift, LiftType, MachineType } from '../../types';
-import { LiftPassportModal } from '../common/LiftPassportModal';
-import { LiftQrModal } from '../common/LiftQrModal';
 import { IoTLiftSimulationModal } from '../common/IoTLiftSimulationModal';
 import { Activity, Cpu } from 'lucide-react';
 
@@ -27,8 +24,6 @@ export const LiftDirectory: React.FC = () => {
   const { lifts, buildings, addNewLift, amcContracts } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
-  const [selectedLiftForPassport, setSelectedLiftForPassport] = useState<Lift | null>(null);
-  const [selectedLiftForQr, setSelectedLiftForQr] = useState<Lift | null>(null);
   const [selectedLiftForIoT, setSelectedLiftForIoT] = useState<Lift | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingLift, setEditingLift] = useState<Lift | null>(null);
@@ -98,7 +93,7 @@ export const LiftDirectory: React.FC = () => {
             Lift Management
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Digital lifecycle registry, equipment details, AMC contracts, and unique QR passports.
+            Digital lifecycle registry, equipment details, and AMC contracts.
           </p>
         </div>
 
@@ -223,7 +218,7 @@ export const LiftDirectory: React.FC = () => {
                   </span>
                 </td>
 
-                {/* Actions: View Digital Passport, Edit Lift, Generate QR */}
+                {/* Actions: Launch IoT, Edit Lift */}
                 <td className="py-3.5 px-3 text-right">
                   <div className="flex items-center justify-end gap-1.5">
                     <button
@@ -236,15 +231,6 @@ export const LiftDirectory: React.FC = () => {
                     </button>
 
                     <button
-                      onClick={() => setSelectedLiftForPassport(lift)}
-                      className="px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-[#1976D2] font-bold text-[11px] border border-blue-200 transition-colors flex items-center gap-1"
-                      title="View Digital Passport"
-                    >
-                      <Eye className="w-3 h-3" />
-                      <span className="hidden xl:inline">Passport</span>
-                    </button>
-
-                    <button
                       onClick={() => {
                         setEditingLift(lift);
                         setLiftNumber(lift.liftNumber);
@@ -254,20 +240,11 @@ export const LiftDirectory: React.FC = () => {
                         setCapacityKg(lift.capacityKg);
                         setIsAddModalOpen(true);
                       }}
-                      className="px-2 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] transition-colors flex items-center gap-1"
+                      className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] transition-colors flex items-center gap-1"
                       title="Edit Lift"
                     >
                       <Edit2 className="w-3 h-3" />
-                      <span className="hidden xl:inline">Edit</span>
-                    </button>
-
-                    <button
-                      onClick={() => setSelectedLiftForQr(lift)}
-                      className="px-2.5 py-1.5 rounded-lg bg-[#1976D2] hover:bg-blue-700 text-white font-bold text-[11px] shadow-sm transition-colors flex items-center gap-1"
-                      title="Generate QR Code"
-                    >
-                      <QrCode className="w-3 h-3" />
-                      <span>QR</span>
+                      <span>Edit</span>
                     </button>
                   </div>
                 </td>
@@ -413,20 +390,7 @@ export const LiftDirectory: React.FC = () => {
         </div>
       )}
 
-      {/* Lift Passport Modal */}
-      <LiftPassportModal
-        lift={selectedLiftForPassport}
-        isOpen={!!selectedLiftForPassport}
-        onClose={() => setSelectedLiftForPassport(null)}
-      />
 
-      {/* Lift QR Code Modal */}
-      <LiftQrModal
-        lift={selectedLiftForQr}
-        isOpen={!!selectedLiftForQr}
-        onClose={() => setSelectedLiftForQr(null)}
-        onOpenPassport={(l) => setSelectedLiftForPassport(l)}
-      />
 
       {/* IoT Lift Telemetry & 3D Simulation Modal */}
       <IoTLiftSimulationModal

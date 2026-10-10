@@ -8,7 +8,6 @@ import {
   AlertTriangle,
   FileCheck2,
   Sparkles,
-  QrCode,
   ShieldCheck,
   User,
   ArrowLeft,
@@ -30,6 +29,7 @@ import {
   ArrowRight,
   Wifi,
   Lock,
+  LogOut,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import {
@@ -56,8 +56,6 @@ import { TechnicianNotificationsView } from './TechnicianNotificationsView';
 import { TechnicianProfileView } from './TechnicianProfileView';
 import { PmChecklistRunner } from './PmChecklistRunner';
 import { AiFaultAssistant } from './AiFaultAssistant';
-import { LiftPassportModal } from '../common/LiftPassportModal';
-import { QrScannerModal } from '../common/QrScannerModal';
 import elevatorLobbyImg from '../../assets/elevator-lobby.jpg';
 
 export type TechNavTab =
@@ -78,13 +76,11 @@ export type TechNavTab =
 export interface TechnicianDashboardProps {
   activeTab?: TechNavTab | string;
   onNavigateTab?: (tab: TechNavTab) => void;
-  onOpenQrScanner?: () => void;
 }
 
 export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
   activeTab: propActiveTab,
   onNavigateTab,
-  onOpenQrScanner: propOpenQrScanner,
 }) => {
   const {
     activeTechnicianId,
@@ -97,6 +93,8 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
     activeCompany,
     serviceReports,
     aiErrorCodes,
+    showLogoutModal,
+    logout,
   } = useApp();
 
   const normalizeTechTab = (tabStr?: string): TechNavTab => {
@@ -200,8 +198,6 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
   }, [lifts, selectedJob]);
 
   // Modals
-  const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
-  const [isPassportOpen, setIsPassportOpen] = useState(false);
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
 
   // Sync state changes back to localStorage
@@ -218,11 +214,6 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
     const handleHash = () => {
       const rawHash = window.location.hash.toLowerCase().replace('#', '');
       const hash = rawHash.split('?')[0];
-      if (hash === 'qr-scanner' || hash === 'qr') {
-        if (propOpenQrScanner) propOpenQrScanner();
-        else setIsQrScannerOpen(true);
-        return;
-      }
       if (
         [
           'dashboard',
@@ -383,17 +374,8 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
             })}
           </div>
 
-          {/* Quick QR Scanner & AI Trigger */}
+          {/* Quick AI Trigger & Logout */}
           <div className="flex items-center gap-1.5 shrink-0 pl-2 border-l border-slate-200">
-            <button
-              onClick={() => setIsQrScannerOpen(true)}
-              title="Scan Lift QR Code"
-              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all flex items-center gap-1 text-xs font-bold"
-            >
-              <QrCode className="w-4 h-4 text-[#1976D2]" />
-              <span className="hidden sm:inline">Scan QR</span>
-            </button>
-
             <button
               onClick={() => setIsAiModalOpen(true)}
               title="Open AI Fault Diagnostic Assistant"
@@ -401,6 +383,15 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
             >
               <Sparkles className="w-4 h-4 text-[#1976D2]" />
               <span className="hidden sm:inline">AI Helper</span>
+            </button>
+
+            <button
+              onClick={() => showLogoutModal(() => logout())}
+              title="Logout from WEPSUN"
+              className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 transition-all flex items-center gap-1 text-xs font-bold border border-rose-200 cursor-pointer"
+            >
+              <LogOut className="w-4 h-4 text-rose-600" />
+              <span className="hidden sm:inline">Logout</span>
             </button>
           </div>
         </div>
@@ -1093,30 +1084,7 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
         }
       })()}
 
-      {/* MODALS */}
-      <QrScannerModal
-        isOpen={isQrScannerOpen}
-        onClose={() => setIsQrScannerOpen(false)}
-        onScanLift={(scannedLift) => {
-          setIsQrScannerOpen(false);
-          // Find matching job or view passport
-          const matchJob = assignedJobs.find((j) => j.liftNumber === scannedLift.liftNumber || j.liftId === scannedLift.id);
-          if (matchJob) {
-            setSelectedJobId(matchJob.id);
-            navigateTab('client_lift');
-            showToast('success', 'Lift QR Matched', `Opened assigned job ${matchJob.jobId} for Lift ${scannedLift.liftNumber}.`);
-          } else {
-            setIsPassportOpen(true);
-          }
-        }}
-      />
 
-      <LiftPassportModal
-        lift={activeLift}
-        isOpen={isPassportOpen}
-        onClose={() => setIsPassportOpen(false)}
-        onRaiseTicket={() => navigateTab('diagnosis')}
-      />
 
       {isAiModalOpen && (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">

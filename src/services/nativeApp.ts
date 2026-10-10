@@ -58,11 +58,29 @@ export async function initNativeApp(): Promise<void> {
     }
 
     try {
-      // Android hardware back button handler
+      // Android hardware back button handler: prevent logout bypass and handle root dashboards
       CapApp.addListener('backButton', ({ canGoBack }) => {
-        if (!canGoBack) {
+        const hash = (typeof window !== 'undefined' ? window.location.hash : '')
+          .toLowerCase()
+          .replace('#', '')
+          .split('?')[0];
+
+        const isAuthEntry =
+          !hash ||
+          hash === 'login' ||
+          hash === 'signin' ||
+          hash === 'signup' ||
+          hash === 'register' ||
+          hash === 'landing' ||
+          hash.startsWith('login-');
+
+        const isRootDashboard = hash === 'home' || hash === 'jobs' || hash === 'dashboard';
+
+        if (isAuthEntry || isRootDashboard || !canGoBack) {
+          // On login/landing screen or top-level dashboard, minimize/exit app cleanly
           CapApp.exitApp();
         } else {
+          // On nested views or modals, navigate backwards within the application
           window.history.back();
         }
       });

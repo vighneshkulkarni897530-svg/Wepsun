@@ -21,19 +21,17 @@ import {
 } from 'lucide-react';
 import { Lift } from '../../types';
 import { useApp } from '../../context/AppContext';
-import { downloadLiftPassportPdf } from '../../services/pdfGenerator';
+import { downloadLiftSpecificationPdf } from '../../services/pdfGenerator';
 import { IoTLiftSimulationModal } from '../common/IoTLiftSimulationModal';
 
 interface ClientLiftsViewProps {
   lifts: Lift[];
-  onOpenPassport: (lift: Lift) => void;
   onRaiseComplaint: (liftId?: string) => void;
   onNavigateTab?: (tab: string) => void;
 }
 
 export const ClientLiftsView: React.FC<ClientLiftsViewProps> = ({
   lifts,
-  onOpenPassport,
   onRaiseComplaint,
   onNavigateTab,
 }) => {
@@ -279,18 +277,12 @@ export const ClientLiftsView: React.FC<ClientLiftsViewProps> = ({
                   <span>IoT Live</span>
                 </button>
                 <button
-                  onClick={() => onOpenPassport(lift)}
+                  onClick={() => downloadLiftSpecificationPdf(lift, activeCompany)}
                   className="flex-1 py-2.5 rounded-xl bg-slate-50 hover:bg-blue-50 text-[#1976D2] font-bold text-xs border border-slate-200 transition-colors flex items-center justify-center gap-1.5"
+                  title="Download Technical Specification PDF"
                 >
-                  <FileCheck className="w-3.5 h-3.5" />
-                  <span>Details</span>
-                </button>
-                <button
-                  onClick={() => downloadLiftPassportPdf(lift, activeCompany)}
-                  className="p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 transition-colors"
-                  title="Download Specification Passport PDF"
-                >
-                  <Download className="w-4 h-4" />
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Specs PDF</span>
                 </button>
                 <button
                   onClick={() => onRaiseComplaint(lift.id)}
@@ -358,10 +350,12 @@ export const ClientLiftsView: React.FC<ClientLiftsViewProps> = ({
                           <span>IoT</span>
                         </button>
                         <button
-                          onClick={() => onOpenPassport(lift)}
-                          className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs"
+                          onClick={() => downloadLiftSpecificationPdf(lift, activeCompany)}
+                          className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1"
+                          title="Download Technical Specification Sheet"
                         >
-                          Details
+                          <Download className="w-3.5 h-3.5 text-slate-500" />
+                          <span>Specs</span>
                         </button>
                         <button
                           onClick={() => onRaiseComplaint(lift.id)}

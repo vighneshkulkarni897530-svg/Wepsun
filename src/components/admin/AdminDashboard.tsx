@@ -307,7 +307,7 @@ export const AdminDashboard: React.FC = () => {
                     <Layers className="w-4 h-4 text-[#1976D2]" />
                     <div>
                       <span className="font-bold text-slate-900 block">View Lifts Directory</span>
-                      <span className="text-[11px] text-slate-500">Digital passports & specifications</span>
+                      <span className="text-[11px] text-slate-500">Equipment specifications & directory</span>
                     </div>
                   </div>
                   <ArrowRight className="w-4 h-4 text-slate-400" />

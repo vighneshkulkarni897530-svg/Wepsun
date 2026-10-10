@@ -470,18 +470,22 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         };
 
         // Set persistent Master Admin session tokens
+        const masterExpiry = Date.now() + 30 * 24 * 60 * 60 * 1000;
         sessionStorage.setItem('wepsun_master_authenticated', 'true');
+        sessionStorage.setItem('wepsun_master_session_expiry', String(masterExpiry));
         sessionStorage.setItem('wepsun_role', 'master_admin');
         sessionStorage.setItem('wepsun_lift_saas_v2_role', 'master_admin');
         sessionStorage.setItem('wepsun_userId', masterUser.id);
         sessionStorage.setItem('wepsun_lift_saas_v2_userId', masterUser.id);
 
         localStorage.setItem('wepsun_master_authenticated', 'true');
+        localStorage.setItem('wepsun_master_session_expiry', String(masterExpiry));
         localStorage.setItem('wepsun_role', 'master_admin');
         localStorage.setItem('wepsun_lift_saas_v2_role', 'master_admin');
         localStorage.setItem('wepsun_userId', masterUser.id);
         localStorage.setItem('wepsun_lift_saas_v2_userId', masterUser.id);
         localStorage.setItem('wepsun_lift_saas_v2_currentUser', JSON.stringify(masterUser));
+        localStorage.removeItem('wepsun_explicit_logout');
 
         loginAsUser(masterUser);
         setCurrentRole('master_admin');

@@ -117,9 +117,19 @@ router.post('/submit', async (req: any, res: Response): Promise<void> => {
     let newFeedback: any = null;
 
     try {
+      let targetClientId: string | null = req.user?.clientId || null;
+      if (!targetClientId && liftNumber) {
+        try {
+          const l = await prisma.lift.findFirst({ where: { permanentLiftId: liftNumber, companyId } });
+          if (l) targetClientId = l.clientId;
+        } catch {}
+      }
+
       newFeedback = await prisma.customerFeedback.create({
         data: {
           companyId,
+          clientId: targetClientId,
+          userId: req.user?.sub || null,
           clientName,
           clientPhone: clientPhone || null,
           buildingName,

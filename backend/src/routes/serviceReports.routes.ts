@@ -9,8 +9,20 @@ const router = Router();
 router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const companyId = req.user!.companyId;
-    const { liftId, technicianId } = req.query;
+    const { liftId, technicianId: techQuery } = req.query;
     const isClient = req.user!.role?.toUpperCase() === 'CLIENT';
+    const isTechnician = req.user!.role?.toUpperCase() === 'TECHNICIAN';
+    const clientId = req.user!.clientId;
+    const technicianId = req.user!.technicianId;
+
+    if (isClient && !clientId) {
+      res.json({ success: true, count: 0, data: [] });
+      return;
+    }
+    if (isTechnician && !technicianId) {
+      res.json({ success: true, count: 0, data: [] });
+      return;
+    }
 
     let result: any[] = [];
 
@@ -19,8 +31,9 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response): P
         where: {
           companyId,
           ...(liftId ? { liftId: liftId as string } : {}),
-          ...(technicianId ? { technicianId: technicianId as string } : {}),
-          ...(isClient && req.user!.clientId ? { lift: { clientId: req.user!.clientId } } : {}),
+          ...(techQuery && !isTechnician ? { technicianId: techQuery as string } : {}),
+          ...(isTechnician ? { technicianId: technicianId! } : {}),
+          ...(isClient ? { OR: [{ clientId: clientId! }, { lift: { clientId: clientId! } }] } : {}),
         },
         include: {
           lift: {
@@ -36,9 +49,12 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response): P
       });
     } catch {
       result = [...db.serviceReports].filter((r) => r.companyId === companyId);
-      if (isClient && req.user!.clientId) {
-        const clientLiftIds = new Set(db.lifts.filter((l) => l.clientId === req.user!.clientId).map((l) => l.id));
-        result = result.filter((r) => r.clientId === req.user!.clientId || clientLiftIds.has(r.liftId));
+      if (isTechnician) {
+        result = result.filter((r) => r.technicianId === technicianId);
+      }
+      if (isClient && clientId) {
+        const clientLiftIds = new Set(db.lifts.filter((l) => l.clientId === clientId).map((l) => l.id));
+        result = result.filter((r) => r.clientId === clientId || clientLiftIds.has(r.liftId));
       }
     }
 
@@ -57,6 +73,10 @@ router.get('/:id', requireAuth, async (req: AuthenticatedRequest, res: Response)
   try {
     const companyId = req.user!.companyId;
     const id = req.params.id as string;
+    const isClient = req.user!.role?.toUpperCase() === 'CLIENT';
+    const isTechnician = req.user!.role?.toUpperCase() === 'TECHNICIAN';
+    const clientId = req.user!.clientId;
+    const technicianId = req.user!.technicianId;
 
     let report: any = null;
 
@@ -91,13 +111,28 @@ router.get('/:id', requireAuth, async (req: AuthenticatedRequest, res: Response)
     }
 
     // Object-level check for Client
-    if (req.user!.role?.toUpperCase() === 'CLIENT' && req.user!.clientId && (report.clientId ? report.clientId !== req.user!.clientId : report.lift?.clientId !== req.user!.clientId)) {
-      res.status(403).json({
-        success: false,
-        message: 'Access Denied – You are not authorized to view this information.',
-        code: 'FORBIDDEN_OBJECT',
-      });
-      return;
+    if (isClient) {
+      const matchesClient = (report.clientId && report.clientId === clientId) || (report.lift?.clientId && report.lift.clientId === clientId);
+      if (!clientId || !matchesClient) {
+        res.status(403).json({
+          success: false,
+          message: 'Access Denied – You are not authorized to view this information.',
+          code: 'FORBIDDEN_OBJECT',
+        });
+        return;
+      }
+    }
+
+    // Object-level check for Technician
+    if (isTechnician) {
+      if (!technicianId || report.technicianId !== technicianId) {
+        res.status(403).json({
+          success: false,
+          message: 'Access Denied – You are not authorized to view this service report.',
+          code: 'FORBIDDEN_OBJECT',
+        });
+        return;
+      }
     }
 
     res.json({
@@ -138,11 +173,22 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): 
 
     try {
       newReport = await prisma.$transaction(async (tx) => {
+        let targetClientId: string | null = null;
+        if (liftId) {
+          const l = await tx.lift.findUnique({ where: { id: liftId } });
+          if (l) targetClientId = l.clientId;
+        } else if (ticketId) {
+          const c = await tx.complaint.findUnique({ where: { id: ticketId } });
+          if (c) targetClientId = c.clientId;
+        }
+
         // 1. Create service report
         const rep = await tx.serviceReport.create({
           data: {
             companyId,
             branchId,
+            clientId: targetClientId,
+            createdById: req.user!.sub,
             reportNumber,
             ticketId,
             liftId,

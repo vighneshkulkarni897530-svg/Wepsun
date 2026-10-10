@@ -359,6 +359,36 @@ router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Respo
       const displayName = googleName || cleanEmail.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
       const newUserId = 'usr-g-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
 
+      let createdClientId: string | null = null;
+      try {
+        // Find or create Client profile for this Google user
+        const existingClient = await prisma.client.findFirst({
+          where: {
+            companyId: defaultCompanyId,
+            email: { equals: cleanEmail, mode: 'insensitive' as const },
+          },
+        });
+        if (existingClient) {
+          createdClientId = existingClient.id;
+        } else {
+          const newClient = await prisma.client.create({
+            data: {
+              companyId: defaultCompanyId,
+              branchId: 'br-mum-1',
+              name: displayName + ' Property',
+              contactPerson: displayName,
+              email: cleanEmail,
+              phone: '+91 98200 00000',
+              billingAddress: 'Registered Office',
+              status: 'active',
+            },
+          });
+          createdClientId = newClient.id;
+        }
+      } catch (clientErr) {
+        console.warn('[AuthRoute] Client auto-creation notice:', clientErr);
+      }
+
       try {
         user = await prisma.user.create({
           data: {
@@ -369,6 +399,7 @@ router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Respo
             authProvider: 'google',
             role: assignedRole as any,
             companyId: defaultCompanyId,
+            clientId: createdClientId,
             avatarUrl: googleAvatar || null,
             isActive: true,
             phone: '+91 98200 00000',
@@ -388,13 +419,46 @@ router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Respo
           role: assignedRole,
           companyId: defaultCompanyId,
           branchId: null,
-          clientId: 'client-1',
+          clientId: createdClientId || 'client-' + newUserId,
           technicianId: null,
           avatarUrl: googleAvatar || null,
           isActive: true,
           tokenVersion: 0,
         };
         db.users.push(user);
+      }
+    }
+
+    // Ensure existing user with CLIENT role has a linked Client record
+    if (user && user.role === 'CLIENT' && !user.clientId) {
+      try {
+        let clientRec = await prisma.client.findFirst({
+          where: {
+            companyId: user.companyId || 'comp-1',
+            email: { equals: cleanEmail, mode: 'insensitive' as const },
+          },
+        });
+        if (!clientRec) {
+          clientRec = await prisma.client.create({
+            data: {
+              companyId: user.companyId || 'comp-1',
+              branchId: user.branchId || 'br-mum-1',
+              name: user.name + ' Property',
+              contactPerson: user.name,
+              email: user.email,
+              phone: user.phone || '+91 98200 00000',
+              billingAddress: 'Registered Office',
+              status: 'active',
+            },
+          });
+        }
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { clientId: clientRec.id },
+        });
+        user.clientId = clientRec.id;
+      } catch (err) {
+        console.warn('[AuthRoute] Failed to link existing Google client:', err);
       }
     }
 
@@ -922,6 +986,57 @@ router.post('/login', authLimiter, async (req: AuthenticatedRequest, res: Respon
       // Non-blocking
     }
 
+    // Ensure client or technician role has valid identity linkage
+    if (user.role === 'CLIENT' && !user.clientId) {
+      try {
+        let clientRec = await prisma.client.findFirst({
+          where: {
+            companyId: user.companyId,
+            email: { equals: user.email, mode: 'insensitive' as const },
+          },
+        });
+        if (!clientRec) {
+          clientRec = await prisma.client.create({
+            data: {
+              companyId: user.companyId,
+              branchId: user.branchId || 'br-mum-1',
+              name: user.name + ' Property',
+              contactPerson: user.name,
+              email: user.email,
+              phone: user.phone || '+91 98200 00000',
+              billingAddress: 'Registered Office',
+              status: 'active',
+            },
+          });
+        }
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { clientId: clientRec.id },
+        });
+        user.clientId = clientRec.id;
+      } catch (linkErr) {
+        console.warn('[AuthRoute] Client auto-link notice on password login:', linkErr);
+      }
+    } else if (user.role === 'TECHNICIAN' && !user.technicianId) {
+      try {
+        let techRec = await prisma.technician.findFirst({
+          where: {
+            companyId: user.companyId,
+            email: { equals: user.email, mode: 'insensitive' as const },
+          },
+        });
+        if (techRec) {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { technicianId: techRec.id },
+          });
+          user.technicianId = techRec.id;
+        }
+      } catch (linkErr) {
+        console.warn('[AuthRoute] Technician auto-link notice on password login:', linkErr);
+      }
+    }
+
     // Generate JWT Access Token
     const jwtPayload: JwtUserPayload = {
       sub: user.id,
@@ -1337,6 +1452,39 @@ router.get('/me', requireAuth, async (req: AuthenticatedRequest, res: Response):
     if (!user) {
       res.status(404).json({ success: false, message: 'User not found', code: 'USER_NOT_FOUND' });
       return;
+    }
+
+    // Auto-link client identity if missing
+    if (user.role === 'CLIENT' && !user.clientId) {
+      try {
+        let clientRec = await prisma.client.findFirst({
+          where: {
+            companyId: user.companyId || 'comp-1',
+            email: { equals: user.email, mode: 'insensitive' as const },
+          },
+        });
+        if (!clientRec) {
+          clientRec = await prisma.client.create({
+            data: {
+              companyId: user.companyId || 'comp-1',
+              branchId: user.branchId || 'br-mum-1',
+              name: user.name + ' Property',
+              contactPerson: user.name,
+              email: user.email,
+              phone: user.phone || '+91 98200 00000',
+              billingAddress: 'Registered Office',
+              status: 'active',
+            },
+          });
+        }
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { clientId: clientRec.id },
+        });
+        user.clientId = clientRec.id;
+      } catch (err) {
+        console.warn('[AuthRoute] /me client auto-link notice:', err);
+      }
     }
 
     // Role-based permissions mapping

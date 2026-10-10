@@ -60,6 +60,14 @@ router.get('/:id', requireAuth, async (req: AuthenticatedRequest, res: Response)
       return;
     }
 
+    // Object-level check: Technician can only view their own profile & location history
+    if (req.user!.role?.toUpperCase() === 'TECHNICIAN') {
+      if (!req.user!.technicianId || req.user!.technicianId !== id) {
+        res.status(403).json({ success: false, message: 'Access denied: you can only access your own technician profile.', code: 'FORBIDDEN' });
+        return;
+      }
+    }
+
     res.json({ success: true, data: technician });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err?.message || 'Error fetching technician', code: 'DB_ERROR' });
@@ -73,9 +81,11 @@ router.post('/check-in', requireAuth, requireRole('SUPER_ADMIN', 'COMPANY_ADMIN'
     const { technicianId, ticketId, jobId, latitude, longitude, accuracy, locationAddress } = req.body;
 
     // Object-level check: Technician can only check-in for themselves
-    if (req.user!.role?.toUpperCase() === 'TECHNICIAN' && req.user!.technicianId && technicianId && req.user!.technicianId !== technicianId) {
-      res.status(403).json({ success: false, message: 'Cannot record GPS check-in for another technician.', code: 'FORBIDDEN_OBJECT' });
-      return;
+    if (req.user!.role?.toUpperCase() === 'TECHNICIAN') {
+      if (!req.user!.technicianId || (technicianId && req.user!.technicianId !== technicianId)) {
+        res.status(403).json({ success: false, message: 'Cannot record GPS check-in for another technician.', code: 'FORBIDDEN_OBJECT' });
+        return;
+      }
     }
 
     const effectiveTechId = req.user!.technicianId || technicianId;

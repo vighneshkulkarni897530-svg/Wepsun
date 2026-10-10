@@ -28,14 +28,12 @@ interface ClientComplaintsViewProps {
   complaints: Complaint[];
   onOpenRaiseModal: () => void;
   onOpenEmergencyModal: () => void;
-  onOpenPassportModal?: (liftId: string) => void;
 }
 
 export const ClientComplaintsView: React.FC<ClientComplaintsViewProps> = ({
   complaints,
   onOpenRaiseModal,
   onOpenEmergencyModal,
-  onOpenPassportModal,
 }) => {
   const { serviceReports, rateService, showToast } = useApp();
   const [searchQuery, setSearchQuery] = useState('');

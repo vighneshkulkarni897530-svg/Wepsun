@@ -557,10 +557,10 @@ export function downloadQuotationPdf(quotation: Quotation, company: Partial<Comp
   doc.save(`Quotation-${quotation.quoteNumber}.pdf`);
 }
 
-// 5. Download Lift Passport PDF
-export function downloadLiftPassportPdf(lift: Lift, company: Partial<Company> = DEFAULT_COMPANY) {
+// 5. Download Lift Technical Specification PDF
+export function downloadLiftSpecificationPdf(lift: Lift, company: Partial<Company> = DEFAULT_COMPANY) {
   const doc = new jsPDF('p', 'mm', 'a4');
-  addBrandedHeader(doc, 'Digital Lift Passport', lift.liftNumber, company);
+  addBrandedHeader(doc, 'Lift Technical Specification', lift.liftNumber, company);
 
   let y = 36;
 
@@ -573,7 +573,7 @@ export function downloadLiftPassportPdf(lift: Lift, company: Partial<Company> = 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
   doc.setTextColor(18, 59, 93);
-  doc.text(`ELEVATOR SPECIFICATION CERTIFICATE & PASSPORT`, 20, y + 7);
+  doc.text(`ELEVATOR TECHNICAL SPECIFICATION CERTIFICATE`, 20, y + 7);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
@@ -628,5 +628,5 @@ export function downloadLiftPassportPdf(lift: Lift, company: Partial<Company> = 
   });
 
   addBrandedFooter(doc, 1, 1);
-  doc.save(`Lift-Passport-${lift.liftNumber}.pdf`);
+  doc.save(`Lift-Specification-${lift.liftNumber}.pdf`);
 }

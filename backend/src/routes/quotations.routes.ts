@@ -10,6 +10,12 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response): P
   try {
     const companyId = req.user!.companyId;
     const isClient = req.user!.role?.toUpperCase() === 'CLIENT';
+    const clientId = req.user!.clientId;
+
+    if (isClient && !clientId) {
+      res.json({ success: true, count: 0, data: [] });
+      return;
+    }
 
     let list: any[] = [];
 
@@ -18,7 +24,7 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response): P
         where: {
           companyId,
           ...(req.branchId ? { branchId: req.branchId } : {}),
-          ...(isClient && req.user!.clientId ? { clientId: req.user!.clientId } : {}),
+          ...(isClient ? { clientId: clientId! } : {}),
         },
         include: {
           client: true,
@@ -34,8 +40,8 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response): P
       if (req.branchId) {
         list = list.filter((q) => q.branchId === req.branchId);
       }
-      if (isClient && req.user!.clientId) {
-        list = list.filter((q) => q.clientId === req.user!.clientId);
+      if (isClient) {
+        list = list.filter((q) => q.clientId === clientId);
       }
     }
 
@@ -49,6 +55,8 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response): P
 router.get('/:id', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const companyId = req.user!.companyId;
+    const isClient = req.user!.role?.toUpperCase() === 'CLIENT';
+    const clientId = req.user!.clientId;
     const id = req.params.id as string;
     let quote: any = null;
 
@@ -70,13 +78,15 @@ router.get('/:id', requireAuth, async (req: AuthenticatedRequest, res: Response)
       return;
     }
 
-    if (req.user!.role?.toUpperCase() === 'CLIENT' && req.user!.clientId && quote.clientId !== req.user!.clientId) {
-      res.status(403).json({
-        success: false,
-        message: 'Access Denied – You are not authorized to view this information.',
-        code: 'FORBIDDEN_OBJECT',
-      });
-      return;
+    if (isClient) {
+      if (!clientId || quote.clientId !== clientId) {
+        res.status(403).json({
+          success: false,
+          message: 'Access Denied – You are not authorized to view this information.',
+          code: 'FORBIDDEN_OBJECT',
+        });
+        return;
+      }
     }
 
     res.json({ success: true, data: quote });
@@ -272,10 +282,21 @@ router.patch('/:id', requireAuth, async (req: AuthenticatedRequest, res: Respons
     const id = req.params.id as string;
     const { status, notes, terms, validUntil } = req.body;
 
+    const isClient = req.user!.role?.toUpperCase() === 'CLIENT';
+    const clientId = req.user!.clientId;
+
+    if (isClient) {
+      const existing = await prisma.quotation.findFirst({ where: { id, companyId } });
+      if (!existing || !clientId || existing.clientId !== clientId) {
+        res.status(403).json({ success: false, message: 'Access Denied – You are not authorized to update this quotation.', code: 'FORBIDDEN_OBJECT' });
+        return;
+      }
+    }
+
     let updated = null;
     try {
       await prisma.quotation.updateMany({
-        where: { id, companyId },
+        where: { id, companyId, ...(isClient ? { clientId: clientId! } : {}) },
         data: {
           ...(status ? { status } : {}),
           ...(terms ? { terms } : {}),
