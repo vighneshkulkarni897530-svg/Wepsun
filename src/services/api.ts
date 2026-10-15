@@ -492,8 +492,19 @@ export const apiService = {
   simulateTelemetryEvent: (payload: any, options?: ApiRequestOptions) =>
     apiFetch('/telemetry/simulate', { method: 'POST', body: JSON.stringify(payload), ...options }),
 
-  // Batch Cloud Sync for Multi-Tenant Data Store
+  // Batch Cloud Sync for Multi-Tenant Data Store (Fast Single Round-Trip with Parallel Fallback)
   syncAllTenantData: async (options?: ApiRequestOptions) => {
+    // 1. Ultra-fast single HTTP round trip via dedicated batch sync endpoint
+    try {
+      const syncRes = await apiFetch<any>('/sync', options);
+      if (syncRes.success && syncRes.data) {
+        return syncRes.data;
+      }
+    } catch {
+      // Fallback to legacy parallel fetches if server is running older route structure
+    }
+
+    // 2. Legacy parallel requests fallback
     const results = await Promise.allSettled([
       apiFetch('/companies', options),
       apiFetch('/companies/branches', options),

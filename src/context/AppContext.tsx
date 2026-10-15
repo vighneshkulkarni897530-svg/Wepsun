@@ -609,22 +609,16 @@ function mapServerServiceReport(sr: any): ServiceReport {
     }
 
     setSyncStatus('syncing');
+    const syncStart = Date.now();
     try {
-      const health = await checkServerHealth();
-      setIsServerConnected(health.connected);
-      setServerLatencyMs(health.latencyMs);
-
-      if (!health.connected) {
-        setSyncStatus('error');
-        if (!silent) showToast('info', 'Local Cache Mode', `Backend API unreachable (${health.error || 'Check server'}). Using local data.`);
-        return;
-      }
-
       const serverData = await apiService.syncAllTenantData({
         companyId: activeCompanyId,
         branchId: activeBranchId,
         userRole: currentRole,
       });
+
+      setIsServerConnected(true);
+      setServerLatencyMs(Date.now() - syncStart);
 
       if (serverData.buildings !== null && Array.isArray(serverData.buildings)) {
         setBuildings(serverData.buildings.map((sb: any) => ({
@@ -768,7 +762,7 @@ function mapServerServiceReport(sr: any): ServiceReport {
       setSyncStatus('synced');
       setLastSyncedAt(new Date());
       if (!silent) {
-        showToast('success', 'Server Synchronized', `Connected to PostgreSQL backend (${health.latencyMs}ms).`);
+        showToast('success', 'Server Synchronized', `Connected to PostgreSQL backend (${Date.now() - syncStart}ms).`);
       }
     } catch (err: any) {
       console.warn('[AppContext] Cloud sync error:', err);
@@ -781,7 +775,7 @@ function mapServerServiceReport(sr: any): ServiceReport {
     let lastSyncTime = Date.now();
     const throttledSync = () => {
       const now = Date.now();
-      if (now - lastSyncTime > 4000) {
+      if (now - lastSyncTime > 30000) {
         lastSyncTime = now;
         syncWithServer(true).catch(() => {});
       }
@@ -828,7 +822,7 @@ function mapServerServiceReport(sr: any): ServiceReport {
       if (document.visibilityState === 'visible') {
         throttledSync();
       }
-    }, 30000);
+    }, 60000);
 
     return () => {
       unsubNet();

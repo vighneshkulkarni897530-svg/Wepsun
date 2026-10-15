@@ -34,3 +34,7 @@ android/app/build
 android/build
 *.apk
 *.aab
+
+# Scratch & temporary benchmarks
+scratch/
+

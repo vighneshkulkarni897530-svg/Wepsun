@@ -1,33 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Sidebar, NavTabId } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
 import { ToastContainer } from './components/common/ToastContainer';
-import { OverviewDashboard } from './components/admin/OverviewDashboard';
-import { ComplaintManager } from './components/admin/ComplaintManager';
-import { AmcManager } from './components/admin/AmcManager';
-import { LiftDirectory } from './components/admin/LiftDirectory';
-import { QuotationManager } from './components/admin/QuotationManager';
-import { WorkOrderManager } from './components/admin/WorkOrderManager';
-import { InventoryManager } from './components/admin/InventoryManager';
-import { TechnicianPerformance } from './components/admin/TechnicianPerformance';
-import { LiveTechnicianRadar } from './components/admin/LiveTechnicianRadar';
-import { AuditLogViewer } from './components/admin/AuditLogViewer';
-import { DesignSystemShowcase } from './components/admin/DesignSystemShowcase';
-import { SystemFlowchartViewer } from './components/admin/SystemFlowchartViewer';
-import { AdminClientsView } from './components/admin/AdminClientsView';
-import { AdminBuildingsView } from './components/admin/AdminBuildingsView';
-import { AdminReportsView } from './components/admin/AdminReportsView';
-import { AdminNotificationsView } from './components/admin/AdminNotificationsView';
-import { AdminProfileSettingsView } from './components/admin/AdminProfileSettingsView';
-import { CustomerFeedbackManager } from './components/admin/CustomerFeedbackManager';
-import { ClientDashboard } from './components/client/ClientDashboard';
-import { TechnicianDashboard } from './components/technician/TechnicianDashboard';
 import { RaiseComplaintModal } from './components/client/RaiseComplaintModal';
 import { LoginModal } from './components/common/LoginModal';
 import { LoginPage } from './components/common/LoginPage';
 import { LandingPage } from './components/common/LandingPage';
-import { PublicFeedbackPage } from './components/common/PublicFeedbackPage';
 import { WepsunSplashAnimation } from './components/common/WepsunSplashAnimation';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { WepsunLogo, WepsunLogoIcon, GeometricBlueWLogo } from './components/common/WepsunLogo';
@@ -37,8 +16,38 @@ import { AppInstallBanner } from './components/common/AppInstallBanner';
 import { MobileBottomNav } from './components/layout/MobileBottomNav';
 import { isMasterAdminAuthenticated } from './lib/masterAuthClient';
 import { WepsunModalContainer } from './components/common/WepsunModalContainer';
-import { EditProfilePage } from './components/common/EditProfilePage';
 import { AuthGuard } from './components/common/AuthGuard';
+
+// Lazy-loaded sub-dashboards and views for optimal Android startup & bundle splitting
+const OverviewDashboard = lazy(() => import('./components/admin/OverviewDashboard').then(m => ({ default: m.OverviewDashboard })));
+const ComplaintManager = lazy(() => import('./components/admin/ComplaintManager').then(m => ({ default: m.ComplaintManager })));
+const AmcManager = lazy(() => import('./components/admin/AmcManager').then(m => ({ default: m.AmcManager })));
+const LiftDirectory = lazy(() => import('./components/admin/LiftDirectory').then(m => ({ default: m.LiftDirectory })));
+const QuotationManager = lazy(() => import('./components/admin/QuotationManager').then(m => ({ default: m.QuotationManager })));
+const WorkOrderManager = lazy(() => import('./components/admin/WorkOrderManager').then(m => ({ default: m.WorkOrderManager })));
+const InventoryManager = lazy(() => import('./components/admin/InventoryManager').then(m => ({ default: m.InventoryManager })));
+const TechnicianPerformance = lazy(() => import('./components/admin/TechnicianPerformance').then(m => ({ default: m.TechnicianPerformance })));
+const LiveTechnicianRadar = lazy(() => import('./components/admin/LiveTechnicianRadar').then(m => ({ default: m.LiveTechnicianRadar })));
+const AuditLogViewer = lazy(() => import('./components/admin/AuditLogViewer').then(m => ({ default: m.AuditLogViewer })));
+const DesignSystemShowcase = lazy(() => import('./components/admin/DesignSystemShowcase').then(m => ({ default: m.DesignSystemShowcase })));
+const SystemFlowchartViewer = lazy(() => import('./components/admin/SystemFlowchartViewer').then(m => ({ default: m.SystemFlowchartViewer })));
+const AdminClientsView = lazy(() => import('./components/admin/AdminClientsView').then(m => ({ default: m.AdminClientsView })));
+const AdminBuildingsView = lazy(() => import('./components/admin/AdminBuildingsView').then(m => ({ default: m.AdminBuildingsView })));
+const AdminReportsView = lazy(() => import('./components/admin/AdminReportsView').then(m => ({ default: m.AdminReportsView })));
+const AdminNotificationsView = lazy(() => import('./components/admin/AdminNotificationsView').then(m => ({ default: m.AdminNotificationsView })));
+const AdminProfileSettingsView = lazy(() => import('./components/admin/AdminProfileSettingsView').then(m => ({ default: m.AdminProfileSettingsView })));
+const CustomerFeedbackManager = lazy(() => import('./components/admin/CustomerFeedbackManager').then(m => ({ default: m.CustomerFeedbackManager })));
+const ClientDashboard = lazy(() => import('./components/client/ClientDashboard').then(m => ({ default: m.ClientDashboard })));
+const TechnicianDashboard = lazy(() => import('./components/technician/TechnicianDashboard').then(m => ({ default: m.TechnicianDashboard })));
+const PublicFeedbackPage = lazy(() => import('./components/common/PublicFeedbackPage').then(m => ({ default: m.PublicFeedbackPage })));
+const EditProfilePage = lazy(() => import('./components/common/EditProfilePage').then(m => ({ default: m.EditProfilePage })));
+
+const ViewLoadingFallback = () => (
+  <div className="flex flex-col items-center justify-center min-h-[350px] w-full py-16 animate-in fade-in duration-200">
+    <div className="w-10 h-10 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mb-4" />
+    <span className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Loading Screen...</span>
+  </div>
+);
 
 const PUBLIC_HASHES = [
   'login',
@@ -779,12 +788,14 @@ export const AppContent: React.FC = () => {
     return (
       <div className="min-h-screen bg-slate-950">
         {renderSplashOverlay()}
-        <PublicFeedbackPage
-          onClose={() => {
-            setIsPublicFeedbackPage(false);
-            window.location.hash = 'feedback';
-          }}
-        />
+        <Suspense fallback={<ViewLoadingFallback />}>
+          <PublicFeedbackPage
+            onClose={() => {
+              setIsPublicFeedbackPage(false);
+              window.location.hash = 'feedback';
+            }}
+          />
+        </Suspense>
         <ToastContainer />
         <WepsunModalContainer />
       </div>
@@ -818,7 +829,9 @@ export const AppContent: React.FC = () => {
           <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ease-in-out ${isSidebarOpen ? 'lg:pl-[240px]' : 'lg:pl-0'}`}>
             <main className="flex-1 p-4 sm:p-6 lg:p-7 max-w-[1600px] w-full mx-auto pb-20 md:pb-7">
               <ErrorBoundary key={`${currentRole}-${activeTab}`} fallbackTitle="View Failed to Render">
-                {renderMainContent()}
+                <Suspense fallback={<ViewLoadingFallback />}>
+                  {renderMainContent()}
+                </Suspense>
               </ErrorBoundary>
             </main>
 

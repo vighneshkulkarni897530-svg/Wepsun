@@ -1113,46 +1113,6 @@ export const EditProfilePage: React.FC<EditProfilePageProps> = ({ onBack, onSave
           </div>
         </div>
 
-        {/* ========================================================================= */}
-        {/* 3. BOTTOM STICKY ACTION BUTTONS */}
-        {/* ========================================================================= */}
-        <div className="bg-white border border-slate-200/90 rounded-3xl p-5 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="text-center sm:text-left">
-            <span className="text-xs font-bold text-[#0b2545] block">
-              {hasChanges ? 'You have unsaved changes' : 'Profile up to date'}
-            </span>
-            <p className="text-[11px] text-slate-400">
-              {hasChanges ? 'Save your changes to sync across all WepSun applications.' : 'All information is synchronized with WepSun Cloud.'}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="flex-1 sm:flex-none px-5 py-3 rounded-2xl border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-bold transition-all cursor-pointer active:scale-95"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="flex-1 sm:flex-none px-7 py-3 rounded-2xl bg-[#0066FF] hover:bg-[#0052cc] disabled:opacity-60 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Saving Changes…</span>
-                </>
-              ) : (
-                <>
-                  <Save className="w-4 h-4" />
-                  <span>Save Changes</span>
-                </>
-              )}
-            </button>
-          </div>
-        </div>
       </form>
 
       {/* ========================================================================= */}

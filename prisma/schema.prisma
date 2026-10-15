@@ -277,6 +277,7 @@ model User {
   feedbacks           CustomerFeedback[]
 
   @@index([companyId, role])
+  @@index([phone])
   @@map("users")
 }
 
@@ -332,6 +333,7 @@ model Building {
   lifts         Lift[]
 
   @@index([companyId, branchId])
+  @@index([companyId, clientId])
   @@map("buildings")
 }
 
@@ -391,6 +393,7 @@ model Lift {
   qrCodeTokens            QRCodeToken[]
 
   @@index([companyId, branchId, buildingId])
+  @@index([companyId, clientId])
   @@map("lifts")
 }
 
@@ -487,6 +490,7 @@ model Complaint {
   @@index([companyId, status, priority])
   @@index([companyId, clientId])
   @@index([companyId, createdById])
+  @@index([companyId, assignedTechnicianId])
   @@map("complaints")
 }
 

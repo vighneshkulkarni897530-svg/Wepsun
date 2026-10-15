@@ -121,7 +121,7 @@ export async function createSession(
   const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRES_DAYS * 24 * 60 * 60 * 1000);
   const sessionId = 'sess_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
-  // Store in memory cache
+  // Store in memory cache immediately (instant 0ms resolution)
   memorySessions.set(tokenHash, {
     id: sessionId,
     userId,
@@ -135,25 +135,21 @@ export async function createSession(
     lastUsedAt: new Date(),
   });
 
-  try {
-    await Promise.race([
-      prisma.userSession.create({
-        data: {
-          id: sessionId,
-          userId,
-          companyId,
-          tokenHash,
-          userAgent: userAgent || null,
-          ipAddress: ipAddress || null,
-          expiresAt,
-          isRevoked: false,
-        },
-      }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('DB Timeout')), 8000)),
-    ]);
-  } catch {
-    // If DB offline, foreign key mismatch (demo profile), or timed out, memorySessions retains active session
-  }
+  // Asynchronously persist to database in the background without blocking the HTTP response
+  prisma.userSession
+    .create({
+      data: {
+        id: sessionId,
+        userId,
+        companyId,
+        tokenHash,
+        userAgent: userAgent || null,
+        ipAddress: ipAddress || null,
+        expiresAt,
+        isRevoked: false,
+      },
+    })
+    .catch(() => {});
 
   return { refreshToken: rawRefreshToken, expiresAt };
 }
@@ -168,18 +164,19 @@ export async function rotateSession(
 ): Promise<{ user: any; tokens: AuthTokens } | null> {
   const incomingHash = hashToken(rawRefreshToken);
 
-  let session: any = null;
-  try {
-    session = await prisma.userSession.findUnique({
-      where: { tokenHash: incomingHash },
-      include: { user: true },
-    });
-  } catch {
-    session = null;
-  }
+  // Check fast in-memory sessions first (0.1ms)
+  let session: any = memorySessions.get(incomingHash) || null;
 
+  // Fallback to database query only if server restarted or evicted from memory
   if (!session) {
-    session = memorySessions.get(incomingHash) || null;
+    try {
+      session = await prisma.userSession.findUnique({
+        where: { tokenHash: incomingHash },
+        include: { user: true },
+      });
+    } catch {
+      session = null;
+    }
   }
 
   if (!session) {

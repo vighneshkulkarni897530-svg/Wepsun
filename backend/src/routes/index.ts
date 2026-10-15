@@ -18,10 +18,14 @@ import paymentsRoutes from './payments.routes.js';
 import auditRoutes from './audit.routes.js';
 import telemetryRoutes from './telemetry.routes.js';
 import webhooksRoutes from './webhooks.routes.js';
+import syncRoutes from './sync.routes.js';
 import { requireAuth, requireRole, AuthenticatedRequest } from '../middleware/auth.js';
 import { getEmailServiceHealth } from '../lib/emailOtpService.js';
 
 const router = Router();
+
+// High-Performance Unified Batch Sync
+router.use('/sync', syncRoutes);
 
 // Domain Routers
 router.use('/auth', authRoutes);

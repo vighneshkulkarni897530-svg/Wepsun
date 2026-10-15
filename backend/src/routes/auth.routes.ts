@@ -65,15 +65,18 @@ async function ensureClientAccountWithEquipment(user: any): Promise<string | nul
   const branchId = user.branchId || 'br-mum-1';
   let clientId = user.clientId;
 
+  // Fast-path: If client already has a resolved clientId, return immediately (0ms)
+  if (clientId) {
+    return clientId;
+  }
+
   try {
-    let clientRec = clientId
-      ? await prisma.client.findUnique({ where: { id: clientId } })
-      : await prisma.client.findFirst({
-          where: {
-            companyId,
-            email: { equals: user.email, mode: 'insensitive' as const },
-          },
-        });
+    let clientRec = await prisma.client.findFirst({
+      where: {
+        companyId,
+        email: { equals: user.email, mode: 'insensitive' as const },
+      },
+    });
 
     if (!clientRec) {
       clientRec = await prisma.client.create({
@@ -90,12 +93,10 @@ async function ensureClientAccountWithEquipment(user: any): Promise<string | nul
 
     clientId = clientRec.id;
     if (user.id && user.clientId !== clientId) {
-      try {
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { clientId },
-        });
-      } catch {}
+      prisma.user.update({
+        where: { id: user.id },
+        data: { clientId },
+      }).catch(() => {});
       user.clientId = clientId;
     }
 
@@ -1251,15 +1252,11 @@ router.post('/login', authLimiter, async (req: AuthenticatedRequest, res: Respon
       return;
     }
 
-    // Reset failed attempts on success
-    try {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { failedLoginAttempts: 0, lockedUntil: null },
-      });
-    } catch {
-      // Non-blocking
-    }
+    // Reset failed attempts on success (non-blocking background task)
+    prisma.user.update({
+      where: { id: user.id },
+      data: { failedLoginAttempts: 0, lockedUntil: null },
+    }).catch(() => {});
 
     // Ensure client or technician role has valid identity linkage
     if (user.role === 'CLIENT' || String(user.role).toUpperCase() === 'CLIENT') {
@@ -1309,22 +1306,18 @@ router.post('/login', authLimiter, async (req: AuthenticatedRequest, res: Respon
       path: '/api/auth',
     });
 
-    // Record Success in AuditLog
-    try {
-      await prisma.auditLog.create({
-        data: {
-          companyId: user.companyId,
-          entityType: 'User',
-          entityId: user.id,
-          action: 'LOGIN_SUCCESS',
-          performedBy: user.name,
-          userRole: String(user.role),
-          details: `User ${user.name} (${user.email}) logged in successfully`,
-        },
-      });
-    } catch {
-      // Non-blocking
-    }
+    // Record Success in AuditLog (non-blocking background task)
+    prisma.auditLog.create({
+      data: {
+        companyId: user.companyId,
+        entityType: 'User',
+        entityId: user.id,
+        action: 'LOGIN_SUCCESS',
+        performedBy: user.name,
+        userRole: String(user.role),
+        details: `User ${user.name} (${user.email}) logged in successfully`,
+      },
+    }).catch(() => {});
 
     res.json({
       success: true,
