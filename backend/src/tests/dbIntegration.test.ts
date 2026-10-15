@@ -175,5 +175,14 @@ export async function runIntegrationTests() {
 }
 
 if (process.argv[1]?.includes('dbIntegration.test.ts') || process.argv[1]?.includes('dbIntegration.test.js')) {
-  runIntegrationTests().catch(console.error);
+  runIntegrationTests()
+    .then(async () => {
+      await prisma.$disconnect();
+      process.exit(0);
+    })
+    .catch(async (err) => {
+      console.error(err);
+      await prisma.$disconnect();
+      process.exit(1);
+    });
 }

@@ -1738,6 +1738,142 @@ router.get('/me', requireAuth, async (req: AuthenticatedRequest, res: Response):
   }
 });
 
+// PATCH /api/auth/profile — Update Authenticated User Profile & Synchronize Across Devices
+router.patch('/profile', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user!.sub || req.user!.userId;
+    const {
+      name,
+      phone,
+      avatar,
+      avatarUrl,
+      companyName,
+      address,
+      city,
+      state,
+      pincode,
+      designation,
+      bio,
+      language,
+      notificationPreferences,
+    } = req.body;
+
+    const newAvatar = avatarUrl || avatar;
+
+    let updatedUser: any = null;
+    try {
+      updatedUser = await prisma.user.update({
+        where: { id: userId },
+        data: {
+          ...(name ? { name: String(name).trim() } : {}),
+          ...(phone ? { phone: String(phone).trim() } : {}),
+          ...(newAvatar ? { avatarUrl: newAvatar } : {}),
+        },
+        include: { company: true, branch: true },
+      });
+    } catch {
+      // User might be in mockDb or fallback
+      let mock = db.users.find((u) => u.id === userId || u.email.toLowerCase() === req.user?.email?.toLowerCase());
+      if (mock) {
+        if (name) mock.name = String(name).trim();
+        if (phone) mock.phone = String(phone).trim();
+        if (newAvatar) mock.avatarUrl = newAvatar;
+        if (companyName) (mock as any).companyName = companyName;
+        updatedUser = mock;
+      }
+    }
+
+    if (!updatedUser) {
+      res.status(404).json({ success: false, message: 'User not found', code: 'USER_NOT_FOUND' });
+      return;
+    }
+
+    // If user has a clientId, synchronize client entity
+    const effectiveClientId = updatedUser.clientId || req.user?.clientId;
+    if (effectiveClientId) {
+      try {
+        await prisma.client.update({
+          where: { id: effectiveClientId },
+          data: {
+            ...(name ? { contactPerson: String(name).trim() } : {}),
+            ...(companyName ? { name: String(companyName).trim() } : {}),
+            ...(phone ? { phone: String(phone).trim() } : {}),
+            ...(address ? { billingAddress: String(address).trim() } : {}),
+          },
+        });
+      } catch {
+        const mc = db.clients.find((c) => c.id === effectiveClientId);
+        if (mc) {
+          if (name) mc.contactPerson = String(name).trim();
+          if (companyName) mc.name = String(companyName).trim();
+          if (phone) mc.phone = String(phone).trim();
+        }
+      }
+    }
+
+    // If user has a technicianId, synchronize technician entity
+    const effectiveTechId = updatedUser.technicianId || req.user?.technicianId;
+    if (effectiveTechId) {
+      try {
+        await prisma.technician.update({
+          where: { id: effectiveTechId },
+          data: {
+            ...(name ? { name: String(name).trim() } : {}),
+            ...(phone ? { phone: String(phone).trim() } : {}),
+            ...(newAvatar ? { avatarUrl: newAvatar } : {}),
+          },
+        });
+      } catch {
+        const mt = db.technicians.find((t) => t.id === effectiveTechId);
+        if (mt) {
+          if (name) mt.name = String(name).trim();
+          if (phone) mt.phone = String(phone).trim();
+          if (newAvatar) mt.avatar = newAvatar;
+        }
+      }
+    }
+
+    // Record Audit Log
+    try {
+      await prisma.auditLog.create({
+        data: {
+          companyId: updatedUser.companyId || 'comp-1',
+          entityType: 'User',
+          entityId: userId,
+          action: 'PROFILE_UPDATED',
+          performedBy: updatedUser.name,
+          userRole: String(updatedUser.role),
+          details: `User profile updated across devices for ${updatedUser.email}`,
+        },
+      });
+    } catch {
+      // Non-blocking
+    }
+
+    const sanitized = sanitizeUser(updatedUser);
+    res.json({
+      success: true,
+      message: 'Profile updated successfully across devices.',
+      data: {
+        user: {
+          ...sanitized,
+          companyName: companyName || (updatedUser as any).companyName || sanitized.company?.name,
+          designation,
+          bio,
+          address,
+          city,
+          state,
+          pincode,
+          language,
+          notificationPreferences,
+        },
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: 'Failed to update profile', error: err?.message });
+  }
+});
+
 // ============================================================================
 // FIREBASE & EMAIL OTP AUTHENTICATION ENDPOINTS
 // ============================================================================

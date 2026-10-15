@@ -252,8 +252,8 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
         role: activeRole,
         companyId: userRecord.companyId || 'comp-1',
         branchId: userRecord.branchId,
-        clientId: userRecord.clientId || (activeRole === 'client' ? 'client-' + Date.now() : undefined),
-        technicianId: userRecord.technicianId || (activeRole === 'technician' ? 'tech-' + Date.now() : undefined),
+        clientId: userRecord.clientId || (activeRole === 'client' ? `client-${userRecord.id.replace(/^usr-/, '')}` : undefined),
+        technicianId: userRecord.technicianId || (activeRole === 'technician' ? `tech-${userRecord.id.replace(/^usr-/, '')}` : undefined),
         avatar: userRecord.avatar || userRecord.avatarUrl || defaultAvatar,
         isActive: true,
       });
@@ -362,8 +362,8 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
               role: activeRole,
               companyId: userRecord.companyId || 'comp-1',
               branchId: userRecord.branchId,
-              clientId: userRecord.clientId || (activeRole === 'client' ? 'client-' + Date.now() : undefined),
-              technicianId: userRecord.technicianId || (activeRole === 'technician' ? 'tech-' + Date.now() : undefined),
+              clientId: userRecord.clientId || (activeRole === 'client' ? `client-${userRecord.id.replace(/^usr-/, '')}` : undefined),
+              technicianId: userRecord.technicianId || (activeRole === 'technician' ? `tech-${userRecord.id.replace(/^usr-/, '')}` : undefined),
               avatar: userRecord.avatarUrl || userRecord.avatar || profile?.picture,
               isActive: userRecord.isActive ?? true,
             });

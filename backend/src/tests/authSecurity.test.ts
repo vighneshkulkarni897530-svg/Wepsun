@@ -374,7 +374,13 @@ async function runAuthSecurityTests() {
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 }
 
-runAuthSecurityTests().catch((err) => {
-  console.error('❌ Test Suite Failed:', err);
-  process.exit(1);
-});
+runAuthSecurityTests()
+  .then(async () => {
+    await prisma.$disconnect();
+    process.exit(0);
+  })
+  .catch(async (err) => {
+    console.error('❌ Test Suite Failed:', err);
+    await prisma.$disconnect();
+    process.exit(1);
+  });

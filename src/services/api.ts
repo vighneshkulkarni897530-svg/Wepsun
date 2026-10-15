@@ -68,56 +68,29 @@ export function setApiBaseUrl(url: string): void {
   }
 }
 
+import {
+  getStoredAccessToken,
+  getStoredRefreshToken,
+  persistTokens,
+  clearStoredTokens,
+  refreshActiveSession,
+  isTokenExpired,
+} from './sessionManager';
+
 export function getAccessToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
+  return getStoredAccessToken();
 }
 
 export function getRefreshToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem(REFRESH_TOKEN_KEY) || sessionStorage.getItem(REFRESH_TOKEN_KEY);
+  return getStoredRefreshToken();
 }
 
 export function setTokens(accessToken: string, refreshToken?: string): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(TOKEN_KEY, accessToken);
-  sessionStorage.setItem(TOKEN_KEY, accessToken);
-  if (refreshToken) {
-    localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
-    sessionStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
-  }
-  localStorage.removeItem('wepsun_explicit_logout');
-  sessionStorage.removeItem('wepsun_explicit_logout');
-
-  // Mirror tokens to Android Keystore / iOS Keychain via native Preferences
-  try {
-    if (Capacitor.isNativePlatform()) {
-      import('@capacitor/preferences').then(({ Preferences }) => {
-        Preferences.set({ key: TOKEN_KEY, value: accessToken }).catch(() => {});
-        if (refreshToken) {
-          Preferences.set({ key: REFRESH_TOKEN_KEY, value: refreshToken }).catch(() => {});
-        }
-        Preferences.remove({ key: 'wepsun_explicit_logout' }).catch(() => {});
-      }).catch(() => {});
-    }
-  } catch {}
+  persistTokens(accessToken, refreshToken);
 }
 
 export function clearTokens(): void {
-  if (typeof window === 'undefined') return;
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
-  sessionStorage.removeItem(TOKEN_KEY);
-  sessionStorage.removeItem(REFRESH_TOKEN_KEY);
-
-  try {
-    if (Capacitor.isNativePlatform()) {
-      import('@capacitor/preferences').then(({ Preferences }) => {
-        Preferences.remove({ key: TOKEN_KEY }).catch(() => {});
-        Preferences.remove({ key: REFRESH_TOKEN_KEY }).catch(() => {});
-      }).catch(() => {});
-    }
-  } catch {}
+  clearStoredTokens();
 }
 
 export interface ApiRequestOptions extends RequestInit {
@@ -175,50 +148,9 @@ export async function checkServerHealth(customUrl?: string): Promise<{
   }
 }
 
-// Token refresh synchronization queue
-let isRefreshing = false;
-let refreshSubscribers: ((token: string) => void)[] = [];
-
-function subscribeTokenRefresh(cb: (token: string) => void) {
-  refreshSubscribers.push(cb);
-}
-
-function onRefreshed(token: string) {
-  refreshSubscribers.forEach((cb) => cb(token));
-  refreshSubscribers = [];
-}
-
 export async function tryRefreshToken(): Promise<string | null> {
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) return null;
-
-  try {
-    const baseUrl = getApiBaseUrl();
-    const res = await fetch(`${baseUrl}/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken }),
-    });
-
-    if (res.status === 401 || res.status === 403) {
-      clearTokens();
-      return null;
-    }
-
-    if (!res.ok) {
-      // Temporary network/server status: do not clear tokens
-      return null;
-    }
-
-    const data = await res.json();
-    if (data.success && data.data?.accessToken) {
-      setTokens(data.data.accessToken, data.data.refreshToken);
-      return data.data.accessToken;
-    }
-  } catch {
-    // Network or server error - do not wipe tokens
-  }
-  return null;
+  const res = await refreshActiveSession();
+  return res.success && res.accessToken ? res.accessToken : null;
 }
 
 /**
@@ -241,8 +173,16 @@ export async function apiFetch<T = any>(
     ...rest
   } = options;
 
-  const accessToken = getAccessToken();
+  let accessToken = getAccessToken();
   const baseUrl = getApiBaseUrl();
+
+  // Proactive token refresh if token expires within 15 seconds
+  if (!skipAuth && !isAuthRoute && accessToken && isTokenExpired(accessToken, 15) && getRefreshToken()) {
+    const proactive = await refreshActiveSession();
+    if (proactive.success && proactive.accessToken) {
+      accessToken = proactive.accessToken;
+    }
+  }
 
   const requestHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -269,33 +209,14 @@ export async function apiFetch<T = any>(
     clearTimeout(timeoutId);
 
     // If 401 Unauthorized, attempt transparent refresh (unless calling auth routes)
-    if (response.status === 401 && !endpoint.startsWith('/auth/login') && !endpoint.startsWith('/auth/master') && !endpoint.startsWith('/auth/refresh')) {
-      if (!isRefreshing) {
-        isRefreshing = true;
-        const newToken = await tryRefreshToken();
-        isRefreshing = false;
-
-        if (newToken) {
-          onRefreshed(newToken);
-          requestHeaders.Authorization = `Bearer ${newToken}`;
-          response = await fetch(`${baseUrl}${normalizedEndpoint}`, {
-            headers: requestHeaders,
-            ...rest,
-          });
-        }
-      } else {
-        // Wait for active refresh
-        const retryPromise = new Promise<Response>((resolve) => {
-          subscribeTokenRefresh(async (newToken) => {
-            requestHeaders.Authorization = `Bearer ${newToken}`;
-            const retryRes = await fetch(`${baseUrl}${normalizedEndpoint}`, {
-              headers: requestHeaders,
-              ...rest,
-            });
-            resolve(retryRes);
-          });
+    if (response.status === 401 && !endpoint.includes('/auth/login') && !endpoint.includes('/auth/master') && !endpoint.includes('/auth/refresh')) {
+      const refreshResult = await refreshActiveSession();
+      if (refreshResult.success && refreshResult.accessToken) {
+        requestHeaders.Authorization = `Bearer ${refreshResult.accessToken}`;
+        response = await fetch(`${baseUrl}${normalizedEndpoint}`, {
+          headers: requestHeaders,
+          ...rest,
         });
-        response = await retryPromise;
       }
     }
 
@@ -384,6 +305,8 @@ export const apiService = {
     apiFetch('/auth/logout-all', { method: 'POST' }),
   getMe: (options?: ApiRequestOptions) =>
     apiFetch('/auth/me', options),
+  updateProfile: (payload: any, options?: ApiRequestOptions) =>
+    apiFetch('/auth/profile', { method: 'PATCH', body: JSON.stringify(payload), ...options }),
   changePassword: (payload: { currentPassword: string; newPassword: string }, options?: ApiRequestOptions) =>
     apiFetch('/auth/change-password', { method: 'POST', body: JSON.stringify(payload), ...options }),
   forgotPassword: (email: string) =>
@@ -414,6 +337,7 @@ export const apiService = {
   // Companies & Branches
   getCompanies: (options?: ApiRequestOptions) => apiFetch('/companies', options),
   getBranches: (options?: ApiRequestOptions) => apiFetch('/companies/branches', options),
+  getBuildings: (options?: ApiRequestOptions) => apiFetch('/companies/buildings', options),
 
   // Lifts & Equipment Directory
   getLifts: (options?: ApiRequestOptions) => apiFetch('/lifts', options),
@@ -585,6 +509,8 @@ export const apiService = {
       apiFetch('/technicians', options),
       apiFetch('/feedback', options),
       apiFetch('/audit', options),
+      apiFetch('/companies/buildings', options),
+      apiFetch('/notifications', options),
     ]);
 
     return {
@@ -602,6 +528,8 @@ export const apiService = {
       technicians: results[11].status === 'fulfilled' ? results[11].value.data : null,
       feedbacks: results[12].status === 'fulfilled' ? results[12].value.data?.feedbacks || results[12].value.data : null,
       auditLogs: results[13].status === 'fulfilled' ? results[13].value.data : null,
+      buildings: results[14].status === 'fulfilled' ? results[14].value.data : null,
+      notifications: results[15].status === 'fulfilled' ? results[15].value.data : null,
     };
   },
 };

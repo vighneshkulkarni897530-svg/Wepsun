@@ -378,7 +378,11 @@ export const AppContent: React.FC = () => {
 
     handleHashChange();
     window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    window.addEventListener('popstate', handleHashChange);
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+      window.removeEventListener('popstate', handleHashChange);
+    };
   }, [lifts, currentRole, isAuthenticated, isAuthLoading]);
 
   const clientUsers = users.filter((u) => u.role === 'client');

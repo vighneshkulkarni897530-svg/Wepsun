@@ -32,7 +32,11 @@ import {
   AppNotification,
   NotificationPriority,
   NotificationCategory,
+  ComplaintPriority,
+  IssueType,
+  ComplaintTimelineEntry,
 } from '../types';
+import { Capacitor } from '@capacitor/core';
 import type { WepsunModalOptions, WepsunModalType } from '../components/common/WepsunModal';
 import {
   INITIAL_COMPANIES,
@@ -304,14 +308,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Current Role & Mock User (Defaults to Client unless valid Master Admin session exists)
   const [currentRole, setCurrentRoleState] = useState<UserRole>(() => {
-    const isMasterAuth =
-      typeof window !== 'undefined' &&
-      (localStorage.getItem('wepsun_master_authenticated') === 'true' ||
-        sessionStorage.getItem('wepsun_master_authenticated') === 'true');
+    const cached = getCachedUserSession();
+    if (cached && cached.role) {
+      if (cached.role === 'company_admin' || cached.role === 'master_admin' || cached.role === 'super_admin') {
+        if (isMasterAdminSessionValid()) {
+          return cached.role;
+        }
+      } else {
+        return cached.role;
+      }
+    }
 
     const savedRole = localStorage.getItem(STORAGE_PREFIX + 'role') as UserRole;
     if (savedRole === 'company_admin' || savedRole === 'master_admin' || savedRole === 'super_admin') {
-      if (isMasterAuth) {
+      if (isMasterAdminSessionValid()) {
         return savedRole;
       }
       return 'client';
@@ -320,12 +330,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [activeUserId, setActiveUserId] = useState<string>(() => {
-    const isMasterAuth =
-      typeof window !== 'undefined' &&
-      (localStorage.getItem('wepsun_master_authenticated') === 'true' ||
-        sessionStorage.getItem('wepsun_master_authenticated') === 'true');
+    const cached = getCachedUserSession();
+    if (cached && cached.user?.id) {
+      if ((cached.user.id.includes('admin') || cached.user.id.includes('master')) && !isMasterAdminSessionValid()) {
+        return 'usr-client-priya';
+      }
+      return cached.user.id;
+    }
     const savedUserId = localStorage.getItem(STORAGE_PREFIX + 'userId');
-    if (savedUserId && (savedUserId.includes('admin') || savedUserId.includes('master')) && !isMasterAuth) {
+    if (savedUserId && (savedUserId.includes('admin') || savedUserId.includes('master')) && !isMasterAdminSessionValid()) {
       return 'usr-client-priya';
     }
     return savedUserId || 'usr-client-priya';
@@ -498,6 +511,94 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return res;
   }, []);
 
+function mapServerComplaint(sc: any): Complaint {
+  const statusMap: Record<string, ComplaintStatus> = {
+    NEW: 'pending',
+    PENDING: 'pending',
+    ASSIGNED: 'assigned',
+    TECHNICIAN_ON_WAY: 'technician_on_way',
+    IN_PROGRESS: 'inspection_repair',
+    INSPECTION_REPAIR: 'inspection_repair',
+    RESOLVED: 'resolved',
+    CLOSED: 'closed',
+    CANCELLED: 'closed',
+  };
+
+  const priorityMap: Record<string, ComplaintPriority> = {
+    CRITICAL: 'critical',
+    HIGH: 'high',
+    NORMAL: 'normal',
+    LOW: 'normal',
+    MEDIUM: 'normal',
+  };
+
+  const rawStatus = String(sc.status || '').toUpperCase();
+  const rawPriority = String(sc.priority || '').toUpperCase();
+
+  const status = statusMap[rawStatus] || (sc.status ? String(sc.status).toLowerCase() : 'pending') as ComplaintStatus;
+  const priority = priorityMap[rawPriority] || (sc.priority ? String(sc.priority).toLowerCase() : 'normal') as ComplaintPriority;
+  const issueType = (sc.issueType ? String(sc.issueType).toLowerCase() : 'other') as IssueType;
+
+  const rawTimeline = sc.timelineEntries || sc.timeline || [];
+  const timeline: ComplaintTimelineEntry[] = Array.isArray(rawTimeline)
+    ? rawTimeline.map((t: any) => ({
+        id: t.id || `tl-${Math.random().toString(36).substring(2, 9)}`,
+        status: statusMap[String(t.status || '').toUpperCase()] || (t.status ? String(t.status).toLowerCase() : 'pending') as ComplaintStatus,
+        title: t.title || t.remarks || 'Status Update',
+        description: t.description || t.remarks || '',
+        timestamp: t.timestamp ? new Date(t.timestamp).toISOString() : new Date().toISOString(),
+        actorName: t.actorName || t.actor || 'System',
+        actorRole: t.actorRole || 'system',
+      }))
+    : [];
+
+  return {
+    ...sc,
+    ticketNumber: sc.ticketNumber || sc.id,
+    liftNumber: sc.lift?.permanentLiftId || sc.liftNumber || 'LIFT',
+    buildingId: sc.lift?.buildingId || sc.buildingId || sc.lift?.building?.id || '',
+    buildingName: sc.lift?.building?.name || sc.buildingName || '',
+    clientId: sc.clientId || sc.lift?.clientId || sc.lift?.client?.id || '',
+    clientName: sc.client?.name || sc.lift?.client?.name || sc.clientName || 'Client',
+    clientPhone: sc.client?.phone || sc.lift?.client?.phone || sc.clientPhone || '',
+    assignedTechnicianId: sc.assignedTechnicianId || sc.assignedTechnician?.id,
+    assignedTechnicianName: sc.assignedTechnician?.name || sc.assignedTechnicianName || '',
+    technicianPhone: sc.assignedTechnician?.phone || sc.technicianPhone || '',
+    status,
+    priority,
+    issueType,
+    partsReplaced: Array.isArray(sc.partsReplaced) ? sc.partsReplaced : [],
+    beforePhotos: Array.isArray(sc.beforePhotos) ? sc.beforePhotos : [],
+    afterPhotos: Array.isArray(sc.afterPhotos) ? sc.afterPhotos : [],
+    timeline,
+    reportedAt: sc.reportedAt ? new Date(sc.reportedAt).toISOString() : new Date().toISOString(),
+  };
+}
+
+function mapServerServiceReport(sr: any): ServiceReport {
+  return {
+    ...sr,
+    reportNumber: sr.reportNumber || sr.id,
+    ticketId: sr.ticketId || sr.complaintId || '',
+    ticketNumber: sr.complaint?.ticketNumber || sr.ticketNumber || '',
+    liftId: sr.liftId || '',
+    liftNumber: sr.lift?.permanentLiftId || sr.liftNumber || 'LIFT',
+    liftBrand: sr.lift?.brand || sr.liftBrand || '',
+    liftModel: sr.lift?.model || sr.liftModel || '',
+    buildingName: sr.lift?.building?.name || sr.buildingName || '',
+    buildingAddress: sr.lift?.building?.address || sr.buildingAddress || '',
+    clientId: sr.clientId || sr.lift?.clientId || '',
+    clientName: sr.lift?.client?.name || sr.clientName || 'Client',
+    clientContact: sr.lift?.client?.phone || sr.clientContact || '',
+    technicianId: sr.technicianId || sr.technician?.id || '',
+    technicianName: sr.technician?.name || sr.technicianName || 'Technician',
+    technicianPhone: sr.technician?.phone || sr.technicianPhone || '',
+    partsReplaced: Array.isArray(sr.partsReplaced) ? sr.partsReplaced : [],
+    beforePhotos: Array.isArray(sr.beforePhotos) ? sr.beforePhotos : [],
+    afterPhotos: Array.isArray(sr.afterPhotos) ? sr.afterPhotos : [],
+  };
+}
+
   const syncWithServer = useCallback(async (silent = false) => {
     const net = await getNetworkStatus();
     if (!net.connected) {
@@ -525,36 +626,90 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         userRole: currentRole,
       });
 
+      if (serverData.buildings !== null && Array.isArray(serverData.buildings)) {
+        setBuildings(serverData.buildings.map((sb: any) => ({
+          ...sb,
+          clientName: sb.client?.name || sb.clientName || '',
+          totalLifts: sb.lifts ? sb.lifts.length : (sb.totalLifts || 0),
+          liftIds: sb.lifts ? sb.lifts.map((l: any) => l.id) : (sb.liftIds || []),
+        })));
+      }
+
       if (serverData.lifts !== null && Array.isArray(serverData.lifts)) {
         setLifts(serverData.lifts.map((sl: any) => ({
           ...sl,
           liftNumber: sl.permanentLiftId || sl.liftNumber || 'LIFT',
           buildingName: sl.building?.name || sl.buildingName || 'Complex',
+          clientName: sl.client?.name || sl.clientName || 'Client',
+          clientId: sl.clientId || sl.client?.id || '',
         })));
       }
 
       if (serverData.complaints !== null && Array.isArray(serverData.complaints)) {
-        setComplaints(serverData.complaints);
+        setComplaints(serverData.complaints.map(mapServerComplaint));
       }
 
       if (serverData.workOrders !== null && Array.isArray(serverData.workOrders)) {
-        setWorkOrders(serverData.workOrders);
+        setWorkOrders(serverData.workOrders.map((wo: any) => ({
+          ...wo,
+          workOrderNumber: wo.workOrderNumber || wo.id,
+          liftNumber: wo.lift?.permanentLiftId || wo.liftNumber || 'LIFT',
+          buildingName: wo.lift?.building?.name || wo.buildingName || '',
+          clientName: wo.client?.name || wo.lift?.client?.name || wo.clientName || 'Client',
+          technicianName: wo.technician?.name || wo.technicianName || '',
+          status: (wo.status ? String(wo.status).toLowerCase() : 'scheduled') as any,
+          priority: (wo.priority ? String(wo.priority).toLowerCase() : 'medium') as any,
+        })));
       }
 
       if (serverData.amcContracts !== null && Array.isArray(serverData.amcContracts)) {
-        setAmcContracts(serverData.amcContracts);
+        setAmcContracts(serverData.amcContracts.map((a: any) => ({
+          ...a,
+          contractNumber: a.contractNumber || a.id,
+          clientName: a.client?.name || a.clientName || 'Client',
+          buildingId: a.lifts?.[0]?.buildingId || a.buildingId || '',
+          buildingName: a.lifts?.[0]?.building?.name || a.buildingName || '',
+          liftIds: a.lifts ? a.lifts.map((l: any) => l.id) : (a.liftIds || (a.liftId ? [a.liftId] : [])),
+          status: (a.status ? String(a.status).toLowerCase() : 'active') as any,
+          paymentStatus: (a.paymentStatus ? String(a.paymentStatus).toLowerCase() : 'pending') as any,
+        })));
       }
 
       if (serverData.quotations !== null && Array.isArray(serverData.quotations)) {
-        setQuotations(serverData.quotations);
+        setQuotations(serverData.quotations.map((q: any) => ({
+          ...q,
+          quoteNumber: q.quoteNumber || q.quotationNumber || q.id,
+          liftNumber: q.lift?.permanentLiftId || q.liftNumber || 'LIFT',
+          buildingName: q.lift?.building?.name || q.buildingName || '',
+          clientName: q.client?.name || q.clientName || 'Client',
+          clientEmail: q.client?.email || q.clientEmail || '',
+          clientPhone: q.client?.phone || q.clientPhone || '',
+          status: (q.status ? String(q.status).toLowerCase() : 'draft') as any,
+          items: Array.isArray(q.items) ? q.items : [],
+        })));
       }
 
       if (serverData.invoices !== null && Array.isArray(serverData.invoices)) {
-        setInvoices(serverData.invoices);
+        setInvoices(serverData.invoices.map((inv: any) => ({
+          ...inv,
+          invoiceNumber: inv.invoiceNumber || inv.id,
+          clientName: inv.client?.name || inv.clientName || 'Client',
+          buildingName: inv.lift?.building?.name || inv.buildingName || '',
+          liftNumber: inv.lift?.permanentLiftId || inv.liftNumber || '',
+          status: (inv.status ? String(inv.status).toLowerCase() : 'pending') as any,
+        })));
       }
 
       if (serverData.inventory !== null && Array.isArray(serverData.inventory)) {
         setInventory(serverData.inventory);
+      }
+
+      if (serverData.inventoryMovements !== null && Array.isArray(serverData.inventoryMovements)) {
+        setInventoryMovements(serverData.inventoryMovements);
+      }
+
+      if (serverData.serviceReports !== null && Array.isArray(serverData.serviceReports)) {
+        setServiceReports(serverData.serviceReports.map(mapServerServiceReport));
       }
 
       if (serverData.technicians !== null && Array.isArray(serverData.technicians)) {
@@ -563,6 +718,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (serverData.feedbacks !== null && Array.isArray(serverData.feedbacks)) {
         setFeedbacks(serverData.feedbacks);
+      }
+
+      if (serverData.auditLogs !== null && Array.isArray(serverData.auditLogs)) {
+        setAuditLogs(serverData.auditLogs);
+      }
+
+      if (serverData.notifications !== null && Array.isArray(serverData.notifications)) {
+        const notifCategoryMap: Record<string, NotificationCategory> = {
+          BREAKDOWN: 'complaint',
+          COMPLAINT: 'complaint',
+          PM_DUE: 'pm',
+          PM: 'pm',
+          AMC: 'amc',
+          AMC_EXPIRY: 'amc',
+          QUOTATION: 'quotation',
+          INVOICE: 'payment',
+          EMERGENCY: 'emergency',
+        };
+        const mappedNotifs: AppNotification[] = serverData.notifications.map((sn: any) => {
+          const rawType = String(sn.type || '').toUpperCase();
+          return {
+            id: sn.id,
+            type: sn.type || 'SYSTEM',
+            title: sn.title || 'Alert',
+            message: sn.message || '',
+            timestamp: sn.createdAt ? new Date(sn.createdAt).toISOString() : (sn.timestamp || new Date().toISOString()),
+            category: notifCategoryMap[rawType] || (sn.category as NotificationCategory) || 'system',
+            priority: sn.priority || (rawType.includes('BREAKDOWN') || rawType.includes('EMERGENCY') ? 'critical' : 'normal'),
+            isRead: Boolean(sn.isRead),
+            targetRole: sn.targetRole || 'all',
+            clientId: sn.clientId,
+            technicianId: sn.technicianId,
+            buildingName: sn.buildingName,
+            liftNumber: sn.liftNumber,
+            ticketNumber: sn.ticketNumber,
+            referenceId: sn.referenceId,
+            actionTab: sn.actionTab,
+            actionLabel: sn.actionLabel,
+          };
+        });
+        setAppNotifications((prev) => {
+          const serverIds = new Set(mappedNotifs.map((n) => n.id));
+          const remainingLocal = prev.filter((n) => !serverIds.has(n.id));
+          return [...mappedNotifs, ...remainingLocal];
+        });
       }
 
       setSyncStatus('synced');
@@ -576,31 +776,83 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [activeCompanyId, activeBranchId, currentRole]);
 
-  // Real-time network change listener & automatic sync
+  // Real-time network change listener & automatic sync on reconnect, focus, visibility & interval
   useEffect(() => {
-    const unsub = subscribeNetworkStatus((status) => {
+    let lastSyncTime = Date.now();
+    const throttledSync = () => {
+      const now = Date.now();
+      if (now - lastSyncTime > 4000) {
+        lastSyncTime = now;
+        syncWithServer(true).catch(() => {});
+      }
+    };
+
+    const unsubNet = subscribeNetworkStatus((status) => {
       if (status.connected) {
-        syncWithServer(true);
+        throttledSync();
       } else {
         setIsServerConnected(false);
         setSyncStatus('offline');
       }
     });
 
-    syncWithServer(true);
-    return () => unsub();
+    const handleFocus = () => {
+      throttledSync();
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        throttledSync();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    let unsubApp: (() => void) | undefined;
+    try {
+      if (Capacitor.isNativePlatform()) {
+        import('@capacitor/app').then(({ App }) => {
+          App.addListener('appStateChange', (state) => {
+            if (state.isActive) {
+              throttledSync();
+            }
+          }).then((handle) => {
+            unsubApp = () => handle.remove();
+          }).catch(() => {});
+        }).catch(() => {});
+      }
+    } catch {}
+
+    const intervalId = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        throttledSync();
+      }
+    }, 30000);
+
+    return () => {
+      unsubNet();
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      if (unsubApp) unsubApp();
+      clearInterval(intervalId);
+    };
   }, [syncWithServer]);
 
   // Current User representation based on activeUserId or current role
   const [currentUser, setCurrentUserState] = useState<User>(() => {
-    const isMasterAuth =
-      typeof window !== 'undefined' &&
-      (localStorage.getItem('wepsun_master_authenticated') === 'true' ||
-        sessionStorage.getItem('wepsun_master_authenticated') === 'true');
+    const cached = getCachedUserSession();
+    if (cached && cached.user) {
+      const userRole = cached.user.role || cached.role;
+      if ((userRole === 'company_admin' || userRole === 'master_admin' || userRole === 'super_admin') && !isMasterAdminSessionValid()) {
+        return INITIAL_USERS.find((u) => u.role === 'client') || INITIAL_USERS[2];
+      }
+      return cached.user;
+    }
 
     const saved = safeStorageParse<User | null>(STORAGE_PREFIX + 'currentUser', null);
     if (saved) {
-      if ((saved.role === 'company_admin' || saved.role === 'master_admin' || saved.role === 'super_admin') && !isMasterAuth) {
+      if ((saved.role === 'company_admin' || saved.role === 'master_admin' || saved.role === 'super_admin') && !isMasterAdminSessionValid()) {
         return INITIAL_USERS.find((u) => u.role === 'client') || INITIAL_USERS[2];
       }
       return saved;
@@ -609,7 +861,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (savedUserId) {
       const found = INITIAL_USERS.find((u) => u.id === savedUserId);
       if (found) {
-        if ((found.role === 'company_admin' || found.role === 'master_admin' || found.role === 'super_admin') && !isMasterAuth) {
+        if ((found.role === 'company_admin' || found.role === 'master_admin' || found.role === 'super_admin') && !isMasterAdminSessionValid()) {
           return INITIAL_USERS.find((u) => u.role === 'client') || INITIAL_USERS[2];
         }
         return found;
@@ -987,13 +1239,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.setItem(STORAGE_PREFIX + 'branchId', finalUser.branchId);
     }
     if (finalUser.clientId) {
+      setActiveClientId(finalUser.clientId);
       localStorage.setItem(STORAGE_PREFIX + 'clientId', finalUser.clientId);
     } else {
+      setActiveClientId('');
       localStorage.removeItem(STORAGE_PREFIX + 'clientId');
     }
     if (finalUser.technicianId) {
+      setActiveTechnicianId(finalUser.technicianId);
       localStorage.setItem(STORAGE_PREFIX + 'technicianId', finalUser.technicianId);
     } else {
+      setActiveTechnicianId('');
       localStorage.removeItem(STORAGE_PREFIX + 'technicianId');
     }
 
@@ -1586,7 +1842,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     [currentRole, effectiveClientId]
   );
 
-  // Profile Mutators
+  // Profile Mutators with Cloud Database Persistence
   const updateUserProfile = (userData: Partial<User>) => {
     setCurrentUserState((prev) => ({ ...prev, ...userData }));
     setUsers((prev) =>
@@ -1630,6 +1886,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       );
     }
 
+    // Cloud Database Persistence & Cross-Device Synchronization
+    apiService
+      .updateProfile({
+        name: userData.name,
+        phone: userData.phone,
+        avatar: userData.avatar,
+        companyName: userData.companyName,
+        address: userData.address,
+        city: userData.city,
+        state: userData.state,
+        pincode: userData.pincode,
+        designation: userData.designation,
+        bio: userData.bio,
+        language: userData.language,
+        notificationPreferences: userData.notificationPreferences,
+      })
+      .then((res) => {
+        if (res && res.success && res.data) {
+          const sess = getCachedUserSession();
+          if (sess && sess.user) {
+            cacheUserSession(
+              { ...sess.user, ...res.data },
+              sess.role,
+              isMasterAdminSessionValid()
+            );
+          }
+        }
+      })
+      .catch((err) => console.warn('[AppContext] Background updateProfile API sync:', err));
+
     showToast('success', 'Profile Saved', 'Your personal account profile details have been saved.');
   };
 
@@ -1659,6 +1945,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         )
       );
     }
+
+    // Cloud Database Persistence & Cross-Device Synchronization
+    apiService
+      .updateProfile({
+        name: data.name,
+        phone: data.phone,
+        avatar: data.avatar,
+        bio: data.bio,
+        address: data.currentLocationName,
+      })
+      .catch((err) => console.warn('[AppContext] Background updateTechnicianProfile API sync:', err));
+
     showToast('success', 'Technician Profile Saved', 'Field engineer credentials and vehicle details updated.');
   };
 
@@ -1700,6 +1998,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           : u
       )
     );
+
+    // Cloud Database Persistence & Cross-Device Synchronization
+    apiService
+      .updateProfile({
+        name: profileData.contactPerson,
+        companyName: profileData.companyName,
+        phone: profileData.phone,
+        address: profileData.address,
+        city: profileData.city,
+        pincode: profileData.pincode,
+        avatar: profileData.logo,
+      })
+      .catch((err) => console.warn('[AppContext] Background updateClientProfile API sync:', err));
+
     showToast('success', 'Profile Updated', 'Your client profile information has been saved successfully.');
   };
 
@@ -1916,12 +2228,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .then((res) => {
         if (res && res.success && res.data) {
           const serverRec = res.data;
+          const mapped = mapServerComplaint(serverRec);
           setComplaints((prev) =>
             prev.map((c) =>
               c.id === newComplaint.id || c.ticketNumber === newComplaint.ticketNumber
                 ? {
                     ...c,
-                    ...serverRec,
+                    ...mapped,
                     id: serverRec.id || c.id,
                     ticketNumber: serverRec.ticketNumber || c.ticketNumber,
                   }

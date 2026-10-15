@@ -61,4 +61,38 @@ router.get('/branches', requireAuth, async (req: AuthenticatedRequest, res: Resp
   }
 });
 
+// GET /api/companies/buildings — Get buildings for active tenant company (scoped by role/clientId)
+router.get('/buildings', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const user = req.user!;
+    const companyId = user.companyId || 'comp-1';
+    const userRole = (user.role || '').toUpperCase();
+    const isClient = userRole === 'CLIENT';
+
+    let buildings = [];
+    try {
+      buildings = await prisma.building.findMany({
+        where: {
+          companyId,
+          ...(req.branchId ? { branchId: req.branchId } : {}),
+          ...(isClient && user.clientId ? { clientId: user.clientId } : {}),
+        },
+        include: {
+          client: true,
+          lifts: true,
+        },
+      });
+    } catch {
+      buildings = db.buildings.filter((b) => b.companyId === companyId);
+      if (isClient && user.clientId) {
+        buildings = buildings.filter((b) => b.clientId === user.clientId);
+      }
+    }
+
+    res.json({ success: true, count: buildings.length, data: buildings });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err?.message || 'Failed to retrieve buildings', code: 'DB_ERROR' });
+  }
+});
+
 export default router;

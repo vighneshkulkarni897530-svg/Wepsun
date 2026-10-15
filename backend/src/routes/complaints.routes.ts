@@ -164,7 +164,7 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): 
     const companyId = user.companyId || 'comp-1';
     const userRole = (user.role || '').toUpperCase();
     const currentUserId = user.userId || user.sub;
-    const {
+    let {
       liftId,
       branchId,
       issueType,
@@ -179,6 +179,39 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): 
       res.status(400).json({ success: false, message: 'Lift ID, title, and description are required', code: 'VALIDATION_ERROR' });
       return;
     }
+
+    // Normalize issueType to Prisma enum
+    const validIssueTypes: Record<string, string> = {
+      stuck_passengers: 'STUCK_PASSENGERS',
+      lift_not_moving: 'LIFT_NOT_MOVING',
+      door_jammed: 'DOOR_JAMMED',
+      doors_not_opening: 'DOOR_JAMMED',
+      unusual_sound_vibration: 'UNUSUAL_SOUND_VIBRATION',
+      strange_noise: 'UNUSUAL_SOUND_VIBRATION',
+      floor_leveling_error: 'FLOOR_LEVELING_ERROR',
+      leveling_issue: 'FLOOR_LEVELING_ERROR',
+      buttons_not_working: 'BUTTONS_NOT_WORKING',
+      cop_lop_buttons: 'BUTTONS_NOT_WORKING',
+      ard_failure: 'ARD_FAILURE',
+      emergency_alarm: 'EMERGENCY_ALARM',
+      water_seepage: 'WATER_SEEPAGE',
+      routine_check: 'ROUTINE_CHECK',
+      other: 'OTHER',
+    };
+    const normalizedIssueType = (issueType && validIssueTypes[String(issueType).toLowerCase()])
+      ? (validIssueTypes[String(issueType).toLowerCase()] as any)
+      : (typeof issueType === 'string' && issueType.toUpperCase() in validIssueTypes ? issueType.toUpperCase() as any : 'LIFT_NOT_MOVING');
+
+    const validPriorities: Record<string, string> = {
+      critical: 'CRITICAL',
+      high: 'HIGH',
+      normal: 'NORMAL',
+      medium: 'NORMAL',
+      low: 'LOW',
+    };
+    const normalizedPriority = (priority && validPriorities[String(priority).toLowerCase()])
+      ? (validPriorities[String(priority).toLowerCase()] as any)
+      : (isEmergency ? 'CRITICAL' : 'NORMAL');
 
     // If caller is a Client, ensure they own or are authorized for the lift
     if (userRole === 'CLIENT') {
@@ -315,10 +348,10 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): 
             clientId: effectiveClientId,
             createdById: currentUserId,
             ticketNumber,
-            issueType: issueType || 'LIFT_NOT_MOVING',
+            issueType: normalizedIssueType,
             title,
             description,
-            priority: priority || (isEmergency ? 'CRITICAL' : 'NORMAL'),
+            priority: normalizedPriority,
             isEmergency: Boolean(isEmergency),
             status: effectiveTechId ? 'ASSIGNED' : 'NEW',
             assignedTechnicianId: effectiveTechId,
@@ -354,7 +387,7 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): 
             companyId,
             userId: currentUserId,
             title: `New Ticket: ${ticketNumber}`,
-            message: `Priority: ${priority || 'NORMAL'} - ${title}`,
+            message: `Priority: ${normalizedPriority} - ${title}`,
             type: 'BREAKDOWN',
             entityType: 'Complaint',
             entityId: comp.id,
@@ -373,10 +406,10 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): 
         clientId: effectiveClientId,
         createdById: currentUserId,
         ticketNumber,
-        issueType: issueType || 'LIFT_NOT_MOVING',
+        issueType: normalizedIssueType,
         title,
         description,
-        priority: priority || 'NORMAL',
+        priority: normalizedPriority,
         isEmergency: Boolean(isEmergency),
         status: effectiveTechId ? 'assigned' : 'pending',
         reportedAt: new Date().toISOString(),
@@ -399,6 +432,21 @@ router.patch('/:id', requireAuth, async (req: AuthenticatedRequest, res: Respons
     const userRole = (user.role || '').toUpperCase();
     const currentUserId = user.userId || user.sub;
     const { status, assignedTechnicianId, diagnosisRemarks, actionTaken, clientRating, clientFeedback, clientSignature } = req.body;
+
+    const validStatuses: Record<string, string> = {
+      new: 'NEW',
+      pending: 'NEW',
+      assigned: 'ASSIGNED',
+      technician_on_way: 'TECHNICIAN_ON_WAY',
+      in_progress: 'IN_PROGRESS',
+      inspection_repair: 'INSPECTION_REPAIR',
+      waiting_for_parts: 'WAITING_FOR_PARTS',
+      resolved: 'RESOLVED',
+      client_confirmation: 'CLIENT_CONFIRMATION',
+      closed: 'CLOSED',
+      cancelled: 'CANCELLED',
+    };
+    const normalizedStatus = status ? (validStatuses[String(status).toLowerCase()] || String(status).toUpperCase()) as any : undefined;
 
     let existing: any = null;
     try {
@@ -435,7 +483,7 @@ router.patch('/:id', requireAuth, async (req: AuthenticatedRequest, res: Respons
             ...(clientRating ? { clientRating: Number(clientRating) } : {}),
             ...(clientFeedback ? { clientFeedback } : {}),
             ...(clientSignature ? { clientSignature } : {}),
-            ...(status === 'CLOSED' ? { status: 'CLOSED', closedAt: new Date() } : {}),
+            ...(normalizedStatus === 'CLOSED' ? { status: 'CLOSED', closedAt: new Date() } : {}),
           },
           include: { lift: true, assignedTechnician: true, timelineEntries: true },
         });
@@ -461,22 +509,22 @@ router.patch('/:id', requireAuth, async (req: AuthenticatedRequest, res: Respons
         await tx.complaint.updateMany({
           where: { id, companyId },
           data: {
-            ...(status ? { status } : {}),
+            ...(normalizedStatus ? { status: normalizedStatus } : {}),
             ...(userRole !== 'TECHNICIAN' && assignedTechnicianId ? { assignedTechnicianId, assignedAt: new Date() } : {}),
             ...(diagnosisRemarks ? { diagnosisRemarks } : {}),
             ...(actionTaken ? { actionTaken } : {}),
             ...(clientRating ? { clientRating: Number(clientRating) } : {}),
             ...(clientFeedback ? { clientFeedback } : {}),
-            ...(status === 'CLOSED' || status === 'RESOLVED' ? { closedAt: new Date() } : {}),
+            ...(normalizedStatus === 'CLOSED' || normalizedStatus === 'RESOLVED' ? { closedAt: new Date() } : {}),
           },
         });
 
-        if (status) {
+        if (normalizedStatus) {
           await tx.complaintTimeline.create({
             data: {
               complaintId: id,
-              status: status as any,
-              title: `Status updated to ${status}`,
+              status: normalizedStatus,
+              title: `Status updated to ${normalizedStatus}`,
               description: actionTaken || diagnosisRemarks || 'Complaint status updated',
               actorName: user.name || user.email,
               actorRole: user.role,

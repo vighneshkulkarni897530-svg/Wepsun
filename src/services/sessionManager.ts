@@ -74,14 +74,23 @@ export function decodeJwtPayload(token: string | null): any | null {
     const parts = token.split('.');
     if (parts.length !== 3) return null;
     const base64Url = parts[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join('')
-    );
-    return JSON.parse(jsonPayload);
+    let base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const pad = (4 - (base64.length % 4)) % 4;
+    base64 += '='.repeat(pad);
+
+    if (typeof atob === 'function') {
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split('')
+          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      return JSON.parse(jsonPayload);
+    } else if (typeof (globalThis as any).Buffer !== 'undefined') {
+      const jsonPayload = (globalThis as any).Buffer.from(base64, 'base64').toString('utf8');
+      return JSON.parse(jsonPayload);
+    }
+    return null;
   } catch {
     return null;
   }
@@ -178,6 +187,8 @@ export function clearCachedUserSession(): void {
   localStorage.removeItem(STORAGE_PREFIX + 'currentUser');
   localStorage.removeItem(STORAGE_PREFIX + 'role');
   localStorage.removeItem(STORAGE_PREFIX + 'userId');
+  localStorage.removeItem(STORAGE_PREFIX + 'clientId');
+  localStorage.removeItem(STORAGE_PREFIX + 'technicianId');
   localStorage.removeItem(ROLE_KEY);
   nativePrefRemove(USER_SESSION_KEY);
   nativePrefRemove(ROLE_KEY);
@@ -589,7 +600,7 @@ export async function restoreAuthenticatedSession(): Promise<RestoredSessionResu
       if (rawRole === 'technician') {
         userRole = 'technician';
       } else if (rawRole === 'master_admin' || rawRole === 'company_admin' || rawRole === 'super_admin') {
-        userRole = isMasterAdminSessionValid() ? 'master_admin' : 'client';
+        userRole = 'master_admin';
       } else {
         userRole = 'client';
       }
@@ -608,7 +619,17 @@ export async function restoreAuthenticatedSession(): Promise<RestoredSessionResu
         isActive: serverUser.isActive ?? true,
       };
 
-      const isMasterAdmin = userRole === 'master_admin' && isMasterAdminSessionValid();
+      const isMasterAdmin = userRole === 'master_admin';
+
+      if (isMasterAdmin) {
+        localStorage.setItem(MASTER_AUTH_KEY, 'true');
+        sessionStorage.setItem(MASTER_AUTH_KEY, 'true');
+        const expiry = Date.now() + 30 * 24 * 60 * 60 * 1000;
+        localStorage.setItem(MASTER_EXPIRY_KEY, String(expiry));
+        sessionStorage.setItem(MASTER_EXPIRY_KEY, String(expiry));
+        nativePrefSet(MASTER_AUTH_KEY, 'true');
+        nativePrefSet(MASTER_EXPIRY_KEY, String(expiry));
+      }
 
       // Update cached session
       cacheUserSession(verifiedUser, userRole, isMasterAdmin);
@@ -635,8 +656,8 @@ export async function restoreAuthenticatedSession(): Promise<RestoredSessionResu
             const userRole: UserRole =
               rawRole === 'technician'
                 ? 'technician'
-                : rawRole === 'master_admin' || rawRole === 'company_admin'
-                ? isMasterAdminSessionValid() ? 'master_admin' : 'client'
+                : rawRole === 'master_admin' || rawRole === 'company_admin' || rawRole === 'super_admin'
+                ? 'master_admin'
                 : 'client';
 
             const verifiedUser: User = {
@@ -647,12 +668,21 @@ export async function restoreAuthenticatedSession(): Promise<RestoredSessionResu
               role: userRole,
               companyId: serverUser.companyId || 'comp-1',
               branchId: serverUser.branchId,
-              clientId: serverUser.clientId,
-              technicianId: serverUser.technicianId,
+              clientId: serverUser.clientId || (userRole === 'client' ? `client-${serverUser.id.replace(/^usr-/, '')}` : undefined),
+              technicianId: serverUser.technicianId || (userRole === 'technician' ? `tech-${serverUser.id.replace(/^usr-/, '')}` : undefined),
               avatar: serverUser.avatarUrl || serverUser.avatar || '',
               isActive: true,
             };
-            const isMasterAdmin = userRole === 'master_admin' && isMasterAdminSessionValid();
+            const isMasterAdmin = userRole === 'master_admin';
+            if (isMasterAdmin) {
+              localStorage.setItem(MASTER_AUTH_KEY, 'true');
+              sessionStorage.setItem(MASTER_AUTH_KEY, 'true');
+              const expiry = Date.now() + 30 * 24 * 60 * 60 * 1000;
+              localStorage.setItem(MASTER_EXPIRY_KEY, String(expiry));
+              sessionStorage.setItem(MASTER_EXPIRY_KEY, String(expiry));
+              nativePrefSet(MASTER_AUTH_KEY, 'true');
+              nativePrefSet(MASTER_EXPIRY_KEY, String(expiry));
+            }
             cacheUserSession(verifiedUser, userRole, isMasterAdmin);
 
             return {
@@ -815,38 +845,17 @@ export async function terminateSession(): Promise<void> {
     // Record explicit logout to prevent automatic restoration until next manual sign-in
     localStorage.setItem(EXPLICIT_LOGOUT_KEY, 'true');
 
-    // Remove user session cache
-    localStorage.removeItem(USER_SESSION_KEY);
-    localStorage.removeItem(ROLE_KEY);
+    // Remove user session cache and identity keys without deleting shared database collections
+    clearCachedUserSession();
+    clearMasterAdminFlag();
 
-    // Remove storage-prefix user keys but preserve non-sensitive configs like custom API URL
-    const keysToRemove: string[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (
-        key &&
-        (key.startsWith(STORAGE_PREFIX) || key.startsWith('wepsun_')) &&
-        key !== 'wepsun_custom_api_url' &&
-        key !== 'wepsun_sound_enabled' &&
-        key !== 'wepsun_installed' &&
-        key !== EXPLICIT_LOGOUT_KEY
-      ) {
-        keysToRemove.push(key);
-      }
-    }
-    keysToRemove.forEach((k) => localStorage.removeItem(k));
-
-    for (let i = 0; i < sessionStorage.length; i++) {
-      const key = sessionStorage.key(i);
-      if (
-        key &&
-        (key.startsWith(STORAGE_PREFIX) || key.startsWith('wepsun_')) &&
-        key !== 'wepsun_custom_api_url'
-      ) {
-        keysToRemove.push(key);
-      }
-    }
-    keysToRemove.forEach((k) => sessionStorage.removeItem(k));
+    // Clean any session-specific tokens from sessionStorage
+    sessionStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+    sessionStorage.removeItem(USER_SESSION_KEY);
+    sessionStorage.removeItem(ROLE_KEY);
+    sessionStorage.removeItem(MASTER_AUTH_KEY);
+    sessionStorage.removeItem(MASTER_EXPIRY_KEY);
   }
 }
 
@@ -859,10 +868,16 @@ export function registerSessionLifecycle(callbacks: {
   onSessionRefreshed: (tokens: { accessToken: string }) => void;
 }): () => void {
   let isChecking = false;
+  let lastCheckedTime = 0;
 
   const handleAppResumed = async () => {
     if (isChecking) return;
     if (typeof window === 'undefined') return;
+
+    // Throttle checks to once every 5 seconds to prevent spam on rapid tab switching
+    const now = Date.now();
+    if (now - lastCheckedTime < 5000) return;
+    lastCheckedTime = now;
 
     const token = getStoredAccessToken();
     const refreshToken = getStoredRefreshToken();

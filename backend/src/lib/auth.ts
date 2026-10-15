@@ -149,7 +149,7 @@ export async function createSession(
           isRevoked: false,
         },
       }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('DB Timeout')), 500)),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('DB Timeout')), 8000)),
     ]);
   } catch {
     // If DB offline, foreign key mismatch (demo profile), or timed out, memorySessions retains active session
@@ -186,10 +186,10 @@ export async function rotateSession(
     return null;
   }
 
-  // Grace Period Handling: If session was revoked within 30 seconds, treat as concurrent refresh / retry
+  // Grace Period Handling: If session was revoked within 60 seconds, treat as concurrent refresh / retry
   if (session.isRevoked) {
     const revokedAtTime = session.revokedAt ? new Date(session.revokedAt).getTime() : 0;
-    const isWithinGracePeriod = Date.now() - revokedAtTime < 30000;
+    const isWithinGracePeriod = Date.now() - revokedAtTime < 60000;
 
     if (isWithinGracePeriod) {
       let resolvedUser = session.user;
