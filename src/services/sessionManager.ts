@@ -303,22 +303,6 @@ export function isMasterAdminSessionValid(): boolean {
   const isExplicitLogout = localStorage.getItem(EXPLICIT_LOGOUT_KEY) === 'true';
   if (isExplicitLogout) return false;
 
-  const flag =
-    localStorage.getItem(MASTER_AUTH_KEY) === 'true' ||
-    sessionStorage.getItem(MASTER_AUTH_KEY) === 'true';
-  if (!flag) return false;
-
-  // Check admin session expiry
-  const expiryRaw = localStorage.getItem(MASTER_EXPIRY_KEY) || sessionStorage.getItem(MASTER_EXPIRY_KEY);
-  if (expiryRaw) {
-    const expiry = Number(expiryRaw);
-    if (!isNaN(expiry) && Date.now() > expiry) {
-      // Admin session lifetime expired
-      clearMasterAdminFlag();
-      return false;
-    }
-  }
-
   // A valid token must exist and contain an authorized administrative claim
   const token = getStoredAccessToken() || getStoredRefreshToken();
   if (!token) {
@@ -334,6 +318,25 @@ export function isMasterAdminSessionValid(): boolean {
   const isAdminRole = roleStr === 'MASTER_ADMIN' || roleStr === 'SUPER_ADMIN' || roleStr === 'COMPANY_ADMIN';
   if (!isAdminRole) {
     return false;
+  }
+
+  // Check admin session expiry
+  const expiryRaw = localStorage.getItem(MASTER_EXPIRY_KEY) || sessionStorage.getItem(MASTER_EXPIRY_KEY);
+  if (expiryRaw) {
+    const expiry = Number(expiryRaw);
+    if (!isNaN(expiry) && Date.now() > expiry) {
+      // Admin session lifetime expired
+      clearMasterAdminFlag();
+      return false;
+    }
+  }
+
+  const flag =
+    localStorage.getItem(MASTER_AUTH_KEY) === 'true' ||
+    sessionStorage.getItem(MASTER_AUTH_KEY) === 'true';
+  if (!flag) {
+    localStorage.setItem(MASTER_AUTH_KEY, 'true');
+    sessionStorage.setItem(MASTER_AUTH_KEY, 'true');
   }
 
   return true;
@@ -745,10 +748,12 @@ export async function restoreAuthenticatedSession(): Promise<RestoredSessionResu
   if (tokenToDecode) {
     const claims = decodeJwtPayload(tokenToDecode);
     if (claims && claims.sub) {
+      const claimRole = (claims.role || '').toLowerCase();
+      const isClaimAdmin = claimRole === 'master_admin' || claimRole === 'company_admin' || claimRole === 'super_admin';
       const fallbackRole: UserRole =
-        claims.role?.toLowerCase() === 'technician'
+        claimRole === 'technician'
           ? 'technician'
-          : claims.role?.toLowerCase() === 'master_admin' && isMasterAdminSessionValid()
+          : isClaimAdmin && isMasterAdminSessionValid()
           ? 'master_admin'
           : 'client';
 

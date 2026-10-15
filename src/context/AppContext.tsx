@@ -954,31 +954,6 @@ function mapServerServiceReport(sr: any): ServiceReport {
       userObj = users.find(
         (u) => u.id === target || u.email.toLowerCase() === target.toLowerCase() || u.phone === target
       );
-      if (!userObj) {
-        const demo = demoAccounts.find(
-          (d) =>
-            d.id === target ||
-            d.email.toLowerCase() === target.toLowerCase() ||
-            d.phone === target
-        );
-        if (demo) {
-          userObj = {
-            id: demo.id,
-            name: demo.name,
-            email: demo.email,
-            phone: demo.phone,
-            role: demo.role,
-            companyId: demo.companyId,
-            branchId: demo.branchId,
-            clientId: (demo as any).clientId || (demo.role === 'client' ? (demo.id === 'usr-client-priya' ? 'client-priya' : 'client-1') : undefined),
-            technicianId: (demo as any).technicianId || (demo.role === 'technician' ? (demo.id === 'usr-tech-rohan' ? 'tech-rohan' : 'tech-1') : undefined),
-            avatar: demo.avatar,
-            companyName: demo.companyName,
-            designation: demo.title,
-            isActive: true,
-          };
-        }
-      }
     } else {
       userObj = { ...target };
     }
@@ -1247,7 +1222,12 @@ function mapServerServiceReport(sr: any): ServiceReport {
       localStorage.removeItem(STORAGE_PREFIX + 'technicianId');
     }
 
-    cacheUserSession(finalUser, finalUser.role, isMasterAdminSessionValid());
+    const isMasterRole =
+      finalUser.role === 'company_admin' ||
+      finalUser.role === 'super_admin' ||
+      finalUser.role === 'master_admin' ||
+      isMasterAdminSessionValid();
+    cacheUserSession(finalUser, finalUser.role, isMasterRole);
     setIsAuthenticated(true);
     localStorage.removeItem('wepsun_explicit_logout');
 

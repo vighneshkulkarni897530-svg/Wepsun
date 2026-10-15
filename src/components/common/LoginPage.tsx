@@ -43,7 +43,6 @@ import {
 } from '../../services/firebaseAuth';
 import elevatorGlassLobbyImg from '../../assets/elevator-glass-lobby.jpg';
 import constructionPlansSunsetImg from '../../assets/construction-plans-sunset.jpg';
-import { DEMO_ACCOUNTS, INITIAL_USERS } from '../../data/initialData';
 
 interface LoginPageProps {
   isOpen?: boolean;
@@ -65,6 +64,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     setCurrentRole,
     showToast,
     currentRole,
+    users,
   } = useApp();
 
   const {
@@ -259,11 +259,23 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       const res = await apiService.login(payload);
       if (res && res.success && res.data) {
         const authData = res.data as any;
-        if (authData.tokens?.accessToken) {
-          setTokens(authData.tokens.accessToken, authData.tokens.refreshToken);
+        const accessToken = authData.tokens?.accessToken || authData.accessToken;
+        const refreshToken = authData.tokens?.refreshToken || authData.refreshToken;
+        if (accessToken) {
+          setTokens(accessToken, refreshToken);
         }
         if (authData.user) {
           const userRole = (authData.user.role || targetRole).toLowerCase() as UserRole;
+          const isAdminRole = userRole === 'company_admin' || userRole === 'super_admin' || userRole === 'master_admin';
+
+          if (isAdminRole) {
+            localStorage.setItem('wepsun_master_authenticated', 'true');
+            sessionStorage.setItem('wepsun_master_authenticated', 'true');
+            const expiry = Date.now() + 30 * 24 * 60 * 60 * 1000;
+            localStorage.setItem('wepsun_master_session_expiry', String(expiry));
+            sessionStorage.setItem('wepsun_master_session_expiry', String(expiry));
+          }
+
           const finalUser: UserRecord = {
             id: authData.user.id,
             name: authData.user.name,
@@ -291,6 +303,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               : userRole === 'technician'
               ? 'jobs'
               : 'dashboard';
+
+          // Immediately update hash so underlying navigation transitions seamlessly
+          window.location.hash = activeDest;
 
           try {
             confetti({
@@ -345,36 +360,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             message: 'This account has been deactivated. Please contact WEPSUN Support.',
           });
         } else if (errorCode === 'OFFLINE' || errorCode === 'NETWORK_ERROR' || errorCode === 'TIMEOUT') {
-          // Attempt offline fallback with demo accounts or initial users so user is not blocked
-          const offlineUser = DEMO_ACCOUNTS.find(
-            (d) => (d.email && d.email.toLowerCase() === cleanIdentifier.toLowerCase()) || d.phone === cleanIdentifier
-          ) || INITIAL_USERS.find(
-            (u) => (u.email && u.email.toLowerCase() === cleanIdentifier.toLowerCase()) || u.phone === cleanIdentifier
-          );
-
-          if (offlineUser && (password === 'Wepsun@2026' || password === (offlineUser as any).password || password === 'admin123' || password === 'tech123')) {
-            const role = (offlineUser.role || targetRole).toLowerCase() as UserRole;
-            const finalUser: UserRecord = {
-              id: offlineUser.id,
-              name: offlineUser.name,
-              email: offlineUser.email,
-              phone: offlineUser.phone || '',
-              role,
-              companyId: offlineUser.companyId || 'comp-1',
-              branchId: offlineUser.branchId,
-              clientId: (offlineUser as any).clientId,
-              technicianId: (offlineUser as any).technicianId,
-              avatar: (offlineUser as any).avatar,
-              isActive: true,
-            };
-            loginAsUser(finalUser);
-            setCurrentRole(role);
-            showToast('info', 'Offline Demo Mode', 'Signed in using local demonstration profile.');
-            window.location.hash = role === 'client' ? 'home' : role === 'technician' ? 'jobs' : 'dashboard';
-            if (onClose) onClose();
-            return;
-          }
-
           showConnectionProblem({
             onRetry: () => {
               handleSignInSubmit(e);
@@ -484,8 +469,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
       if (res && res.success && res.data) {
         const authData = res.data as any;
-        if (authData.tokens?.accessToken) {
-          setTokens(authData.tokens.accessToken, authData.tokens.refreshToken);
+        const accessToken = authData.tokens?.accessToken || authData.accessToken;
+        const refreshToken = authData.tokens?.refreshToken || authData.refreshToken;
+        if (accessToken) {
+          setTokens(accessToken, refreshToken);
         }
 
         const masterUser: UserRecord = {
@@ -886,8 +873,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
             if (res.success && res.data) {
               const authData = res.data as any;
-              if (authData.tokens?.accessToken) {
-                setTokens(authData.tokens.accessToken, authData.tokens.refreshToken);
+              const accessToken = authData.tokens?.accessToken || authData.accessToken;
+              const refreshToken = authData.tokens?.refreshToken || authData.refreshToken;
+              if (accessToken) {
+                setTokens(accessToken, refreshToken);
               }
 
               const finalUser: UserRecord = {
@@ -1650,68 +1639,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 </>
               )}
 
-              {/* Quick Demo Sign In Chips */}
-              <div className="mt-4 pt-3 border-t border-slate-200/80">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                    Quick Demo Accounts
-                  </span>
-                  <span className="text-[10px] text-slate-400">1-click auto-fill</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedRole('client');
-                      setIdentifier('priya.sharma@towers.com');
-                      setPassword('Wepsun@2026');
-                    }}
-                    className="p-2 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded-xl text-left transition-all cursor-pointer group"
-                  >
-                    <div className="text-[11px] font-bold text-slate-800 group-hover:text-[#0066FF] truncate">Priya Sharma</div>
-                    <div className="text-[10px] text-slate-500 truncate">Client • Sunrise Towers</div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedRole('technician');
-                      setTechMode('standard');
-                      setIdentifier('tech1@wepsun.com');
-                      setPassword('tech123');
-                    }}
-                    className="p-2 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded-xl text-left transition-all cursor-pointer group"
-                  >
-                    <div className="text-[11px] font-bold text-slate-800 group-hover:text-[#0066FF] truncate">Rajesh Sharma</div>
-                    <div className="text-[10px] text-slate-500 truncate">Field Tech #1 • Central</div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedRole('technician');
-                      setTechMode('standard');
-                      setIdentifier('admin@wepsun.com');
-                      setPassword('admin123');
-                    }}
-                    className="p-2 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded-xl text-left transition-all cursor-pointer group"
-                  >
-                    <div className="text-[11px] font-bold text-slate-800 group-hover:text-[#0066FF] truncate">Company Admin</div>
-                    <div className="text-[10px] text-slate-500 truncate">Executive Admin</div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedRole('client');
-                      setIdentifier('vighneshkulkarni897530@gmail.com');
-                      setPassword('Wepsun@2026');
-                    }}
-                    className="p-2 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded-xl text-left transition-all cursor-pointer group"
-                  >
-                    <div className="text-[11px] font-bold text-slate-800 group-hover:text-[#0066FF] truncate">Vighnesh Kulkarni</div>
-                    <div className="text-[10px] text-slate-500 truncate">7391010883 • Client</div>
-                  </button>
-                </div>
-              </div>
             </div>
           ) : (
             /* ========================================================================= */

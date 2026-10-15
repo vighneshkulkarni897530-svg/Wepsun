@@ -10,7 +10,7 @@ const STORAGE_API_URL_KEY = 'wepsun_custom_api_url';
 const TOKEN_KEY = 'wepsun_access_token';
 const REFRESH_TOKEN_KEY = 'wepsun_refresh_token';
 
-const DEFAULT_CLOUD_API_URL = 'http://192.168.64.5:5000/api';
+export const DEFAULT_CLOUD_API_URL = 'https://wepsun.onrender.com/api';
 
 // Guarantee window.Capacitor global availability
 if (typeof window !== 'undefined' && !(window as any).Capacitor) {
@@ -27,7 +27,7 @@ if (typeof window !== 'undefined' && !(window as any).Capacitor) {
 export function getApiBaseUrl(): string {
   if (typeof window !== 'undefined') {
     const custom = localStorage.getItem(STORAGE_API_URL_KEY);
-    if (custom && custom.trim().length > 0) {
+    if (custom && custom.trim().length > 0 && !custom.includes('192.168.64.5')) {
       return custom.trim().replace(/\/+$/, '');
     }
 
@@ -37,6 +37,16 @@ export function getApiBaseUrl(): string {
       Boolean((window as any).Capacitor?.isNativePlatform?.()) ||
       window.location.protocol === 'capacitor:' ||
       window.location.protocol === 'ionic:';
+
+    // On native Android/iOS app, always connect directly to the secure production cloud backend
+    // to avoid Mixed Content security blocks and unreachable local network IPs.
+    if (isNative) {
+      const envUrl = import.meta.env.VITE_API_URL;
+      if (envUrl && envUrl.startsWith('https://') && !envUrl.includes('192.168.') && !envUrl.includes('localhost')) {
+        return envUrl.trim().replace(/\/+$/, '');
+      }
+      return DEFAULT_CLOUD_API_URL;
+    }
 
     const isLocalOrLan =
       window.location.hostname === 'localhost' ||
@@ -53,7 +63,7 @@ export function getApiBaseUrl(): string {
   }
 
   const envUrl = import.meta.env.VITE_API_URL;
-  if (envUrl && envUrl.trim().length > 0) {
+  if (envUrl && envUrl.trim().length > 0 && !envUrl.includes('192.168.64.5')) {
     return envUrl.trim().replace(/\/+$/, '');
   }
 
@@ -199,13 +209,45 @@ export async function apiFetch<T = any>(
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   const startTime = Date.now();
 
+  let targetBase = baseUrl;
+
   try {
     const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    let response = await fetch(`${baseUrl}${normalizedEndpoint}`, {
-      headers: requestHeaders,
-      signal: controller.signal,
-      ...rest,
-    });
+    let response: Response;
+
+    try {
+      response = await fetch(`${targetBase}${normalizedEndpoint}`, {
+        headers: requestHeaders,
+        signal: controller.signal,
+        ...rest,
+      });
+
+      // If local dev server returned 502/503/504 gateway error (backend not running locally),
+      // transparently retry against the live production cloud backend
+      if (!response.ok && (response.status === 502 || response.status === 503 || response.status === 504 || (response.status === 500 && isAuthRoute)) && targetBase !== DEFAULT_CLOUD_API_URL) {
+        console.warn(`[apiFetch] ${targetBase} returned HTTP ${response.status}, failing over to ${DEFAULT_CLOUD_API_URL}`);
+        targetBase = DEFAULT_CLOUD_API_URL;
+        response = await fetch(`${targetBase}${normalizedEndpoint}`, {
+          headers: requestHeaders,
+          signal: controller.signal,
+          ...rest,
+        });
+      }
+    } catch (initialErr: any) {
+      // If primary endpoint failed (e.g. ECONNREFUSED on localhost or LAN IP), failover to cloud
+      if (targetBase !== DEFAULT_CLOUD_API_URL) {
+        console.warn(`[apiFetch] ${targetBase} unreachable (${initialErr.message}), failing over to ${DEFAULT_CLOUD_API_URL}`);
+        targetBase = DEFAULT_CLOUD_API_URL;
+        response = await fetch(`${targetBase}${normalizedEndpoint}`, {
+          headers: requestHeaders,
+          signal: controller.signal,
+          ...rest,
+        });
+      } else {
+        throw initialErr;
+      }
+    }
+
     clearTimeout(timeoutId);
 
     // If 401 Unauthorized, attempt transparent refresh (unless calling auth routes)
@@ -213,7 +255,7 @@ export async function apiFetch<T = any>(
       const refreshResult = await refreshActiveSession();
       if (refreshResult.success && refreshResult.accessToken) {
         requestHeaders.Authorization = `Bearer ${refreshResult.accessToken}`;
-        response = await fetch(`${baseUrl}${normalizedEndpoint}`, {
+        response = await fetch(`${targetBase}${normalizedEndpoint}`, {
           headers: requestHeaders,
           ...rest,
         });
@@ -293,10 +335,6 @@ export const apiService = {
     googleId?: string;
   }) =>
     apiFetch('/auth/google', { method: 'POST', body: JSON.stringify(payload), skipAuth: true }),
-  getDemoUsers: () =>
-    apiFetch('/auth/demo-users', { skipAuth: true }),
-  demoLogin: (payload: { identifier?: string; role?: string; userId?: string }) =>
-    apiFetch('/auth/demo-login', { method: 'POST', body: JSON.stringify(payload), skipAuth: true }),
   refreshSession: (refreshToken: string) =>
     apiFetch('/auth/refresh', { method: 'POST', body: JSON.stringify({ refreshToken }), skipAuth: true }),
   logout: (refreshToken?: string) =>

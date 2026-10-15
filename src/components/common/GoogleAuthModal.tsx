@@ -64,7 +64,6 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
   // Any User Input State
   const [userEmail, setUserEmail] = useState('');
   const [userName, setUserName] = useState('');
-  const [showDemoAccounts, setShowDemoAccounts] = useState(false);
 
   // Device-specific saved Google accounts history
   const [recentAccounts, setRecentAccounts] = useState<SavedAccount[]>([]);
@@ -121,30 +120,6 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
     localStorage.setItem(STORAGE_RECENT_GOOGLE_KEY, JSON.stringify(updated));
   };
 
-  // Pre-configured Demo Accounts for Rapid Role Testing
-  const enterpriseDemoAccounts = [
-    {
-      name: 'Sunil Mehta (Managing Director)',
-      email: 'admin@wepsun.com',
-      role: 'company_admin' as UserRole,
-      badge: 'Admin Portal',
-      bgColor: 'bg-indigo-600',
-    },
-    {
-      name: 'Rajesh Sharma (Lead Engineer)',
-      email: 'tech1@wepsun.com',
-      role: 'technician' as UserRole,
-      badge: 'Technician Portal',
-      bgColor: 'bg-emerald-600',
-    },
-    {
-      name: 'Greenwood Society Secretary',
-      email: 'greenwood@wepsun.com',
-      role: 'client' as UserRole,
-      badge: 'Client Portal',
-      bgColor: 'bg-amber-600',
-    },
-  ];
 
   const handleExecuteGoogleLogin = async (account: {
     email: string;
@@ -638,53 +613,7 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
             </div>
           )}
 
-          {/* Quick Demo Accounts Drawer */}
-          <div className="pt-1">
-            <button
-              type="button"
-              onClick={() => setShowDemoAccounts(!showDemoAccounts)}
-              className="w-full py-2 px-3 text-xs text-slate-500 hover:text-slate-700 font-semibold flex items-center justify-between border-t border-slate-100 pt-3"
-            >
-              <span>Need a demo account to test?</span>
-              <span className="text-[11px] text-blue-600 font-bold">
-                {showDemoAccounts ? 'Hide Demo Accounts' : 'Show Demo Accounts'}
-              </span>
-            </button>
 
-            {showDemoAccounts && (
-              <div className="mt-2 space-y-1.5 animate-in fade-in duration-150">
-                {enterpriseDemoAccounts.map((acc) => (
-                  <button
-                    key={acc.email}
-                    type="button"
-                    onClick={() =>
-                      handleExecuteGoogleLogin({
-                        email: acc.email,
-                        name: acc.name,
-                        role: acc.role,
-                      })
-                    }
-                    className="w-full p-2.5 rounded-xl border border-slate-200 hover:border-slate-300 hover:bg-slate-50 flex items-center justify-between text-left transition-all cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div
-                        className={`w-7 h-7 rounded-full ${acc.bgColor} text-white flex items-center justify-center text-xs font-bold shrink-0`}
-                      >
-                        {acc.name.charAt(0)}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-slate-800 truncate">{acc.name}</p>
-                        <p className="text-[10px] text-slate-500 truncate">{acc.email}</p>
-                      </div>
-                    </div>
-                    <span className="text-[10px] text-slate-400 font-medium px-2 py-0.5 rounded-md bg-slate-100 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
-                      {acc.badge}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
 
         {/* Footer */}
