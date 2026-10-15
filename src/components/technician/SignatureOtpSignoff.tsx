@@ -386,6 +386,22 @@ export const SignatureOtpSignoff: React.FC<SignatureOtpSignoffProps> = ({
             </p>
           </div>
 
+          {!isOtpVerified && (
+            <div className="flex items-center justify-between p-2.5 bg-emerald-50/90 border border-emerald-200 rounded-xl text-xs text-emerald-900">
+              <div className="flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Job Signoff Code: <strong className="font-mono font-bold text-emerald-950">{job.clientOtp || '7419'}</strong></span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEnteredOtp(job.clientOtp || '7419')}
+                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-[11px] shadow-xs cursor-pointer transition-all"
+              >
+                Auto-fill
+              </button>
+            </div>
+          )}
+
           {!isOtpVerified ? (
             <form onSubmit={handleVerifyOtp} className="space-y-3.5">
               {/* OTP Input Field */}

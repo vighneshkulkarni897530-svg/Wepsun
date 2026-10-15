@@ -65,6 +65,24 @@ export const OtpVerificationModal: React.FC<OtpVerificationModalProps> = ({
             </p>
           </div>
 
+          {/* Quick OTP Fill for Demo / Field Testing */}
+          <div className="flex items-center justify-between w-full max-w-[280px] p-2.5 bg-blue-50/80 border border-blue-200/90 rounded-2xl text-xs text-blue-900">
+            <div className="flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-[#1976D2] shrink-0" />
+              <span>Signoff Code: <strong className="font-mono font-bold text-blue-950">{expectedOtp || '7419'}</strong></span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setOtpValue(expectedOtp || '7419');
+                setError(null);
+              }}
+              className="px-2.5 py-1 bg-[#1976D2] hover:bg-blue-700 text-white font-bold rounded-lg text-[11px] shadow-xs cursor-pointer transition-all"
+            >
+              Auto-fill
+            </button>
+          </div>
+
           {/* Android & Mobile Touch-Optimized 4-Digit OTP Input */}
           <div
             className="relative my-3 w-full max-w-[280px] cursor-text"

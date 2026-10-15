@@ -217,6 +217,7 @@ export async function initiateMaster2FA(candidateId: string): Promise<{
       email: masterUser.email,
       name: masterUser.name,
       type: 'signup', // Use formatted template
+      otp: emailOtp,
     });
   } catch (err: any) {
     console.warn('[Master 2FA] Email dispatch note:', err?.message);
@@ -327,6 +328,7 @@ export async function resendMaster2FA(challengeToken: string): Promise<{
       email: record.email,
       name: 'Master Admin',
       type: 'signup',
+      otp: record.emailOtp,
     });
   } catch (err: any) {
     console.warn('[Master 2FA Resend] Email note:', err?.message);
