@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
+import { getEffectiveProfilePhoto, isValidCustomAvatar } from '../../utils/avatarUtils';
 import {
   AlertTriangle,
   GitBranch,
@@ -13,12 +14,27 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({ onOpenRaiseComplaint }) => {
   const {
     currentUser,
+    clientProfile,
     activeCompany,
     activeBranchId,
     branches,
     tenantComplaints,
     tenantLifts,
   } = useApp();
+
+  const [, setAvatarVersion] = useState(0);
+
+  useEffect(() => {
+    const handlePhotoUpdated = () => {
+      setAvatarVersion((v) => v + 1);
+    };
+    window.addEventListener('wepsun_profile_photo_updated', handlePhotoUpdated);
+    window.addEventListener('storage', handlePhotoUpdated);
+    return () => {
+      window.removeEventListener('wepsun_profile_photo_updated', handlePhotoUpdated);
+      window.removeEventListener('storage', handlePhotoUpdated);
+    };
+  }, []);
 
 
 
@@ -82,13 +98,16 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenRaiseComplaint }) => {
             {/* User Profile */}
             <div className="flex items-center gap-2.5 pl-3 border-l border-slate-200">
               {(() => {
-                const isProfileSaved = typeof window !== 'undefined' && currentUser?.id && localStorage.getItem('wepsun_profile_saved_' + currentUser.id) === 'true';
-                const isDummyAvatar = (a?: string | null) => !a || a.includes('534528741775-53994a69daeb') || a.includes('541888946425') || a.includes('486406146926') || a.includes('519494026892') || a.includes('545324418');
-                const hasValidAvatar = isProfileSaved && currentUser?.avatar && !isDummyAvatar(currentUser.avatar);
+                const effectiveNavbarAvatar = getEffectiveProfilePhoto(
+                  currentUser?.avatar,
+                  clientProfile?.logo,
+                  currentUser?.id
+                );
+                const hasValidAvatar = isValidCustomAvatar(effectiveNavbarAvatar);
 
                 return hasValidAvatar ? (
                   <img
-                    src={currentUser.avatar}
+                    src={effectiveNavbarAvatar}
                     alt={currentUser.name}
                     className="w-8 h-8 rounded-full object-cover border border-slate-200"
                   />

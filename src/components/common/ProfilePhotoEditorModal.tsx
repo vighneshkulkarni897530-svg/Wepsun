@@ -83,12 +83,12 @@ export const ProfilePhotoEditorModal: React.FC<ProfilePhotoEditorModalProps> = (
   const CROP_DIAMETER = 260; // diameter of the crop circle
   const OUTPUT_SIZE = 512; // output resolution of exported canvas
 
-  // Reset transforms when initial image changes
+  // Reset transforms when initial image changes or modal opens
   useEffect(() => {
-    if (initialImage) {
-      setCurrentImage(initialImage);
+    if (isOpen) {
+      setCurrentImage(initialImage || null);
     }
-  }, [initialImage]);
+  }, [initialImage, isOpen]);
 
   // Cleanup camera stream
   const stopCamera = useCallback(() => {

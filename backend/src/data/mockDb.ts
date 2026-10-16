@@ -36,4 +36,7 @@ export const db = {
   serviceReports: [...INITIAL_SERVICE_REPORTS],
   aiErrorCodes: [...AI_ERROR_CODES_DATABASE],
   auditLogs: [...INITIAL_AUDIT_LOGS],
+  clients: [] as any[],
+  feedbacks: [] as any[],
+  notifications: [] as any[],
 };

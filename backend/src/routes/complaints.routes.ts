@@ -226,10 +226,7 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): 
           where: {
             id: liftId,
             companyId,
-            OR: [
-              { clientId: user.clientId },
-              { clientId: null },
-            ],
+            ...(user.clientId ? { clientId: user.clientId } : {}),
           },
         });
 
@@ -273,13 +270,13 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): 
                 city: 'Navi Mumbai',
                 pinCode: '400703',
                 contactPerson: user.name || 'Society Manager',
-                contactPhone: user.phone || '+91 98200 12345',
+                contactPhone: (user as any).phone || '+91 98200 12345',
                 totalLifts: 2,
               },
             });
           }
 
-          ownedLift = await prisma.lift.create({
+          ownedLift = await (prisma.lift.create as any)({
             data: {
               companyId,
               branchId: building.branchId,

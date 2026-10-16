@@ -11,6 +11,7 @@ import { apiService, getApiBaseUrl } from './api';
 import { Capacitor } from '@capacitor/core';
 import { App as CapApp } from '@capacitor/app';
 import { Preferences } from '@capacitor/preferences';
+import { isValidCustomAvatar, isDummyAvatar } from '../utils/avatarUtils';
 
 // Safe Native Preferences bridge for Android/iOS native app with web fallback.
 // Uses Android SharedPreferences on Android, UserDefaults on iOS, and localStorage on Web.
@@ -608,6 +609,17 @@ export async function restoreAuthenticatedSession(): Promise<RestoredSessionResu
         userRole = 'client';
       }
 
+      const rawAvatar = serverUser.avatarUrl || serverUser.avatar || '';
+      const cachedAvatar = typeof window !== 'undefined' ? localStorage.getItem('wepsun_user_avatar_' + serverUser.id) : null;
+      const resolvedAvatar = (isValidCustomAvatar(rawAvatar) ? rawAvatar : null) ||
+        (isValidCustomAvatar(cachedAvatar) ? cachedAvatar : null) ||
+        '';
+
+      if (resolvedAvatar && typeof window !== 'undefined') {
+        localStorage.setItem('wepsun_profile_saved_' + serverUser.id, 'true');
+        localStorage.setItem('wepsun_user_avatar_' + serverUser.id, resolvedAvatar);
+      }
+
       const verifiedUser: User = {
         id: serverUser.id,
         name: serverUser.name,
@@ -618,7 +630,7 @@ export async function restoreAuthenticatedSession(): Promise<RestoredSessionResu
         branchId: serverUser.branchId || undefined,
         clientId: serverUser.clientId || (userRole === 'client' ? `client-${serverUser.id.replace(/^usr-/, '')}` : undefined),
         technicianId: serverUser.technicianId || (userRole === 'technician' ? `tech-${serverUser.id.replace(/^usr-/, '')}` : undefined),
-        avatar: serverUser.avatarUrl || serverUser.avatar || '',
+        avatar: resolvedAvatar,
         isActive: serverUser.isActive ?? true,
       };
 
@@ -663,6 +675,17 @@ export async function restoreAuthenticatedSession(): Promise<RestoredSessionResu
                 ? 'master_admin'
                 : 'client';
 
+            const retryRawAvatar = serverUser.avatarUrl || serverUser.avatar || '';
+            const retryCachedAvatar = typeof window !== 'undefined' ? localStorage.getItem('wepsun_user_avatar_' + serverUser.id) : null;
+            const retryResolvedAvatar = (isValidCustomAvatar(retryRawAvatar) ? retryRawAvatar : null) ||
+              (isValidCustomAvatar(retryCachedAvatar) ? retryCachedAvatar : null) ||
+              '';
+
+            if (retryResolvedAvatar && typeof window !== 'undefined') {
+              localStorage.setItem('wepsun_profile_saved_' + serverUser.id, 'true');
+              localStorage.setItem('wepsun_user_avatar_' + serverUser.id, retryResolvedAvatar);
+            }
+
             const verifiedUser: User = {
               id: serverUser.id,
               name: serverUser.name,
@@ -673,7 +696,7 @@ export async function restoreAuthenticatedSession(): Promise<RestoredSessionResu
               branchId: serverUser.branchId,
               clientId: serverUser.clientId || (userRole === 'client' ? `client-${serverUser.id.replace(/^usr-/, '')}` : undefined),
               technicianId: serverUser.technicianId || (userRole === 'technician' ? `tech-${serverUser.id.replace(/^usr-/, '')}` : undefined),
-              avatar: serverUser.avatarUrl || serverUser.avatar || '',
+              avatar: retryResolvedAvatar,
               isActive: true,
             };
             const isMasterAdmin = userRole === 'master_admin';

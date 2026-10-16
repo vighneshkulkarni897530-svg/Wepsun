@@ -137,7 +137,7 @@ router.post('/', requireAuth, requireRole(['SUPER_ADMIN', 'COMPANY_ADMIN', 'SERV
           companyId,
           branchId,
           clientId: targetClientId,
-          createdById: user.id || user.sub,
+          createdById: (user as any).id || user.sub,
           workOrderNumber,
           liftId: liftId || (await prisma.lift.findFirst({ where: { companyId } }))?.id || '',
           technicianId: technicianId || null,

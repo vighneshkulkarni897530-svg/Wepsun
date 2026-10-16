@@ -28,17 +28,19 @@ const router = Router();
 
 // Helper to sanitize user object (never return password hashes or internal security fields)
 function sanitizeUser(user: any) {
+  const avatar = user.avatarUrl || user.avatar || null;
   return {
     id: user.id,
     name: user.name,
     email: user.email,
-    phone: user.phone || '+91 98201 55432',
+    phone: user.phone || '',
     role: user.role,
     companyId: user.companyId,
     branchId: user.branchId || null,
     clientId: user.clientId || null,
     technicianId: user.technicianId || null,
-    avatarUrl: user.avatarUrl || null,
+    avatarUrl: avatar,
+    avatar: avatar,
     isActive: user.isActive ?? true,
     company: user.company
       ? {
@@ -207,7 +209,7 @@ async function ensureClientAccountWithEquipment(user: any): Promise<string | nul
         db.clients.push(mockClient);
       }
 
-      let mockBld = db.buildings.find((b: any) => b.clientId === clientId);
+      let mockBld: any = db.buildings.find((b: any) => b.clientId === clientId);
       if (!mockBld) {
         mockBld = {
           id: 'bld-' + clientId,
@@ -221,7 +223,7 @@ async function ensureClientAccountWithEquipment(user: any): Promise<string | nul
           contactPerson: user.name || 'Society Manager',
           contactPhone: user.phone || '+91 98200 12345',
           totalLifts: 2,
-        } as any;
+        };
         db.buildings.push(mockBld);
       }
 
@@ -1706,7 +1708,8 @@ router.patch('/profile', requireAuth, async (req: AuthenticatedRequest, res: Res
       notificationPreferences,
     } = req.body;
 
-    const newAvatar = avatarUrl || avatar;
+    const hasAvatarChange = avatarUrl !== undefined || avatar !== undefined;
+    const newAvatar = avatarUrl !== undefined ? avatarUrl : avatar;
 
     let updatedUser: any = null;
     try {
@@ -1715,7 +1718,7 @@ router.patch('/profile', requireAuth, async (req: AuthenticatedRequest, res: Res
         data: {
           ...(name ? { name: String(name).trim() } : {}),
           ...(phone ? { phone: String(phone).trim() } : {}),
-          ...(newAvatar ? { avatarUrl: newAvatar } : {}),
+          ...(hasAvatarChange ? { avatarUrl: newAvatar ? String(newAvatar).trim() : null } : {}),
         },
         include: { company: true, branch: true },
       });
@@ -1725,7 +1728,10 @@ router.patch('/profile', requireAuth, async (req: AuthenticatedRequest, res: Res
       if (mock) {
         if (name) mock.name = String(name).trim();
         if (phone) mock.phone = String(phone).trim();
-        if (newAvatar) mock.avatarUrl = newAvatar;
+        if (hasAvatarChange) {
+          (mock as any).avatarUrl = newAvatar ? String(newAvatar).trim() : null;
+          (mock as any).avatar = newAvatar ? String(newAvatar).trim() : null;
+        }
         if (companyName) (mock as any).companyName = companyName;
         updatedUser = mock;
       }
@@ -1750,11 +1756,12 @@ router.patch('/profile', requireAuth, async (req: AuthenticatedRequest, res: Res
           },
         });
       } catch {
-        const mc = db.clients.find((c) => c.id === effectiveClientId);
+        const mc = db.clients.find((c: any) => c.id === effectiveClientId);
         if (mc) {
           if (name) mc.contactPerson = String(name).trim();
           if (companyName) mc.name = String(companyName).trim();
           if (phone) mc.phone = String(phone).trim();
+          if (hasAvatarChange) (mc as any).logo = newAvatar ? String(newAvatar).trim() : null;
         }
       }
     }
@@ -1768,7 +1775,7 @@ router.patch('/profile', requireAuth, async (req: AuthenticatedRequest, res: Res
           data: {
             ...(name ? { name: String(name).trim() } : {}),
             ...(phone ? { phone: String(phone).trim() } : {}),
-            ...(newAvatar ? { avatarUrl: newAvatar } : {}),
+            ...(hasAvatarChange ? { avatarUrl: newAvatar ? String(newAvatar).trim() : null } : {}),
           },
         });
       } catch {
@@ -1776,7 +1783,7 @@ router.patch('/profile', requireAuth, async (req: AuthenticatedRequest, res: Res
         if (mt) {
           if (name) mt.name = String(name).trim();
           if (phone) mt.phone = String(phone).trim();
-          if (newAvatar) mt.avatar = newAvatar;
+          if (hasAvatarChange) mt.avatar = newAvatar ? String(newAvatar).trim() : '';
         }
       }
     }
@@ -1787,7 +1794,7 @@ router.patch('/profile', requireAuth, async (req: AuthenticatedRequest, res: Res
         data: {
           companyId: updatedUser.companyId || 'comp-1',
           entityType: 'User',
-          entityId: userId,
+          entityId: String(userId || updatedUser.id),
           action: 'PROFILE_UPDATED',
           performedBy: updatedUser.name,
           userRole: String(updatedUser.role),

@@ -22,6 +22,7 @@ import {
 import { useApp } from '../../context/AppContext';
 import { AuditLogViewer } from './AuditLogViewer';
 import { EditProfilePage } from '../common/EditProfilePage';
+import { getEffectiveProfilePhoto, isValidCustomAvatar } from '../../utils/avatarUtils';
 
 export const AdminProfileSettingsView: React.FC = () => {
   const {
@@ -36,6 +37,21 @@ export const AdminProfileSettingsView: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'audit'>('profile');
   const [isEditingFull, setIsEditingFull] = useState(false);
+  const [, setAvatarVersion] = useState(0);
+
+  useEffect(() => {
+    const handlePhotoUpdated = () => {
+      setAvatarVersion((v) => v + 1);
+    };
+    window.addEventListener('wepsun_profile_photo_updated', handlePhotoUpdated);
+    window.addEventListener('storage', handlePhotoUpdated);
+    return () => {
+      window.removeEventListener('wepsun_profile_photo_updated', handlePhotoUpdated);
+      window.removeEventListener('storage', handlePhotoUpdated);
+    };
+  }, []);
+
+  const effectiveAdminAvatar = getEffectiveProfilePhoto(currentUser.avatar, null, currentUser.id);
 
   // Profile Information Fields synced from currentUser
   const [name, setName] = useState(currentUser.name || 'WEPSUN Administrator');
@@ -45,7 +61,7 @@ export const AdminProfileSettingsView: React.FC = () => {
   const [companyName, setCompanyName] = useState(currentUser.companyName || activeCompany.name || 'WEPSUN Engineering Solution');
   const [address, setAddress] = useState(currentUser.address || 'Plot No. 18, MIDC Industrial Estate, Thane West, Mumbai - 400604');
   const [bio, setBio] = useState(currentUser.bio || 'Managing elevator service operations, preventive maintenance pipelines, and client SLA compliance.');
-  const [avatar, setAvatar] = useState(currentUser.avatar || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&auto=format&fit=crop&q=80');
+  const [avatar, setAvatar] = useState(isValidCustomAvatar(effectiveAdminAvatar) ? effectiveAdminAvatar : '');
   const [isCustomAvatarOpen, setIsCustomAvatarOpen] = useState(false);
   const [customAvatarUrl, setCustomAvatarUrl] = useState('');
 
@@ -58,7 +74,8 @@ export const AdminProfileSettingsView: React.FC = () => {
     setCompanyName(currentUser.companyName || activeCompany.name);
     setAddress(currentUser.address || 'Plot No. 18, MIDC Industrial Estate, Thane West, Mumbai - 400604');
     setBio(currentUser.bio || 'Managing elevator service operations, preventive maintenance pipelines, and client SLA compliance.');
-    setAvatar(currentUser.avatar || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&auto=format&fit=crop&q=80');
+    const eff = getEffectiveProfilePhoto(currentUser.avatar, null, currentUser.id);
+    setAvatar(isValidCustomAvatar(eff) ? eff : '');
   }, [currentUser, activeCompany]);
   
   // Notification Preferences
@@ -175,11 +192,17 @@ export const AdminProfileSettingsView: React.FC = () => {
           <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm space-y-5">
             <div className="flex items-center gap-4 pb-5 border-b border-slate-100">
               <div className="relative group shrink-0">
-                <img
-                  src={currentUser.avatar || avatar}
-                  alt={name}
-                  className="w-16 h-16 rounded-2xl object-cover ring-4 ring-blue-50 shadow-sm border border-slate-200"
-                />
+                {isValidCustomAvatar(effectiveAdminAvatar) ? (
+                  <img
+                    src={effectiveAdminAvatar}
+                    alt={name}
+                    className="w-16 h-16 rounded-2xl object-cover ring-4 ring-blue-50 shadow-sm border border-slate-200"
+                  />
+                ) : (
+                  <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 ring-4 ring-blue-50 shadow-sm border border-slate-200">
+                    <User className="w-8 h-8 text-slate-400" />
+                  </div>
+                )}
                 <button
                   type="button"
                   onClick={() => setIsEditingFull(true)}

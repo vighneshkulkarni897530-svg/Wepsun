@@ -23,7 +23,8 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response): P
   const technicianId = user.technicianId;
 
   // Check short-lived cache (8s TTL) to prevent repeated DB waterfalls on quick navigation
-  const cacheKey = `sync_${user.id}_${role}_${companyId}`;
+  const activeUserId = (user as any).id || (user as any).sub || (user as any).userId || '';
+  const cacheKey = `sync_${activeUserId}_${role}_${companyId}`;
   const cachedData = serverCache.get<any>(cacheKey);
   if (cachedData) {
     res.json({
@@ -228,7 +229,7 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response): P
       prisma.notification.findMany({
         where: {
           companyId,
-          OR: [{ userId: user.id }, { userId: null }],
+          OR: [{ userId: activeUserId }, { userId: null }],
         },
         orderBy: { createdAt: 'desc' },
         take: 30,

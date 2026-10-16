@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   User,
   ShieldCheck,
@@ -27,6 +27,7 @@ import {
 import { Technician, TechnicianJob, InventoryItem } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { EditProfilePage } from '../common/EditProfilePage';
+import { getEffectiveProfilePhoto, isValidCustomAvatar } from '../../utils/avatarUtils';
 
 interface TechnicianProfileViewProps {
   technician: Technician;
@@ -48,6 +49,22 @@ export const TechnicianProfileView: React.FC<TechnicianProfileViewProps> = ({
   const [lastSyncTime, setLastSyncTime] = useState('Just now (Online)');
   const [isOfflineMode, setIsOfflineMode] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [, setAvatarVersion] = useState(0);
+
+  useEffect(() => {
+    const handlePhotoUpdated = () => {
+      setAvatarVersion((v) => v + 1);
+    };
+    window.addEventListener('wepsun_profile_photo_updated', handlePhotoUpdated);
+    window.addEventListener('storage', handlePhotoUpdated);
+    return () => {
+      window.removeEventListener('wepsun_profile_photo_updated', handlePhotoUpdated);
+      window.removeEventListener('storage', handlePhotoUpdated);
+    };
+  }, []);
+
+  const effectiveTechAvatar = getEffectiveProfilePhoto(currentUser?.avatar, technician?.avatar, currentUser?.id);
+  const hasValidTechAvatar = isValidCustomAvatar(effectiveTechAvatar);
 
   // Edit Profile Form State
   const [editForm, setEditForm] = useState({
@@ -119,8 +136,8 @@ export const TechnicianProfileView: React.FC<TechnicianProfileViewProps> = ({
           <div className="flex items-center gap-3.5">
             <div className="relative group shrink-0">
               <div className="w-16 h-16 rounded-2xl overflow-hidden bg-gradient-to-br from-[#123B5D] to-[#1976D2] text-white flex items-center justify-center font-black text-xl shadow-md border-2 border-white">
-                {currentUser?.avatar ? (
-                  <img src={currentUser.avatar} alt={technician.name} className="w-full h-full object-cover" />
+                {hasValidTechAvatar ? (
+                  <img src={effectiveTechAvatar} alt={technician.name} className="w-full h-full object-cover" />
                 ) : (
                   <span>{technician.name.split(' ').map((n) => n[0]).join('')}</span>
                 )}

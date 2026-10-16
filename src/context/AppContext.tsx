@@ -74,6 +74,7 @@ import {
 } from '../services/sessionManager';
 import { getNetworkStatus, subscribeNetworkStatus } from '../services/nativeApp';
 import { playNotificationSound, isSoundEnabled as getSoundPref, setSoundEnabled } from '../utils/notificationSound';
+import { isDummyAvatar, isValidCustomAvatar, getEffectiveProfilePhoto } from '../utils/avatarUtils';
 
 export interface ToastNotification {
   id: string;
@@ -835,33 +836,46 @@ function mapServerServiceReport(sr: any): ServiceReport {
 
   // Current User representation based on activeUserId or current role
   const [currentUser, setCurrentUserState] = useState<User>(() => {
+    const resolveUserAvatar = (u: User): User => {
+      if (typeof window !== 'undefined' && u.id) {
+        const cachedPhoto = localStorage.getItem('wepsun_user_avatar_' + u.id);
+        if (isValidCustomAvatar(cachedPhoto)) {
+          return { ...u, avatar: cachedPhoto };
+        }
+      }
+      if (isDummyAvatar(u.avatar)) {
+        return { ...u, avatar: '' };
+      }
+      return u;
+    };
+
     const cached = getCachedUserSession();
     if (cached && cached.user) {
       const userRole = cached.user.role || cached.role;
       if ((userRole === 'company_admin' || userRole === 'master_admin' || userRole === 'super_admin') && !isMasterAdminSessionValid()) {
-        return INITIAL_USERS.find((u) => u.role === 'client') || INITIAL_USERS[2];
+        return resolveUserAvatar(INITIAL_USERS.find((u) => u.role === 'client') || INITIAL_USERS[2]);
       }
-      return cached.user;
+      return resolveUserAvatar(cached.user);
     }
 
     const saved = safeStorageParse<User | null>(STORAGE_PREFIX + 'currentUser', null);
     if (saved) {
       if ((saved.role === 'company_admin' || saved.role === 'master_admin' || saved.role === 'super_admin') && !isMasterAdminSessionValid()) {
-        return INITIAL_USERS.find((u) => u.role === 'client') || INITIAL_USERS[2];
+        return resolveUserAvatar(INITIAL_USERS.find((u) => u.role === 'client') || INITIAL_USERS[2]);
       }
-      return saved;
+      return resolveUserAvatar(saved);
     }
     const savedUserId = localStorage.getItem(STORAGE_PREFIX + 'userId');
     if (savedUserId) {
       const found = INITIAL_USERS.find((u) => u.id === savedUserId);
       if (found) {
         if ((found.role === 'company_admin' || found.role === 'master_admin' || found.role === 'super_admin') && !isMasterAdminSessionValid()) {
-          return INITIAL_USERS.find((u) => u.role === 'client') || INITIAL_USERS[2];
+          return resolveUserAvatar(INITIAL_USERS.find((u) => u.role === 'client') || INITIAL_USERS[2]);
         }
-        return found;
+        return resolveUserAvatar(found);
       }
     }
-    return INITIAL_USERS.find((u) => u.role === 'client') || INITIAL_USERS[2] || INITIAL_USERS[0];
+    return resolveUserAvatar(INITIAL_USERS.find((u) => u.role === 'client') || INITIAL_USERS[2] || INITIAL_USERS[0]);
   });
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
@@ -975,29 +989,45 @@ function mapServerServiceReport(sr: any): ServiceReport {
       }
     }
 
+    // Resolve persistent custom avatar and discard dummy placeholders
+    if (typeof window !== 'undefined' && userObj.id) {
+      const cachedAvatar = localStorage.getItem('wepsun_user_avatar_' + userObj.id);
+      if (isValidCustomAvatar(cachedAvatar) && (!userObj.avatar || isDummyAvatar(userObj.avatar))) {
+        userObj.avatar = cachedAvatar;
+      }
+    }
+    if (isDummyAvatar(userObj.avatar)) {
+      userObj.avatar = '';
+    }
+
     const finalUser = userObj;
+    if (typeof window !== 'undefined' && finalUser.id && finalUser.avatar) {
+      localStorage.setItem('wepsun_profile_saved_' + finalUser.id, 'true');
+      localStorage.setItem('wepsun_user_avatar_' + finalUser.id, finalUser.avatar);
+    }
     setIsAuthenticated(true);
 
-    // Ensure distinct ClientProfile exists and equipment is provisioned
+    // Ensure distinct ClientProfile exists, and keep its logo in sync with the shared user photo
     if (finalUser.role === 'client' && finalUser.clientId) {
       const cid = finalUser.clientId;
       setClientProfiles((prev) => {
-        if (prev[cid]) return prev;
+        const existing = prev[cid];
+        const sharedLogo = finalUser.avatar || (existing && isValidCustomAvatar(existing.logo) ? existing.logo : '');
         return {
           ...prev,
           [cid]: {
             clientId: cid,
-            companyName: finalUser.companyName || '',
-            contactPerson: finalUser.name || '',
-            phone: finalUser.phone || '',
-            email: finalUser.email || '',
-            address: finalUser.address || '',
-            city: finalUser.city || '',
-            pincode: finalUser.pincode || '',
-            gstin: '',
-            logo: finalUser.avatar || '',
-            registeredBuildings: [],
-            totalLifts: 0,
+            companyName: finalUser.companyName || existing?.companyName || '',
+            contactPerson: finalUser.name || existing?.contactPerson || '',
+            phone: finalUser.phone || existing?.phone || '',
+            email: finalUser.email || existing?.email || '',
+            address: finalUser.address || existing?.address || '',
+            city: finalUser.city || existing?.city || '',
+            pincode: finalUser.pincode || existing?.pincode || '',
+            gstin: existing?.gstin || '',
+            logo: sharedLogo,
+            registeredBuildings: existing?.registeredBuildings || [],
+            totalLifts: existing?.totalLifts || 0,
           },
         };
       });
@@ -1332,6 +1362,11 @@ function mapServerServiceReport(sr: any): ServiceReport {
         variant: 'primary',
         onClick: onContinue,
       },
+      secondaryAction: onContinue ? {
+        label: 'Close',
+        variant: 'secondary',
+        onClick: onContinue,
+      } : undefined,
     });
   }, [openModal]);
 
@@ -1496,6 +1531,7 @@ function mapServerServiceReport(sr: any): ServiceReport {
         technicianId: undefined,
         name: '',
         email: '',
+        avatar: '',
       });
       setCurrentRoleState('client');
       setActiveUserId('');
@@ -1692,21 +1728,30 @@ function mapServerServiceReport(sr: any): ServiceReport {
   const effectiveClientId = currentUser.clientId || activeClientId || '';
 
   const clientProfile: ClientProfile = useMemo(() => {
-    return (
-      clientProfiles[effectiveClientId] || {
-        clientId: effectiveClientId,
-        companyName: currentUser.companyName || '',
-        contactPerson: currentUser.name || '',
-        phone: currentUser.phone || '',
-        email: currentUser.email || '',
-        address: currentUser.address || '',
-        city: currentUser.city || '',
-        pincode: currentUser.pincode || '',
-        gstin: '',
-        registeredBuildings: [],
-        totalLifts: lifts.filter((l) => l.clientId === effectiveClientId).length || 0,
-      }
+    const raw = clientProfiles[effectiveClientId] || {
+      clientId: effectiveClientId,
+      companyName: currentUser.companyName || '',
+      contactPerson: currentUser.name || '',
+      phone: currentUser.phone || '',
+      email: currentUser.email || '',
+      address: currentUser.address || '',
+      city: currentUser.city || '',
+      pincode: currentUser.pincode || '',
+      gstin: '',
+      registeredBuildings: [],
+      totalLifts: lifts.filter((l) => l.clientId === effectiveClientId).length || 0,
+    };
+
+    const sharedPhoto = getEffectiveProfilePhoto(
+      currentUser.avatar,
+      raw.logo,
+      currentUser.id
     );
+
+    return {
+      ...raw,
+      logo: sharedPhoto || (isValidCustomAvatar(raw.logo) ? raw.logo : ''),
+    };
   }, [clientProfiles, effectiveClientId, currentUser, lifts]);
 
   const clientScopedLifts = useMemo(() => {
@@ -1818,32 +1863,49 @@ function mapServerServiceReport(sr: any): ServiceReport {
 
   // Profile Mutators with Cloud Database Persistence
   const updateUserProfile = (userData: Partial<User>) => {
-    setCurrentUserState((prev) => ({ ...prev, ...userData }));
+    const newAvatar = userData.avatar !== undefined ? userData.avatar : currentUser.avatar;
+
+    // 1. Immediately update in-memory current user state
+    setCurrentUserState((prev) => ({ ...prev, ...userData, avatar: newAvatar }));
     setUsers((prev) =>
-      prev.map((u) => (u.id === currentUser.id ? { ...u, ...userData } : u))
+      prev.map((u) => (u.id === currentUser.id ? { ...u, ...userData, avatar: newAvatar } : u))
     );
 
-    // Sync to client profile if current user is client
+    // 2. Persist to localStorage immediately
+    if (typeof window !== 'undefined' && currentUser.id) {
+      localStorage.setItem('wepsun_profile_saved_' + currentUser.id, 'true');
+      if (newAvatar) {
+        localStorage.setItem('wepsun_user_avatar_' + currentUser.id, newAvatar);
+      } else {
+        localStorage.removeItem('wepsun_user_avatar_' + currentUser.id);
+      }
+    }
+
+    // 3. Sync to client profile if current user is client
     if (currentUser.role === 'client' && effectiveClientId) {
       setClientProfiles((prev) => {
         const existing = prev[effectiveClientId] || clientProfile;
-        return {
+        const updated = {
           ...prev,
           [effectiveClientId]: {
             ...existing,
             contactPerson: userData.name || existing.contactPerson,
             email: userData.email || existing.email,
             phone: userData.phone || existing.phone,
-            logo: userData.avatar || existing.logo,
+            logo: newAvatar || existing.logo,
             address: userData.address || existing.address,
             city: userData.city || existing.city,
             companyName: userData.companyName || existing.companyName,
           },
         };
+        try {
+          localStorage.setItem(STORAGE_PREFIX + 'clientProfiles', JSON.stringify(updated));
+        } catch {}
+        return updated;
       });
     }
 
-    // Sync to technician record if current user is technician
+    // 4. Sync to technician record if current user is technician
     if (currentUser.role === 'technician' && activeTechnicianId) {
       setTechnicians((prev) =>
         prev.map((t) =>
@@ -1853,19 +1915,37 @@ function mapServerServiceReport(sr: any): ServiceReport {
               name: userData.name || t.name,
               email: userData.email || t.email,
               phone: userData.phone || t.phone,
-              avatar: userData.avatar || t.avatar,
+              avatar: newAvatar || t.avatar,
             }
             : t
         )
       );
     }
 
-    // Cloud Database Persistence & Cross-Device Synchronization
+    // 5. Synchronously update session cache
+    const updatedUserObj: User = {
+      ...currentUser,
+      ...userData,
+      avatar: newAvatar,
+    };
+    cacheUserSession(updatedUserObj, currentRole, isMasterAdminSessionValid());
+
+    // 6. Broadcast reactive event across window/tabs
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('wepsun_profile_photo_updated', {
+          detail: { avatar: newAvatar, userId: currentUser.id },
+        })
+      );
+    }
+
+    // 7. Cloud Database Persistence & Cross-Device Synchronization
     apiService
       .updateProfile({
         name: userData.name,
         phone: userData.phone,
-        avatar: userData.avatar,
+        avatar: newAvatar,
+        avatarUrl: newAvatar,
         companyName: userData.companyName,
         address: userData.address,
         city: userData.city,
@@ -1878,10 +1958,12 @@ function mapServerServiceReport(sr: any): ServiceReport {
       })
       .then((res) => {
         if (res && res.success && res.data) {
+          const srvUser = res.data.user || res.data;
+          const srvAvatar = srvUser?.avatarUrl || srvUser?.avatar || newAvatar;
           const sess = getCachedUserSession();
           if (sess && sess.user) {
             cacheUserSession(
-              { ...sess.user, ...res.data },
+              { ...sess.user, ...srvUser, avatar: srvAvatar },
               sess.role,
               isMasterAdminSessionValid()
             );
@@ -1926,6 +2008,7 @@ function mapServerServiceReport(sr: any): ServiceReport {
         name: data.name,
         phone: data.phone,
         avatar: data.avatar,
+        avatarUrl: data.avatar,
         bio: data.bio,
         address: data.currentLocationName,
       })
@@ -1935,23 +2018,31 @@ function mapServerServiceReport(sr: any): ServiceReport {
   };
 
   const updateClientProfile = (profileData: Partial<ClientProfile>) => {
+    const newLogo = profileData.logo !== undefined ? profileData.logo : clientProfile.logo;
+
     setClientProfiles((prev) => {
       const existing = prev[effectiveClientId] || clientProfile;
-      return {
+      const updated = {
         ...prev,
         [effectiveClientId]: {
           ...existing,
           ...profileData,
+          logo: newLogo,
         },
       };
+      try {
+        localStorage.setItem(STORAGE_PREFIX + 'clientProfiles', JSON.stringify(updated));
+      } catch {}
+      return updated;
     });
+
     // Sync current user state
     setCurrentUserState((prev) => ({
       ...prev,
       name: profileData.contactPerson || profileData.companyName || prev.name,
       email: profileData.email || prev.email,
       phone: profileData.phone || prev.phone,
-      avatar: profileData.logo || prev.avatar,
+      avatar: newLogo || prev.avatar,
       address: profileData.address || prev.address,
       city: profileData.city || prev.city,
       companyName: profileData.companyName || prev.companyName,
@@ -1964,7 +2055,7 @@ function mapServerServiceReport(sr: any): ServiceReport {
             name: profileData.contactPerson || profileData.companyName || u.name,
             email: profileData.email || u.email,
             phone: profileData.phone || u.phone,
-            avatar: profileData.logo || u.avatar,
+            avatar: newLogo || u.avatar,
             address: profileData.address || u.address,
             city: profileData.city || u.city,
             companyName: profileData.companyName || u.companyName,
@@ -1972,6 +2063,34 @@ function mapServerServiceReport(sr: any): ServiceReport {
           : u
       )
     );
+
+    if (typeof window !== 'undefined' && currentUser.id) {
+      localStorage.setItem('wepsun_profile_saved_' + currentUser.id, 'true');
+      if (newLogo) {
+        localStorage.setItem('wepsun_user_avatar_' + currentUser.id, newLogo);
+      } else {
+        localStorage.removeItem('wepsun_user_avatar_' + currentUser.id);
+      }
+    }
+
+    const updatedUserObj: User = {
+      ...currentUser,
+      name: profileData.contactPerson || profileData.companyName || currentUser.name,
+      phone: profileData.phone || currentUser.phone,
+      avatar: newLogo || currentUser.avatar,
+      address: profileData.address || currentUser.address,
+      city: profileData.city || currentUser.city,
+      companyName: profileData.companyName || currentUser.companyName,
+    };
+    cacheUserSession(updatedUserObj, currentRole, isMasterAdminSessionValid());
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('wepsun_profile_photo_updated', {
+          detail: { avatar: newLogo, userId: currentUser.id },
+        })
+      );
+    }
 
     // Cloud Database Persistence & Cross-Device Synchronization
     apiService
@@ -1982,7 +2101,8 @@ function mapServerServiceReport(sr: any): ServiceReport {
         address: profileData.address,
         city: profileData.city,
         pincode: profileData.pincode,
-        avatar: profileData.logo,
+        avatar: newLogo,
+        avatarUrl: newLogo,
       })
       .catch((err) => console.warn('[AppContext] Background updateClientProfile API sync:', err));
 

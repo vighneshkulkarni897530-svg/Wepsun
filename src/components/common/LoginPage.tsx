@@ -43,6 +43,7 @@ import {
 } from '../../services/firebaseAuth';
 import elevatorGlassLobbyImg from '../../assets/elevator-glass-lobby.jpg';
 import constructionPlansSunsetImg from '../../assets/construction-plans-sunset.jpg';
+import { isValidCustomAvatar } from '../../utils/avatarUtils';
 
 interface LoginPageProps {
   isOpen?: boolean;
@@ -285,6 +286,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             sessionStorage.setItem('wepsun_master_session_expiry', String(expiry));
           }
 
+          const rawAvatar = authData.user.avatarUrl || authData.user.avatar || '';
+          const cachedAvatar = typeof window !== 'undefined' ? localStorage.getItem('wepsun_user_avatar_' + authData.user.id) : null;
+          const resolvedAvatar = (isValidCustomAvatar(rawAvatar) ? rawAvatar : null) ||
+            (isValidCustomAvatar(cachedAvatar) ? cachedAvatar : null) ||
+            '';
+
+          if (resolvedAvatar && typeof window !== 'undefined') {
+            localStorage.setItem('wepsun_profile_saved_' + authData.user.id, 'true');
+            localStorage.setItem('wepsun_user_avatar_' + authData.user.id, resolvedAvatar);
+          }
+
           const finalUser: UserRecord = {
             id: authData.user.id,
             name: authData.user.name,
@@ -295,7 +307,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             branchId: authData.user.branchId,
             clientId: authData.user.clientId || (userRole === 'client' ? `client-${authData.user.id.replace(/^usr-/, '')}` : undefined),
             technicianId: authData.user.technicianId || (userRole === 'technician' ? `tech-${authData.user.id.replace(/^usr-/, '')}` : undefined),
-            avatar: authData.user.avatarUrl || authData.user.avatar,
+            avatar: resolvedAvatar,
             isActive: true,
           };
 
@@ -487,6 +499,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           setTokens(accessToken, refreshToken);
         }
 
+        const rawMasterAvatar = authData.user.avatarUrl || authData.user.avatar || '';
+        const cachedMasterAvatar = typeof window !== 'undefined' ? localStorage.getItem('wepsun_user_avatar_' + authData.user.id) : null;
+        const resolvedMasterAvatar = (isValidCustomAvatar(rawMasterAvatar) ? rawMasterAvatar : null) ||
+          (isValidCustomAvatar(cachedMasterAvatar) ? cachedMasterAvatar : null) ||
+          '';
+
+        if (resolvedMasterAvatar && typeof window !== 'undefined') {
+          localStorage.setItem('wepsun_profile_saved_' + authData.user.id, 'true');
+          localStorage.setItem('wepsun_user_avatar_' + authData.user.id, resolvedMasterAvatar);
+        }
+
         const masterUser: UserRecord = {
           id: authData.user.id,
           name: authData.user.name,
@@ -495,7 +518,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           role: 'master_admin',
           companyId: authData.user.companyId || 'comp-1',
           branchId: authData.user.branchId,
-          avatar: authData.user.avatarUrl || authData.user.avatar,
+          avatar: resolvedMasterAvatar,
           isActive: true,
         };
 
@@ -891,6 +914,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 setTokens(accessToken, refreshToken);
               }
 
+              const rawGoogleAvatar = authData.user.avatarUrl || profile?.picture || '';
+              const cachedGoogleAvatar = typeof window !== 'undefined' ? localStorage.getItem('wepsun_user_avatar_' + authData.user.id) : null;
+              const resolvedGoogleAvatar = (isValidCustomAvatar(rawGoogleAvatar) ? rawGoogleAvatar : null) ||
+                (isValidCustomAvatar(cachedGoogleAvatar) ? cachedGoogleAvatar : null) ||
+                '';
+
+              if (resolvedGoogleAvatar && typeof window !== 'undefined') {
+                localStorage.setItem('wepsun_profile_saved_' + authData.user.id, 'true');
+                localStorage.setItem('wepsun_user_avatar_' + authData.user.id, resolvedGoogleAvatar);
+              }
+
               const finalUser: UserRecord = {
                 id: authData.user.id,
                 name: authData.user.name,
@@ -900,7 +934,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 companyId: authData.user.companyId || 'comp-1',
                 branchId: authData.user.branchId,
                 clientId: authData.user.clientId || `client-${authData.user.id.replace(/^usr-/, '')}`,
-                avatar: authData.user.avatarUrl || profile?.picture,
+                avatar: resolvedGoogleAvatar,
                 isActive: true,
               };
 

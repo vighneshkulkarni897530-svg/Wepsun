@@ -36,6 +36,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { getEffectiveProfilePhoto, isValidCustomAvatar } from '../../utils/avatarUtils';
 import { UserRole } from '../../types';
 import { NavTabId } from './Sidebar';
 import { WepsunLiftServicesLogo } from '../common/WepsunLogo';
@@ -56,6 +57,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const {
     currentUser,
+    clientProfile,
     activeCompany,
     companies,
     setActiveCompanyId,
@@ -89,6 +91,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [isGoogleAuthModalOpen, setIsGoogleAuthModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [, setAvatarVersion] = useState(0);
 
   const notifRef = useRef<HTMLDivElement>(null);
   const companyRef = useRef<HTMLDivElement>(null);
@@ -115,6 +118,19 @@ export const Header: React.FC<HeaderProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Listen for instant profile photo sync across windows and components
+  useEffect(() => {
+    const handlePhotoUpdated = () => {
+      setAvatarVersion((v) => v + 1);
+    };
+    window.addEventListener('wepsun_profile_photo_updated', handlePhotoUpdated);
+    window.addEventListener('storage', handlePhotoUpdated);
+    return () => {
+      window.removeEventListener('wepsun_profile_photo_updated', handlePhotoUpdated);
+      window.removeEventListener('storage', handlePhotoUpdated);
+    };
+  }, []);
+
   // Strict RBAC Live Search Filtering (Zero cross-client data leakage)
   const isClient = currentRole === 'client';
   const effectiveSearchLifts = isClient ? clientScopedLifts : tenantLifts;
@@ -124,20 +140,12 @@ export const Header: React.FC<HeaderProps> = ({
 
   const trimmedSearch = searchQuery.trim().toLowerCase();
 
-  const isProfileSaved =
-    typeof window !== 'undefined' &&
-    currentUser?.id &&
-    localStorage.getItem('wepsun_profile_saved_' + currentUser.id) === 'true';
-
-  const isDummyAvatar = (a?: string | null) =>
-    !a ||
-    a.includes('534528741775-53994a69daeb') ||
-    a.includes('541888946425') ||
-    a.includes('486406146926') ||
-    a.includes('519494026892') ||
-    a.includes('545324418');
-
-  const hasUserCustomAvatar = isProfileSaved && currentUser?.avatar && !isDummyAvatar(currentUser.avatar);
+  const effectiveHeaderAvatar = getEffectiveProfilePhoto(
+    currentUser?.avatar,
+    clientProfile?.logo,
+    currentUser?.id
+  );
+  const hasUserCustomAvatar = isValidCustomAvatar(effectiveHeaderAvatar);
 
   const matchingLifts = trimmedSearch
     ? effectiveSearchLifts.filter(
@@ -638,7 +646,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-100 border border-white/20 shadow-sm shrink-0 flex items-center justify-center text-slate-700">
                   {hasUserCustomAvatar ? (
                     <img
-                      src={currentUser.avatar}
+                      src={effectiveHeaderAvatar}
                       alt={displayName}
                       className="w-full h-full object-cover"
                     />
@@ -663,7 +671,7 @@ export const Header: React.FC<HeaderProps> = ({
                     <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 shadow-sm shrink-0 flex items-center justify-center overflow-hidden">
                       {hasUserCustomAvatar ? (
                         <img
-                          src={currentUser.avatar}
+                          src={effectiveHeaderAvatar}
                           alt={displayName}
                           className="w-full h-full object-cover"
                         />
