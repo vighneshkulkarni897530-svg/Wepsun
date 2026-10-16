@@ -269,27 +269,30 @@ export const ClientLiftsView: React.FC<ClientLiftsViewProps> = ({
               {/* Action Buttons */}
               <div className="pt-3 border-t border-slate-100 flex items-center gap-2">
                 <button
+                  type="button"
                   onClick={() => setSelectedIoTLift(lift)}
-                  className="px-3 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-cyan-400 font-bold text-xs border border-cyan-500/30 transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                  className="px-3 py-2.5 min-h-[44px] rounded-xl bg-slate-900 hover:bg-slate-800 text-cyan-400 font-bold text-xs border border-cyan-500/30 transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer active:scale-95"
                   title="Real-time IoT Telemetry & 3D Simulation"
                 >
-                  <Activity className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
+                  <Activity className="w-3.5 h-3.5 text-cyan-400 animate-pulse shrink-0" />
                   <span>IoT Live</span>
                 </button>
                 <button
+                  type="button"
                   onClick={() => downloadLiftSpecificationPdf(lift, activeCompany)}
-                  className="flex-1 py-2.5 rounded-xl bg-slate-50 hover:bg-blue-50 text-[#1976D2] font-bold text-xs border border-slate-200 transition-colors flex items-center justify-center gap-1.5"
+                  className="flex-1 min-h-[44px] py-2.5 rounded-xl bg-slate-50 hover:bg-blue-50 text-[#1976D2] font-bold text-xs border border-slate-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                   title="Download Technical Specification PDF"
                 >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Specs PDF</span>
+                  <Download className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">Specs PDF</span>
                 </button>
                 <button
+                  type="button"
                   onClick={() => onRaiseComplaint(lift.id)}
-                  className="flex-1 py-2.5 rounded-xl bg-[#123B5D] hover:bg-[#0e2f4a] text-white font-bold text-xs shadow-sm transition-colors flex items-center justify-center gap-1"
+                  className="flex-1 min-h-[44px] py-2.5 rounded-xl bg-[#123B5D] hover:bg-[#0e2f4a] text-white font-bold text-xs shadow-sm transition-colors flex items-center justify-center gap-1 cursor-pointer active:scale-95"
                 >
-                  <AlertTriangle className="w-3.5 h-3.5 text-amber-300" />
-                  <span>Report</span>
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                  <span className="truncate">Report</span>
                 </button>
               </div>
             </div>
@@ -298,7 +301,7 @@ export const ClientLiftsView: React.FC<ClientLiftsViewProps> = ({
       ) : (
         /* TABLE VIEW */
         <div className="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="table-scroll-container">
             <table className="w-full text-left text-xs">
               <thead className="bg-[#F5F8FA] text-slate-700 uppercase font-mono text-[10px] border-b border-slate-200">
                 <tr>

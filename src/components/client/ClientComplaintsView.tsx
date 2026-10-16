@@ -109,20 +109,20 @@ export const ClientComplaintsView: React.FC<ClientComplaintsViewProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 w-full sm:w-auto">
           <button
             onClick={onOpenEmergencyModal}
-            className="px-4 py-2.5 rounded-xl bg-[#D32F2F] hover:bg-red-700 text-white font-bold text-xs shadow-md shadow-red-500/20 flex items-center gap-1.5 transition-all"
+            className="flex-1 sm:flex-initial min-h-[44px] justify-center px-4 py-2.5 rounded-xl bg-[#D32F2F] hover:bg-red-700 text-white font-bold text-xs shadow-md shadow-red-500/20 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
           >
-            <ShieldAlert className="w-4 h-4" />
-            <span>🚨 Emergency SOS</span>
+            <ShieldAlert className="w-4 h-4 shrink-0" />
+            <span className="truncate">🚨 Emergency SOS</span>
           </button>
           <button
             onClick={onOpenRaiseModal}
-            className="px-4 py-2.5 rounded-xl bg-[#123B5D] hover:bg-[#0e2f4a] text-white font-bold text-xs shadow-sm flex items-center gap-1.5 transition-all"
+            className="flex-1 sm:flex-initial min-h-[44px] justify-center px-4 py-2.5 rounded-xl bg-[#123B5D] hover:bg-[#0e2f4a] text-white font-bold text-xs shadow-sm flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
           >
-            <Plus className="w-4 h-4" />
-            <span>Raise Complaint</span>
+            <Plus className="w-4 h-4 shrink-0" />
+            <span className="truncate">Raise Complaint</span>
           </button>
         </div>
       </div>
@@ -438,7 +438,7 @@ export const ClientComplaintsView: React.FC<ClientComplaintsViewProps> = ({
                           onSubmit={(e) => handleRatingSubmit(complaint.id, e)}
                           className="pt-3 border-t border-emerald-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
                         >
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-xs font-bold text-slate-800">Your Rating:</span>
                             <div className="flex items-center gap-1">
                               {[1, 2, 3, 4, 5].map((star) => (
@@ -455,10 +455,11 @@ export const ClientComplaintsView: React.FC<ClientComplaintsViewProps> = ({
                                       },
                                     }))
                                   }
-                                  className="p-0.5 hover:scale-110 transition-transform disabled:opacity-80"
+                                  className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-amber-100/60 hover:scale-110 transition-transform active:scale-95 disabled:opacity-80 cursor-pointer"
+                                  aria-label={`${star} star`}
                                 >
                                   <Star
-                                    className={`w-4 h-4 ${
+                                    className={`w-5 h-5 ${
                                       star <= ratingState.rating
                                         ? 'text-amber-400 fill-amber-400'
                                         : 'text-slate-300'
@@ -484,11 +485,11 @@ export const ClientComplaintsView: React.FC<ClientComplaintsViewProps> = ({
                                   }))
                                 }
                                 placeholder="Feedback comments..."
-                                className="flex-1 sm:w-64 bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 focus:border-[#1976D2] outline-none"
+                                className="flex-1 sm:w-64 min-h-[40px] bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 focus:border-[#1976D2] outline-none"
                               />
                               <button
                                 type="submit"
-                                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-colors shadow-xs shrink-0"
+                                className="min-h-[40px] px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-colors shadow-xs shrink-0 cursor-pointer active:scale-95"
                               >
                                 Submit Rating
                               </button>

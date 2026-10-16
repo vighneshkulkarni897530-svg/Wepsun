@@ -222,13 +222,14 @@ export const Header: React.FC<HeaderProps> = ({
       : 'Admin');
 
   return (
-    <header className="h-16 bg-[#0E2238] border-b border-[#0A1828] sticky top-0 z-50 px-3 sm:px-6 flex items-center justify-between gap-3 sm:gap-4 select-none">
+    <header className="min-h-16 h-auto bg-[#0E2238] border-b border-[#0A1828] sticky top-0 z-50 px-2.5 sm:px-6 py-2 sm:py-0 flex items-center justify-between gap-2 sm:gap-4 select-none safe-top">
       {/* Left: Hamburger & WEPSUN Lift Services Logo */}
-      <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+      <div className="flex items-center gap-1.5 sm:gap-3 shrink-0 min-w-0">
         <button
           onClick={onToggleSidebar}
-          className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-colors shrink-0"
+          className="p-2 sm:p-2.5 min-w-[42px] min-h-[42px] rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-colors shrink-0 flex items-center justify-center cursor-pointer active:scale-95"
           title="Toggle Sidebar"
+          aria-label="Toggle Navigation Sidebar"
         >
           <Menu className="w-5 h-5" />
         </button>
@@ -238,7 +239,7 @@ export const Header: React.FC<HeaderProps> = ({
           onClick={() => {
             if (onNavigateTab) onNavigateTab(currentRole === 'client' ? 'home' : currentRole === 'technician' ? 'jobs' : 'dashboard');
           }}
-          className="cursor-pointer"
+          className="cursor-pointer max-w-[170px] xs:max-w-none truncate"
         >
           <WepsunLiftServicesLogo />
         </div>
@@ -392,17 +393,18 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="relative" ref={notifRef}>
           <button
             onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-            className="relative p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            className="relative p-2 sm:p-2.5 min-w-[42px] min-h-[42px] rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-colors flex items-center justify-center cursor-pointer active:scale-95"
             title="Notifications & Field Alerts"
+            aria-label="View Notifications"
           >
-            <Bell className="w-5 h-5" />
+            <Bell className="w-5 h-5 shrink-0" />
             {unreadNotificationsCount > 0 && (
               <>
                 {criticalNotificationsCount > 0 && (
-                  <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-red-500 animate-ping opacity-75" />
+                  <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-red-500 animate-ping opacity-75" />
                 )}
                 <span
-                  className={`absolute top-1 right-1 w-4 h-4 flex items-center justify-center rounded-full text-white text-[9px] font-black ring-2 ring-[#0E2238] ${
+                  className={`absolute top-1.5 right-1.5 w-4 h-4 flex items-center justify-center rounded-full text-white text-[9px] font-black ring-2 ring-[#0E2238] ${
                     criticalNotificationsCount > 0 ? 'bg-red-600' : 'bg-[#1976D2]'
                   }`}
                 >
@@ -414,7 +416,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Attractive & Interactive Notifications Popover */}
           {isNotificationsOpen && (
-            <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white border border-slate-200 rounded-3xl shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 text-slate-800 overflow-hidden ring-1 ring-black/5">
+            <div className="absolute right-0 mt-2 w-[calc(100vw-20px)] sm:w-96 max-w-[390px] bg-white border border-slate-200 rounded-3xl shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 text-slate-800 overflow-hidden ring-1 ring-black/5">
               {/* Popover Header */}
               <div className="p-4 bg-gradient-to-r from-slate-900 via-[#0E2238] to-slate-900 text-white flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
@@ -641,7 +643,8 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="relative" ref={profileRef}>
               <button
                 onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
-                className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl hover:bg-white/10 transition-colors"
+                className="flex items-center gap-2 px-2 py-1.5 rounded-xl hover:bg-white/10 transition-colors min-h-[42px] cursor-pointer active:scale-95"
+                aria-label="User Account Menu"
               >
                 <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-100 border border-white/20 shadow-sm shrink-0 flex items-center justify-center text-slate-700">
                   {hasUserCustomAvatar ? (
@@ -662,11 +665,11 @@ export const Header: React.FC<HeaderProps> = ({
                     {displayRoleLabel}
                   </span>
                 </div>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
               </button>
 
               {isProfileDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 z-50 animate-in fade-in text-slate-800">
+                <div className="absolute right-0 mt-2 w-[calc(100vw-20px)] sm:w-80 max-w-[320px] bg-white border border-slate-200 rounded-2xl shadow-xl p-2 z-50 animate-in fade-in text-slate-800">
                   <div className="p-3 border-b border-slate-100 flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 shadow-sm shrink-0 flex items-center justify-center overflow-hidden">
                       {hasUserCustomAvatar ? (

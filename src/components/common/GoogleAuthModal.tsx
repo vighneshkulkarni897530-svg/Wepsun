@@ -407,15 +407,15 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
       <div
-        className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden text-slate-800 transition-all transform animate-in zoom-in-95 duration-200"
+        className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden text-slate-800 transition-all transform animate-in zoom-in-95 duration-200 max-h-[92dvh] overflow-y-auto"
         role="dialog"
         aria-modal="true"
       >
         {/* Header */}
-        <div className="p-5 pb-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
-          <div className="flex items-center gap-3">
+        <div className="p-4 sm:p-5 pb-3 sm:pb-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/60 pr-10">
+          <div className="flex items-center gap-2.5 sm:gap-3">
             {/* Google G Logo */}
             <div className="w-10 h-10 rounded-2xl bg-white shadow-xs border border-slate-200/80 flex items-center justify-center shrink-0">
               <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -444,8 +444,10 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
           </div>
 
           <button
+            type="button"
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
+            aria-label="Close Google auth modal"
+            className="w-9 h-9 sm:w-10 sm:h-10 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full flex items-center justify-center transition-colors cursor-pointer active:scale-95"
             title="Close"
           >
             <X className="w-5 h-5" />

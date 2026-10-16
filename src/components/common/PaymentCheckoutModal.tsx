@@ -163,11 +163,13 @@ export const PaymentCheckoutModal: React.FC<PaymentCheckoutModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-6 shadow-2xl relative text-slate-800 flex flex-col gap-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
+      <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl relative text-slate-800 flex flex-col gap-4 sm:gap-5 max-h-[92dvh] overflow-y-auto">
         <button
+          type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100"
+          aria-label="Close checkout modal"
+          className="absolute top-3 right-3 sm:top-4 sm:right-4 w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer active:scale-95"
         >
           <X className="w-5 h-5" />
         </button>
@@ -287,12 +289,13 @@ export const PaymentCheckoutModal: React.FC<PaymentCheckoutModalProps> = ({
 
             {/* Pay Button */}
             <button
+              type="button"
               onClick={handleSimulateOrRazorpay}
               disabled={isProcessing}
-              className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-2"
+              className="w-full min-h-[46px] py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 disabled:opacity-50"
             >
               <Lock className="w-3.5 h-3.5" />
-              <span>
+              <span className="truncate">
                 {isProcessing
                   ? 'Verifying with Razorpay Gateway...'
                   : `Pay ₹${invoice.grandTotal.toLocaleString('en-IN')} via Razorpay`}
@@ -300,8 +303,8 @@ export const PaymentCheckoutModal: React.FC<PaymentCheckoutModalProps> = ({
             </button>
 
             <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-400">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>256-Bit Encrypted Razorpay Checkout • RBI Compliant</span>
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span className="text-center">256-Bit Encrypted Razorpay Checkout • RBI Compliant</span>
             </div>
           </>
         ) : (
@@ -333,17 +336,19 @@ export const PaymentCheckoutModal: React.FC<PaymentCheckoutModalProps> = ({
               </div>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2 pt-2">
               <button
+                type="button"
                 onClick={() => downloadInvoicePdf(invoice, activeCompany)}
-                className="flex-1 py-2.5 rounded-xl bg-[#1976D2] hover:bg-blue-700 text-white font-bold text-xs shadow-sm transition-colors flex items-center justify-center gap-1.5"
+                className="flex-1 min-h-[44px] py-2.5 px-4 rounded-xl bg-[#1976D2] hover:bg-blue-700 text-white font-bold text-xs shadow-sm transition-colors flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Download Tax Receipt PDF</span>
               </button>
               <button
+                type="button"
                 onClick={onClose}
-                className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors"
+                className="min-h-[44px] px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer active:scale-95"
               >
                 Done
               </button>

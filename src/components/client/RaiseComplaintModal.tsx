@@ -173,19 +173,21 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 animate-in fade-in">
-      <div className="bg-[#FFFFFF] border border-slate-200 rounded-3xl w-full max-w-lg max-h-[94vh] overflow-y-auto shadow-2xl relative text-slate-800">
-        {/* Close Button */}
+    <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in select-none">
+      <div className="bg-[#FFFFFF] border border-slate-200 rounded-3xl w-full max-w-lg max-h-[92dvh] overflow-y-auto shadow-2xl relative text-slate-800 my-auto">
+        {/* Accessible Close Button with min 40px tap target */}
         <button
+          type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 z-20 w-8 h-8 rounded-full bg-black/20 hover:bg-black/40 text-white flex items-center justify-center transition-colors"
+          aria-label="Close modal"
+          className="absolute top-3.5 right-3.5 z-20 w-10 h-10 rounded-full bg-black/25 hover:bg-black/45 text-white flex items-center justify-center transition-all cursor-pointer active:scale-90 shadow-sm"
         >
           <X className="w-4 h-4" />
         </button>
 
         {/* Success Confirmation View */}
         {submittedTicket ? (
-          <div className="p-7 text-center space-y-5">
+          <div className="p-5 sm:p-7 text-center space-y-5">
             <div
               className={`w-16 h-16 rounded-3xl flex items-center justify-center mx-auto ${
                 submittedTicket.mode === 'emergency'
@@ -225,7 +227,7 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Subject:</span>
-                <span className="font-bold text-slate-800">{submittedTicket.title}</span>
+                <span className="font-bold text-slate-800 truncate ml-2">{submittedTicket.title}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Status:</span>
@@ -233,10 +235,11 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
               </div>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex gap-2 pt-1">
               <button
+                type="button"
                 onClick={onClose}
-                className="w-full py-3 rounded-xl bg-[#123B5D] hover:bg-[#0e2f4a] text-white font-bold text-xs shadow-md transition-all"
+                className="w-full py-3.5 rounded-xl bg-[#123B5D] hover:bg-[#0e2f4a] text-white font-bold text-xs shadow-md transition-all cursor-pointer active:scale-98"
               >
                 Done & View Ticket Tracker
               </button>
@@ -245,31 +248,31 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
         ) : (
           <div>
             {/* Header Mode Switcher Tab */}
-            <div className="p-3 bg-slate-100 border-b border-slate-200 flex items-center justify-between gap-2">
-              <div className="grid grid-cols-2 p-1 bg-white rounded-2xl w-full border border-slate-200/80 text-xs font-bold">
+            <div className="p-2.5 sm:p-3 bg-slate-100 border-b border-slate-200 flex items-center justify-between gap-2">
+              <div className="grid grid-cols-2 p-1 bg-white rounded-2xl w-full border border-slate-200/80 text-[11px] sm:text-xs font-bold gap-1">
                 <button
                   type="button"
                   onClick={() => setModalMode('normal')}
-                  className={`py-2 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                  className={`py-2 px-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                     modalMode === 'normal'
                       ? 'bg-[#123B5D] text-white shadow-sm'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  <FileText className="w-3.5 h-3.5" />
-                  <span>Raise Service Request</span>
+                  <FileText className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">Service Request</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setModalMode('emergency')}
-                  className={`py-2 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                  className={`py-2 px-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                     modalMode === 'emergency'
                       ? 'bg-[#D32F2F] text-white shadow-sm'
                       : 'text-red-700 hover:bg-red-50'
                   }`}
                 >
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  <span>🚨 Emergency Breakdown</span>
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">🚨 Emergency</span>
                 </button>
               </div>
             </div>
@@ -277,9 +280,9 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
             {/* PAGE 5: RAISE A SERVICE REQUEST (NORMAL COMPLAINT) */}
             {modalMode === 'normal' && (
               <div>
-                <div className="bg-[#123B5D] text-white p-5 text-center">
-                  <h2 className="text-lg font-black tracking-tight">Raise a Service Request</h2>
-                  <p className="text-xs text-sky-200 mt-0.5">
+                <div className="bg-[#123B5D] text-white p-4 sm:p-5 text-center">
+                  <h2 className="text-base sm:text-lg font-black tracking-tight">Raise a Service Request</h2>
+                  <p className="text-xs text-sky-200 mt-0.5 max-w-sm mx-auto">
                     Log routine elevator complaints, door sensor glitches, or electrical queries.
                   </p>
                 </div>

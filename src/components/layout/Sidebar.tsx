@@ -170,13 +170,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {isOpen && (
         <div
           onClick={onCloseMobile}
-          className="fixed inset-0 top-16 bg-slate-950/60 backdrop-blur-sm z-40 lg:hidden"
+          className="fixed inset-0 top-16 bg-slate-950/65 backdrop-blur-sm z-[55] lg:hidden animate-in fade-in duration-200"
         />
       )}
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed top-16 bottom-0 left-0 z-40 lg:z-30 w-[240px] bg-[#0E2238] border-r border-[#0A1828] flex flex-col transition-all duration-300 ease-in-out select-none ${
+        className={`fixed top-16 bottom-0 left-0 z-[60] lg:z-30 w-[240px] max-w-[82vw] bg-[#0E2238] border-r border-[#0A1828] flex flex-col transition-all duration-300 ease-in-out select-none ${
           isOpen ? 'translate-x-0 shadow-2xl lg:shadow-none' : '-translate-x-full'
         }`}
       >
@@ -298,7 +298,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Bottom Settings & Logout Actions (matching Image 2 & 3) */}
-        <div className="p-3 border-t border-[#0A1828] bg-[#0A192A] shrink-0 space-y-1">
+        <div className="p-3 border-t border-[#0A1828] bg-[#0A192A] shrink-0 space-y-1 safe-sidebar-drawer">
           <button
             type="button"
             onClick={() => {
@@ -307,10 +307,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               window.location.hash = targetTab;
               onCloseMobile();
             }}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer touch-manipulation"
+            className="w-full min-h-[42px] flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer touch-manipulation active:scale-[0.98]"
           >
-            <Settings className="w-4 h-4 text-slate-400" />
-            <span>{isClient ? 'My Profile' : isTechnician ? 'My Profile' : 'Settings & Profile'}</span>
+            <Settings className="w-4 h-4 text-slate-400 shrink-0" />
+            <span className="truncate">{isClient ? 'My Profile' : isTechnician ? 'My Profile' : 'Settings & Profile'}</span>
           </button>
           <button
             type="button"
@@ -320,9 +320,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onCloseMobile();
               });
             }}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer touch-manipulation"
+            className="w-full min-h-[42px] flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer touch-manipulation active:scale-[0.98]"
           >
-            <LogOut className="w-4 h-4 text-slate-400" />
+            <LogOut className="w-4 h-4 text-slate-400 shrink-0" />
             <span>Logout</span>
           </button>
         </div>

@@ -91,8 +91,8 @@ export const RoleSwitcher: React.FC = () => {
         </div>
 
         {/* Right: View as Role Buttons */}
-        <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto">
-          <div className="hidden lg:flex items-center gap-1.5 text-slate-500 text-xs mr-1 font-semibold">
+        <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
+          <div className="hidden lg:flex items-center gap-1.5 text-slate-500 text-xs mr-1 font-semibold shrink-0">
             <span>User:</span>
             <span className="text-slate-900 font-bold max-w-[120px] truncate">{currentUser.name}</span>
             <span>•</span>
@@ -102,10 +102,11 @@ export const RoleSwitcher: React.FC = () => {
             const isActive = currentRole === item.role;
             return (
               <button
+                type="button"
                 key={item.role}
                 onClick={() => setCurrentRole(item.role)}
                 title={`Switch active role to ${item.label}`}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors shrink-0 ${
+                className={`inline-flex items-center gap-1.5 min-h-[34px] sm:min-h-[30px] px-2.5 sm:px-3 py-1 rounded-md text-xs font-semibold transition-colors shrink-0 cursor-pointer active:scale-95 ${
                   isActive
                     ? 'bg-[#1976D2] text-white shadow-sm'
                     : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
@@ -118,6 +119,7 @@ export const RoleSwitcher: React.FC = () => {
           })}
 
           <button
+            type="button"
             onClick={() => {
               showWarningModal(
                 'Reset Application Cache?',
@@ -127,7 +129,7 @@ export const RoleSwitcher: React.FC = () => {
                 }
               );
             }}
-            className="ml-2 inline-flex items-center gap-1 px-2 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 border border-slate-200 text-xs font-semibold cursor-pointer"
+            className="ml-1 sm:ml-2 inline-flex items-center gap-1 min-h-[34px] sm:min-h-[30px] px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 border border-slate-200 text-xs font-semibold cursor-pointer shrink-0 active:scale-95"
             title="Reset cached state"
           >
             <RotateCcw className="w-3 h-3" />

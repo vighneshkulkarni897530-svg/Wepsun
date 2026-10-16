@@ -18,7 +18,9 @@ import { useApp } from '../../context/AppContext';
 
 export const TechnicianPerformance: React.FC = () => {
   const { technicians } = useApp();
-  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>(() =>
+    typeof window !== 'undefined' && window.innerWidth < 768 ? 'cards' : 'table'
+  );
   const [searchQuery, setSearchQuery] = useState('');
 
   const technicianMetrics = [
@@ -184,7 +186,7 @@ export const TechnicianPerformance: React.FC = () => {
       {/* View Mode: Table (Page 27 Exact Columns) */}
       {viewMode === 'table' ? (
         <div className="bg-white border border-slate-200/90 rounded-2xl shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto table-scroll-container">
             <table className="w-full text-left text-xs">
               <thead className="bg-[#F5F8FA] text-slate-600 font-bold uppercase text-[10px] border-b border-slate-200">
                 <tr>
@@ -322,9 +324,15 @@ export const TechnicianPerformance: React.FC = () => {
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                <span className="text-slate-500">Customer Rating:</span>
-                <span className="font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2 text-xs">
+                <a
+                  href={`tel:${tech.phone.replace(/\s+/g, '')}`}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors min-h-[38px]"
+                >
+                  <PhoneCall className="w-3.5 h-3.5 text-[#1976D2]" />
+                  <span>Call {tech.phone}</span>
+                </a>
+                <span className="font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200">
                   {tech.customerRating}
                 </span>
               </div>

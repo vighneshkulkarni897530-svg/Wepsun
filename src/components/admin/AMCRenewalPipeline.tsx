@@ -430,8 +430,8 @@ export const AMCRenewalPipeline: React.FC = () => {
       </div>
 
       {/* Expiring Contracts Table */}
-      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-left text-xs">
+      <div className="table-scroll-container rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <table className="w-full text-left text-xs min-w-[760px]">
           <thead className="bg-[#F5F8FA] text-slate-600 font-bold uppercase text-[10px] border-b border-slate-200">
             <tr>
               <th className="p-3.5">Contract & Society</th>
@@ -557,10 +557,11 @@ export const AMCRenewalPipeline: React.FC = () => {
       {/* ------------------------------------------------------------- */}
       {isQuoteModalOpen && selectedContract && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-6 shadow-2xl relative text-slate-800 flex flex-col gap-4">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl relative text-slate-800 flex flex-col gap-4 max-h-[90dvh] overflow-y-auto">
             <button
               onClick={() => setIsQuoteModalOpen(false)}
-              className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100"
+              className="absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-slate-800 hover:bg-slate-100 min-w-[40px] min-h-[40px] flex items-center justify-center transition-colors"
+              aria-label="Close modal"
             >
               <X className="w-5 h-5" />
             </button>
@@ -686,10 +687,11 @@ export const AMCRenewalPipeline: React.FC = () => {
       {/* ------------------------------------------------------------- */}
       {isRenewModalOpen && selectedContract && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-6 shadow-2xl relative text-slate-800 flex flex-col gap-4">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl relative text-slate-800 flex flex-col gap-4 max-h-[90dvh] overflow-y-auto">
             <button
               onClick={() => setIsRenewModalOpen(false)}
-              className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100"
+              className="absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-slate-800 hover:bg-slate-100 min-w-[40px] min-h-[40px] flex items-center justify-center transition-colors"
+              aria-label="Close modal"
             >
               <X className="w-5 h-5" />
             </button>

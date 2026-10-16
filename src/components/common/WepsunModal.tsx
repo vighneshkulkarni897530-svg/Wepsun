@@ -697,7 +697,7 @@ export const WepsunModal: React.FC<WepsunModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="wepsun-modal-title"
-      className={`fixed inset-0 z-[99990] flex items-center justify-center p-4 sm:p-6 overflow-y-auto select-none transition-all duration-250 ease-out ${
+      className={`fixed inset-0 z-[99990] flex items-center justify-center p-3 sm:p-6 overflow-y-auto select-none transition-all duration-250 ease-out ${
         isAnimating ? 'opacity-100' : 'opacity-0 pointer-events-none'
       }`}
     >
@@ -716,7 +716,7 @@ export const WepsunModal: React.FC<WepsunModalProps> = ({
       {/* Modal Surface Card */}
       <div
         ref={modalContainerRef}
-        className={`relative z-10 w-full max-w-[390px] sm:max-w-[430px] bg-white border border-slate-200/90 rounded-[28px] shadow-[0_25px_60px_-15px_rgba(11,37,69,0.35)] p-6 sm:p-7 overflow-hidden text-center transition-all duration-250 ease-out transform ${
+        className={`relative z-10 w-full max-w-[390px] sm:max-w-[430px] max-h-[92dvh] sm:max-h-[90vh] bg-white border border-slate-200/90 rounded-[28px] shadow-[0_25px_60px_-15px_rgba(11,37,69,0.35)] p-5 sm:p-7 overflow-y-auto text-center transition-all duration-250 ease-out transform ${
           isAnimating ? 'scale-100 translate-y-0 opacity-100' : 'scale-95 translate-y-3 opacity-0'
         } ${className}`}
       >
@@ -729,9 +729,9 @@ export const WepsunModal: React.FC<WepsunModalProps> = ({
             type="button"
             onClick={onClose}
             aria-label="Close dialog"
-            className="absolute top-4 right-4 p-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all cursor-pointer z-20 active:scale-90"
+            className="absolute top-3 right-3 sm:top-4 sm:right-4 w-10 h-10 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all cursor-pointer z-20 active:scale-90"
           >
-            <X className="w-4 h-4" />
+            <X className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         )}
 

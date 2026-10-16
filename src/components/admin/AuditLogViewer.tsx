@@ -99,8 +99,43 @@ export const AuditLogViewer: React.FC = () => {
         </div>
       </div>
 
-      {/* Audit Table */}
-      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+      {/* Mobile Audit Cards (< 768px) */}
+      <div className="block md:hidden space-y-3">
+        {filteredLogs.length === 0 ? (
+          <div className="p-8 text-center text-slate-400 bg-white rounded-2xl border border-slate-200">
+            No audit logs recorded matching this filter.
+          </div>
+        ) : (
+          filteredLogs.map((log) => (
+            <div key={log.id} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs space-y-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-1.5 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 text-[11px] text-slate-800 font-semibold">
+                  {getEntityIcon(log.entityType)} {log.entityType}
+                </span>
+                <span className="text-[10.5px] text-slate-400 font-mono">
+                  {new Date(log.timestamp).toLocaleDateString()}{' '}
+                  {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+
+              <div>
+                <h4 className="text-xs font-bold text-[#1976D2]">{log.action}</h4>
+                <p className="text-xs text-slate-600 mt-1 leading-relaxed font-sans">{log.details}</p>
+              </div>
+
+              <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[11px]">
+                <span className="font-semibold text-slate-800">{log.performedBy}</span>
+                <span className="text-[10px] text-slate-400 uppercase font-mono bg-slate-50 px-2 py-0.5 rounded border border-slate-200/60">
+                  {log.userRole}
+                </span>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop Audit Table (>= 768px) */}
+      <div className="hidden md:block table-scroll-container rounded-2xl border border-slate-200 bg-white shadow-sm">
         <table className="w-full text-left text-xs">
           <thead className="bg-[#F5F8FA] text-slate-600 uppercase font-bold text-[10px] border-b border-slate-200">
             <tr>

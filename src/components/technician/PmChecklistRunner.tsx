@@ -178,7 +178,7 @@ export const PmChecklistRunner: React.FC<PmChecklistRunnerProps> = ({ lift, onCo
       </div>
 
       {/* Zone Switcher Tabs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
         {zones.map((z) => {
           const isSelected = activeZone === z.key;
           return (
@@ -186,17 +186,17 @@ export const PmChecklistRunner: React.FC<PmChecklistRunnerProps> = ({ lift, onCo
               type="button"
               key={z.key}
               onClick={() => setActiveZone(z.key)}
-              className={`p-3.5 rounded-2xl border text-left flex items-center justify-between transition-all shadow-sm ${
+              className={`p-3.5 rounded-2xl border text-left flex items-center justify-between transition-all shadow-sm cursor-pointer active:scale-[0.98] ${
                 isSelected
                   ? 'bg-blue-50 border-[#1976D2] text-[#1976D2] ring-1 ring-[#1976D2]'
                   : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
               }`}
             >
-              <div className="flex items-center gap-2.5">
-                <span className="text-lg">{z.icon}</span>
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="text-lg shrink-0">{z.icon}</span>
                 <span className="text-xs font-bold truncate">{z.label}</span>
               </div>
-              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-white text-slate-700 border border-slate-200">
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-white text-slate-700 border border-slate-200 shrink-0 ml-2">
                 {z.count}
               </span>
             </button>
@@ -256,11 +256,11 @@ export const PmChecklistRunner: React.FC<PmChecklistRunnerProps> = ({ lift, onCo
               </div>
 
               {/* Status Action Buttons */}
-              <div className="flex items-center gap-1.5 shrink-0">
+              <div className="flex items-center gap-1.5 shrink-0 flex-wrap sm:flex-nowrap w-full sm:w-auto pt-1 sm:pt-0">
                 <button
                   type="button"
                   onClick={() => setItemStatus(item.id, 'ok')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
+                  className={`flex-1 sm:flex-initial min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer active:scale-95 ${
                     item.status === 'ok'
                       ? 'bg-emerald-600 text-white shadow-sm'
                       : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
@@ -272,7 +272,7 @@ export const PmChecklistRunner: React.FC<PmChecklistRunnerProps> = ({ lift, onCo
                 <button
                   type="button"
                   onClick={() => setItemStatus(item.id, 'attention')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
+                  className={`flex-1 sm:flex-initial min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer active:scale-95 ${
                     item.status === 'attention'
                       ? 'bg-amber-500 text-white shadow-sm'
                       : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
@@ -284,7 +284,7 @@ export const PmChecklistRunner: React.FC<PmChecklistRunnerProps> = ({ lift, onCo
                 <button
                   type="button"
                   onClick={() => setItemStatus(item.id, 'faulty')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
+                  className={`flex-1 sm:flex-initial min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer active:scale-95 ${
                     item.status === 'faulty'
                       ? 'bg-red-600 text-white shadow-sm'
                       : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'

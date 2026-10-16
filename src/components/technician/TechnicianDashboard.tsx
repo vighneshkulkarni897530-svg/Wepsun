@@ -377,20 +377,22 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
           {/* Quick AI Trigger & Logout */}
           <div className="flex items-center gap-1.5 shrink-0 pl-2 border-l border-slate-200">
             <button
+              type="button"
               onClick={() => setIsAiModalOpen(true)}
               title="Open AI Fault Diagnostic Assistant"
-              className="p-2 rounded-xl bg-sky-50 hover:bg-sky-100 text-[#123B5D] transition-all flex items-center gap-1 text-xs font-bold border border-sky-200"
+              className="p-2 min-h-[38px] rounded-xl bg-sky-50 hover:bg-sky-100 text-[#123B5D] transition-all flex items-center gap-1 text-xs font-bold border border-sky-200 cursor-pointer active:scale-95"
             >
-              <Sparkles className="w-4 h-4 text-[#1976D2]" />
+              <Sparkles className="w-4 h-4 text-[#1976D2] shrink-0" />
               <span className="hidden sm:inline">AI Helper</span>
             </button>
 
             <button
+              type="button"
               onClick={() => showLogoutModal(() => logout())}
               title="Logout from WEPSUN"
-              className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 transition-all flex items-center gap-1 text-xs font-bold border border-rose-200 cursor-pointer"
+              className="p-2 min-h-[38px] rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 transition-all flex items-center gap-1 text-xs font-bold border border-rose-200 cursor-pointer active:scale-95"
             >
-              <LogOut className="w-4 h-4 text-rose-600" />
+              <LogOut className="w-4 h-4 text-rose-600 shrink-0" />
               <span className="hidden sm:inline">Logout</span>
             </button>
           </div>
@@ -399,40 +401,41 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
 
       {/* ACTIVE JOB CONTEXT BANNER (When on detail sub-tabs 3-10) */}
       {activeTab !== 'dashboard' && activeTab !== 'jobs' && activeTab !== 'notifications' && activeTab !== 'profile' && selectedJob && (
-        <div className="bg-gradient-to-r from-[#123B5D] to-[#1976D2] rounded-2xl p-4 text-white shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
+        <div className="bg-gradient-to-r from-[#123B5D] to-[#1976D2] rounded-2xl p-3.5 sm:p-4 text-white shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             <button
+              type="button"
               onClick={() => navigateTab('jobs')}
-              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all text-xs font-bold flex items-center gap-1"
+              className="p-2 min-h-[38px] rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all text-xs font-bold flex items-center gap-1 shrink-0 cursor-pointer active:scale-95"
             >
               <ArrowLeft className="w-4 h-4" />
               <span className="hidden sm:inline">All Jobs</span>
             </button>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                 <span className="font-mono text-xs font-black px-2 py-0.5 rounded bg-white/20">
                   {selectedJob.jobId}
                 </span>
-                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-400 text-slate-900">
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-400 text-slate-900">
                   {selectedJob.jobType}
                 </span>
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-white/10 text-sky-100">
-                  Status: {selectedJob.jobStatus}
+                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/10 text-sky-100">
+                  {selectedJob.jobStatus}
                 </span>
               </div>
-              <h3 className="font-bold text-sm sm:text-base mt-0.5 truncate">
+              <h3 className="font-bold text-xs sm:text-sm md:text-base mt-1 truncate">
                 {selectedJob.buildingName} • Lift {selectedJob.liftNumber}
               </h3>
             </div>
           </div>
 
           {/* Quick Active Job Dropdown Switcher */}
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-sky-200 hidden sm:inline">Switch Assigned Job:</span>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <span className="text-[11px] text-sky-200 hidden md:inline shrink-0">Switch Job:</span>
             <select
               value={selectedJob.id}
               onChange={(e) => setSelectedJobId(e.target.value)}
-              className="px-3 py-1.5 rounded-xl bg-white/15 border border-white/20 text-white text-xs font-bold focus:outline-none focus:bg-[#123B5D]"
+              className="w-full sm:w-auto max-w-full sm:max-w-xs px-3 py-1.5 rounded-xl bg-white/15 border border-white/20 text-white text-xs font-bold focus:outline-none focus:bg-[#123B5D] truncate"
             >
               {assignedJobs.map((j) => (
                 <option key={j.id} value={j.id} className="text-slate-900 bg-white font-semibold">

@@ -156,21 +156,21 @@ export const QuotationManager: React.FC = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search quote number, society, elevator..."
-            className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:border-[#1976D2] focus:ring-1 focus:ring-[#1976D2] outline-none shadow-sm"
+            className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:border-[#1976D2] focus:ring-1 focus:ring-[#1976D2] outline-none shadow-sm min-h-[40px]"
           />
         </div>
 
         <button
           onClick={() => setIsAddModalOpen(true)}
-          className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#1976D2] hover:bg-blue-700 text-white font-bold text-xs shadow-sm shadow-blue-500/20 transition-all"
+          className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#1976D2] hover:bg-blue-700 text-white font-bold text-xs shadow-sm shadow-blue-500/20 transition-all min-h-[40px]"
         >
           <Plus className="w-4 h-4" /> Create Repair Quotation
         </button>
       </div>
 
       {/* Quotations Table */}
-      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-left text-xs">
+      <div className="table-scroll-container rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <table className="w-full text-left text-xs min-w-[780px]">
           <thead className="bg-[#F5F8FA] text-slate-600 uppercase font-bold text-[10px] border-b border-slate-200">
             <tr>
               <th className="p-3.5">Quote No.</th>
@@ -256,8 +256,8 @@ export const QuotationManager: React.FC = () => {
 
       {/* Convert to Work Order Modal */}
       {convertingQuote && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl text-slate-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 max-w-md w-full space-y-4 shadow-2xl text-slate-800 max-h-[90dvh] overflow-y-auto">
             <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <Wrench className="w-5 h-5 text-[#1976D2]" />
               Convert Quotation to Work Order
@@ -340,10 +340,11 @@ export const QuotationManager: React.FC = () => {
       {/* Create Quote Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-3xl w-full p-6 shadow-2xl relative text-slate-800 flex flex-col gap-4 max-h-[92vh] overflow-y-auto">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-3xl w-full p-5 sm:p-6 shadow-2xl relative text-slate-800 flex flex-col gap-4 max-h-[92vh] overflow-y-auto">
             <button
               onClick={() => setIsAddModalOpen(false)}
-              className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100"
+              className="absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-slate-800 hover:bg-slate-100 min-w-[36px] min-h-[36px] flex items-center justify-center transition-colors"
+              aria-label="Close modal"
             >
               <X className="w-5 h-5" />
             </button>
@@ -444,8 +445,8 @@ export const QuotationManager: React.FC = () => {
                   </button>
                 </div>
 
-                <div className="border border-slate-200 rounded-xl overflow-hidden">
-                  <table className="w-full text-left text-xs">
+                <div className="border border-slate-200 rounded-xl table-scroll-container">
+                  <table className="w-full text-left text-xs min-w-[540px]">
                     <thead className="bg-[#F5F8FA] text-slate-600 font-bold text-[10px] uppercase border-b border-slate-200">
                       <tr>
                         <th className="p-2.5">Description</th>

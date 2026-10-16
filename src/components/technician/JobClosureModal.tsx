@@ -142,32 +142,34 @@ export const JobClosureModal: React.FC<JobClosureModalProps> = ({
   return (
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-sm overflow-y-auto animate-fade-in">
-        <div className="bg-white border border-slate-200 rounded-3xl max-w-3xl w-full p-5 sm:p-7 shadow-2xl relative text-slate-800 my-auto flex flex-col gap-6 max-h-[92vh] overflow-y-auto">
+        <div className="bg-white border border-slate-200 rounded-3xl max-w-3xl w-full p-4 sm:p-7 shadow-2xl relative text-slate-800 my-auto flex flex-col gap-5 sm:gap-6 max-h-[92dvh] overflow-y-auto">
           <button
+            type="button"
             onClick={onClose}
-            className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors"
+            aria-label="Close job closure modal"
+            className="absolute top-3 right-3 sm:top-4 sm:right-4 w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer active:scale-95"
           >
             <X className="w-5 h-5" />
           </button>
 
           {/* Header */}
-          <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-[#2E7D32] shadow-sm shrink-0">
-              <FileCheck className="w-6 h-6" />
+          <div className="flex items-center gap-3 pb-3 sm:pb-4 border-b border-slate-100 pr-10">
+            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-[#2E7D32] shadow-sm shrink-0">
+              <FileCheck className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-mono text-xs font-bold text-[#1976D2] uppercase tracking-wider">
+                <span className="font-mono text-[10px] sm:text-xs font-bold text-[#1976D2] uppercase tracking-wider">
                   JOB COMPLETION & SERVICE REPORT GENERATOR
                 </span>
               </div>
-              <h2 className="text-lg sm:text-xl font-bold font-display text-slate-900">
+              <h2 className="text-base sm:text-xl font-bold font-display text-slate-900 leading-snug">
                 Close Ticket: {complaint.ticketNumber} ({complaint.liftNumber})
               </h2>
             </div>
           </div>
 
-          <form onSubmit={handleFinalSubmit} className="space-y-5 text-xs">
+          <form onSubmit={handleFinalSubmit} className="space-y-4 sm:space-y-5 text-xs">
             {/* Technical Diagnosis & Root Cause */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
@@ -208,9 +210,9 @@ export const JobClosureModal: React.FC<JobClosureModalProps> = ({
             </div>
 
             {/* Parts Consumed Logger */}
-            <div className="space-y-3 bg-[#F5F8FA] p-4 rounded-2xl border border-slate-200">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-slate-800 uppercase tracking-wider font-mono">
+            <div className="space-y-3 bg-[#F5F8FA] p-3.5 sm:p-4 rounded-2xl border border-slate-200">
+              <div className="flex items-center justify-between flex-wrap gap-1">
+                <span className="font-bold text-slate-800 uppercase tracking-wider font-mono text-[11px] sm:text-xs">
                   Parts Replaced & Issued (Auto-Deducted from Inventory)
                 </span>
                 <span className="text-[11px] text-[#1976D2] font-mono font-bold">
@@ -232,22 +234,24 @@ export const JobClosureModal: React.FC<JobClosureModalProps> = ({
                   ))}
                 </select>
 
-                <input
-                  type="number"
-                  min={1}
-                  max={20}
-                  value={partQty}
-                  onChange={(e) => setPartQty(parseInt(e.target.value) || 1)}
-                  className="w-20 bg-white border border-slate-200 rounded-xl p-2.5 text-center text-slate-900 font-mono focus:border-[#1976D2] outline-none"
-                />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={partQty}
+                    onChange={(e) => setPartQty(parseInt(e.target.value) || 1)}
+                    className="w-20 bg-white border border-slate-200 rounded-xl p-2.5 text-center text-slate-900 font-mono focus:border-[#1976D2] outline-none"
+                  />
 
-                <button
-                  type="button"
-                  onClick={handleAddPart}
-                  className="px-3.5 py-2.5 bg-[#1976D2] hover:bg-blue-700 text-white font-bold rounded-xl border border-blue-600 flex items-center justify-center gap-1.5 transition-colors shadow-sm"
-                >
-                  <Plus className="w-4 h-4" /> Add Part
-                </button>
+                  <button
+                    type="button"
+                    onClick={handleAddPart}
+                    className="flex-1 sm:flex-initial min-h-[40px] px-3.5 py-2.5 bg-[#1976D2] hover:bg-blue-700 text-white font-bold rounded-xl border border-blue-600 flex items-center justify-center gap-1.5 transition-colors shadow-sm cursor-pointer active:scale-95"
+                  >
+                    <Plus className="w-4 h-4" /> Add Part
+                  </button>
+                </div>
               </div>
 
               {/* Parts Table */}

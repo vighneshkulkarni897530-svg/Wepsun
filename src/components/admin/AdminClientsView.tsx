@@ -163,8 +163,102 @@ export const AdminClientsView: React.FC = () => {
         </div>
       </div>
 
-      {/* Clients Table: Client | Building | Lifts | AMC | Status | Action */}
-      <div className="bg-white border border-slate-200/90 rounded-2xl shadow-sm overflow-hidden">
+      {/* Clients Desktop Table & Mobile Cards */}
+      {/* 1. Mobile Cards View (Visible on < md) */}
+      <div className="block md:hidden space-y-3.5">
+        {filteredClients.length === 0 ? (
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-8 text-center text-slate-500 shadow-sm">
+            <Users className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+            <p className="text-sm font-bold text-slate-800">No clients match your search.</p>
+          </div>
+        ) : (
+          filteredClients.map((client) => (
+            <div
+              key={client.id}
+              className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all space-y-3"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="font-bold text-slate-900 text-sm">{client.name}</div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">{client.designation}</div>
+                </div>
+                <span
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                    client.status === 'Active'
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : 'bg-amber-100 text-amber-700'
+                  }`}
+                >
+                  ● {client.status}
+                </span>
+              </div>
+
+              <div className="space-y-1.5 bg-[#F5F8FA] p-3 rounded-xl border border-slate-200/70 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Building:</span>
+                  <span className="font-semibold text-slate-800 text-right truncate max-w-[200px]">
+                    {client.building}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Society:</span>
+                  <span className="text-slate-700 text-right truncate max-w-[200px]">{client.society}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Fleet Units:</span>
+                  <span className="font-bold text-[#1976D2] bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                    {client.liftsCount} Lifts
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">AMC Tier:</span>
+                  <span className="font-semibold text-slate-800 text-right truncate max-w-[180px]">{client.amcStatus}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Contract Expiry:</span>
+                  <span className="font-mono text-slate-600">{client.contractExpiry}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+                <a
+                  href={`tel:${client.phone.replace(/\s+/g, '')}`}
+                  className="flex-1 py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 touch-manipulation min-h-[40px]"
+                >
+                  <Phone className="w-3.5 h-3.5 text-[#1976D2]" />
+                  <span>Call</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setSelectedClientForView(client)}
+                  className="flex-1 py-2 px-3 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#1976D2] font-bold text-xs transition-colors flex items-center justify-center gap-1.5 touch-manipulation min-h-[40px]"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>Details</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setName(client.name);
+                    setEmail(client.email);
+                    setPhone(client.phone);
+                    setSocietyName(client.society);
+                    setAddress(client.address);
+                    setIsAddClientModalOpen(true);
+                  }}
+                  className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors flex items-center justify-center touch-manipulation min-h-[40px] min-w-[40px]"
+                  title="Edit Client"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* 2. Desktop Table (Visible on md and up) */}
+      <div className="hidden md:block bg-white border border-slate-200/90 rounded-2xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-[#F5F8FA] text-slate-600 font-bold uppercase text-[10px] border-b border-slate-200">
@@ -262,8 +356,8 @@ export const AdminClientsView: React.FC = () => {
 
       {/* Add Client Modal */}
       {isAddClientModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-6 shadow-2xl relative text-slate-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl relative text-slate-800 max-h-[92vh] overflow-y-auto">
             <button
               onClick={() => setIsAddClientModalOpen(false)}
               className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100"
@@ -364,11 +458,12 @@ export const AdminClientsView: React.FC = () => {
 
       {/* View Client Details Modal */}
       {selectedClientForView && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-6 shadow-2xl relative text-slate-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl relative text-slate-800 max-h-[92vh] overflow-y-auto">
             <button
               onClick={() => setSelectedClientForView(null)}
-              className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100"
+              className="absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-slate-800 hover:bg-slate-100 min-w-[36px] min-h-[36px] flex items-center justify-center transition-colors"
+              aria-label="Close modal"
             >
               <X className="w-5 h-5" />
             </button>

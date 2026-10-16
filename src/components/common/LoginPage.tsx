@@ -1232,12 +1232,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       </div>
 
       {/* Main Centered Floating Card */}
-      <div className="relative z-10 flex-1 flex items-center justify-center px-4 py-6">
-        <div className="w-full max-w-[440px] bg-white/95 backdrop-blur-md rounded-[28px] shadow-2xl border border-white/60 p-6 sm:p-8 animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative z-10 flex-1 flex items-center justify-center px-3 sm:px-4 py-4 sm:py-6">
+        <div className="w-full max-w-[440px] bg-white/95 backdrop-blur-md rounded-[24px] sm:rounded-[28px] shadow-2xl border border-white/60 p-4 sm:p-7 sm:p-8 animate-in fade-in zoom-in-95 duration-200">
           
           {/* Top Tabs: Sign In | Sign Up */}
-          <div className="mb-6">
-            <div className="flex items-center gap-3">
+          <div className="mb-5 sm:mb-6">
+            <div className="flex items-center gap-2.5 sm:gap-3">
               <button
                 type="button"
                 onClick={() => {
@@ -1245,7 +1245,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   setSignUpStep('form');
                   window.location.hash = 'login';
                 }}
-                className={`text-2xl sm:text-[28px] font-black tracking-tight transition-all cursor-pointer relative pb-1 ${
+                className={`text-xl sm:text-2xl sm:text-[28px] font-black tracking-tight transition-all cursor-pointer relative pb-1 ${
                   view === 'signin'
                     ? 'text-[#0b2545]'
                     : 'text-slate-400 hover:text-slate-600'
@@ -1257,7 +1257,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 )}
               </button>
 
-              <span className="text-slate-300 text-xl font-light select-none pb-1">|</span>
+              <span className="text-slate-300 text-lg sm:text-xl font-light select-none pb-1">|</span>
 
               <button
                 type="button"
@@ -1265,7 +1265,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   setView('signup');
                   window.location.hash = 'signup';
                 }}
-                className={`text-2xl sm:text-[28px] font-black tracking-tight transition-all cursor-pointer relative pb-1 ${
+                className={`text-xl sm:text-2xl sm:text-[28px] font-black tracking-tight transition-all cursor-pointer relative pb-1 ${
                   view === 'signup'
                     ? 'text-[#0b2545]'
                     : 'text-slate-400 hover:text-[#0066FF]'

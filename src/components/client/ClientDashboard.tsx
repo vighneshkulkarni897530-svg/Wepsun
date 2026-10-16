@@ -364,19 +364,21 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
               </h2>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <button
+                type="button"
                 onClick={() => setIsEmergencyModalOpen(true)}
-                className="px-3.5 py-1.5 rounded-xl bg-[#D32F2F] hover:bg-red-700 text-white text-xs font-bold shadow-sm flex items-center gap-1.5"
+                className="px-3 sm:px-3.5 py-2 min-h-[40px] rounded-xl bg-[#D32F2F] hover:bg-red-700 text-white text-xs font-bold shadow-sm flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
               >
-                <ShieldAlert className="w-3.5 h-3.5" />
+                <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
                 <span>Emergency SOS</span>
               </button>
               <button
+                type="button"
                 onClick={() => setIsRaiseModalOpen(true)}
-                className="px-3.5 py-1.5 rounded-xl bg-[#123B5D] hover:bg-[#0e2f4a] text-white text-xs font-bold shadow-sm hidden sm:flex items-center gap-1.5"
+                className="px-3 sm:px-3.5 py-2 min-h-[40px] rounded-xl bg-[#123B5D] hover:bg-[#0e2f4a] text-white text-xs font-bold shadow-sm hidden sm:flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
               >
-                <Plus className="w-3.5 h-3.5" />
+                <Plus className="w-3.5 h-3.5 shrink-0" />
                 <span>Raise Ticket</span>
               </button>
             </div>
@@ -384,7 +386,7 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
 
           {/* 1. Lifts Fleet View */}
           {activeTab === 'lifts' && (
-            <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 shadow-sm">
+            <div className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 lg:p-7 shadow-sm">
               <ClientLiftsView
                 lifts={clientLifts}
                 onRaiseComplaint={(liftId) => setIsRaiseModalOpen(true)}
@@ -394,7 +396,7 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
 
           {/* 2. Complaints Tracking View */}
           {activeTab === 'complaints' && (
-            <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 shadow-sm">
+            <div className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 lg:p-7 shadow-sm">
               <ClientComplaintsView
                 complaints={clientComplaints}
                 onOpenRaiseModal={() => setIsRaiseModalOpen(true)}
@@ -405,21 +407,21 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
 
           {/* 3. Service History View */}
           {activeTab === 'history' && (
-            <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 shadow-sm">
+            <div className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 lg:p-7 shadow-sm">
               <ClientServiceHistoryView />
             </div>
           )}
 
           {/* 4. Parts Replacement History View */}
           {activeTab === 'parts' && (
-            <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 shadow-sm">
+            <div className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 lg:p-7 shadow-sm">
               <ClientPartsReplacementView />
             </div>
           )}
 
           {/* 5. AMC Management View */}
           {activeTab === 'amc' && (
-            <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 shadow-sm">
+            <div className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 lg:p-7 shadow-sm">
               <ClientAmcView
                 contracts={clientAmcs}
                 lifts={clientLifts}
@@ -431,42 +433,42 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
 
           {/* 6. Quotation Approval View */}
           {activeTab === 'quotations' && (
-            <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 shadow-sm space-y-4">
+            <div className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 lg:p-7 shadow-sm space-y-4">
               <QuotationApprovalView quotations={clientQuotations} />
             </div>
           )}
 
           {/* 7. Payments & Invoices View */}
           {activeTab === 'payments' && (
-            <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 shadow-sm space-y-4">
+            <div className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 lg:p-7 shadow-sm space-y-4">
               <ClientPaymentsView invoices={clientInvoices} />
             </div>
           )}
 
           {/* 8. Reports & Safety Hub View */}
           {activeTab === 'reports' && (
-            <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 shadow-sm">
+            <div className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 lg:p-7 shadow-sm">
               <ClientReportsView />
             </div>
           )}
 
           {/* 9. Preventive Maintenance View */}
           {activeTab === 'pm' && (
-            <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 shadow-sm">
+            <div className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 lg:p-7 shadow-sm">
               <ClientPmView />
             </div>
           )}
 
           {/* 10. Notifications View */}
           {activeTab === 'notifications' && (
-            <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 shadow-sm">
+            <div className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 lg:p-7 shadow-sm">
               <ClientNotificationsView />
             </div>
           )}
 
           {/* 11. Profile View */}
           {activeTab === 'profile' && (
-            <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 shadow-sm">
+            <div className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 lg:p-7 shadow-sm">
               <ClientProfileView />
             </div>
           )}

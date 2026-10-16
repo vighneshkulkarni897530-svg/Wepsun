@@ -299,21 +299,21 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
           </div>
 
           {/* 5 TOP STAT CARDS */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3">
             {/* 1. Total Clients */}
             <div
               onClick={() => onNavigateTab('clients')}
-              className="bg-white border border-slate-200/90 hover:border-blue-300 rounded-2xl p-4 cursor-pointer transition-all shadow-xs flex flex-col justify-between"
+              className="bg-white border border-slate-200/90 hover:border-blue-300 rounded-2xl p-3 sm:p-4 cursor-pointer transition-all shadow-xs flex flex-col justify-between active:scale-[0.98]"
             >
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-[#1976D2]">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-[#1976D2] shrink-0">
                   <Users className="w-4 h-4" />
                 </div>
-                <span className="text-xs font-bold text-slate-700">Total Clients</span>
+                <span className="text-[11px] sm:text-xs font-bold text-slate-700 truncate">Total Clients</span>
               </div>
-              <div className="text-2xl font-black text-slate-900 mt-2 font-mono">{totalClients}</div>
-              <div className="text-[10px] font-semibold text-emerald-600 mt-1 flex items-center gap-0.5">
-                <ArrowUpRight className="w-3 h-3" />
+              <div className="text-xl sm:text-2xl font-black text-slate-900 mt-2 font-mono">{totalClients}</div>
+              <div className="text-[9.5px] sm:text-[10px] font-semibold text-emerald-600 mt-1 flex items-center gap-0.5 truncate">
+                <ArrowUpRight className="w-3 h-3 shrink-0" />
                 <span>Active portfolio</span>
               </div>
             </div>
@@ -321,17 +321,17 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             {/* 2. Total Buildings */}
             <div
               onClick={() => onNavigateTab('buildings')}
-              className="bg-white border border-slate-200/90 hover:border-emerald-300 rounded-2xl p-4 cursor-pointer transition-all shadow-xs flex flex-col justify-between"
+              className="bg-white border border-slate-200/90 hover:border-emerald-300 rounded-2xl p-3 sm:p-4 cursor-pointer transition-all shadow-xs flex flex-col justify-between active:scale-[0.98]"
             >
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
                   <Building className="w-4 h-4" />
                 </div>
-                <span className="text-xs font-bold text-slate-700">Total Buildings</span>
+                <span className="text-[11px] sm:text-xs font-bold text-slate-700 truncate">Total Buildings</span>
               </div>
-              <div className="text-2xl font-black text-slate-900 mt-2 font-mono">{totalBuildings}</div>
-              <div className="text-[10px] font-semibold text-emerald-600 mt-1 flex items-center gap-0.5">
-                <ArrowUpRight className="w-3 h-3" />
+              <div className="text-xl sm:text-2xl font-black text-slate-900 mt-2 font-mono">{totalBuildings}</div>
+              <div className="text-[9.5px] sm:text-[10px] font-semibold text-emerald-600 mt-1 flex items-center gap-0.5 truncate">
+                <ArrowUpRight className="w-3 h-3 shrink-0" />
                 <span>Registered sites</span>
               </div>
             </div>
@@ -339,17 +339,17 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             {/* 3. Total Lifts */}
             <div
               onClick={() => onNavigateTab('lifts')}
-              className="bg-white border border-slate-200/90 hover:border-purple-300 rounded-2xl p-4 cursor-pointer transition-all shadow-xs flex flex-col justify-between"
+              className="bg-white border border-slate-200/90 hover:border-purple-300 rounded-2xl p-3 sm:p-4 cursor-pointer transition-all shadow-xs flex flex-col justify-between active:scale-[0.98]"
             >
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <div className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600 shrink-0">
                   <Layers className="w-4 h-4" />
                 </div>
-                <span className="text-xs font-bold text-slate-700">Total Lifts</span>
+                <span className="text-[11px] sm:text-xs font-bold text-slate-700 truncate">Total Lifts</span>
               </div>
-              <div className="text-2xl font-black text-slate-900 mt-2 font-mono">{totalLifts}</div>
-              <div className="text-[10px] font-semibold text-emerald-600 mt-1 flex items-center gap-0.5">
-                <ArrowUpRight className="w-3 h-3" />
+              <div className="text-xl sm:text-2xl font-black text-slate-900 mt-2 font-mono">{totalLifts}</div>
+              <div className="text-[9.5px] sm:text-[10px] font-semibold text-emerald-600 mt-1 flex items-center gap-0.5 truncate">
+                <ArrowUpRight className="w-3 h-3 shrink-0" />
                 <span>Under service</span>
               </div>
             </div>
@@ -357,16 +357,16 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             {/* 4. Open Complaints */}
             <div
               onClick={() => onNavigateTab('complaints')}
-              className="bg-white border border-slate-200/90 hover:border-red-300 rounded-2xl p-4 cursor-pointer transition-all shadow-xs flex flex-col justify-between"
+              className="bg-white border border-slate-200/90 hover:border-red-300 rounded-2xl p-3 sm:p-4 cursor-pointer transition-all shadow-xs flex flex-col justify-between active:scale-[0.98]"
             >
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center text-red-600">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <div className="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center text-red-600 shrink-0">
                   <AlertTriangle className="w-4 h-4" />
                 </div>
-                <span className="text-xs font-bold text-slate-700">Open Complaints</span>
+                <span className="text-[11px] sm:text-xs font-bold text-slate-700 truncate">Open Complaints</span>
               </div>
-              <div className="text-2xl font-black text-slate-900 mt-2 font-mono">{openComplaintsCount}</div>
-              <div className="text-[10px] font-semibold text-amber-600 mt-1 flex items-center gap-0.5">
+              <div className="text-xl sm:text-2xl font-black text-slate-900 mt-2 font-mono">{openComplaintsCount}</div>
+              <div className="text-[9.5px] sm:text-[10px] font-semibold text-amber-600 mt-1 flex items-center gap-0.5 truncate">
                 <span>Active tickets</span>
               </div>
             </div>
@@ -374,17 +374,17 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             {/* 5. AMC Expiring */}
             <div
               onClick={() => onNavigateTab('amc')}
-              className="bg-white border border-slate-200/90 hover:border-teal-300 rounded-2xl p-4 cursor-pointer transition-all shadow-xs flex flex-col justify-between"
+              className="bg-white border border-slate-200/90 hover:border-teal-300 rounded-2xl p-3 sm:p-4 cursor-pointer transition-all shadow-xs flex flex-col justify-between active:scale-[0.98] col-span-2 sm:col-span-1"
             >
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-teal-50 flex items-center justify-center text-teal-600">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <div className="w-7 h-7 rounded-lg bg-teal-50 flex items-center justify-center text-teal-600 shrink-0">
                   <ShieldCheck className="w-4 h-4" />
                 </div>
-                <span className="text-[11px] font-bold text-slate-700 leading-tight">AMC Expiring</span>
+                <span className="text-[11px] sm:text-xs font-bold text-slate-700 leading-tight truncate">AMC Expiring</span>
               </div>
-              <div className="text-2xl font-black text-slate-900 mt-2 font-mono">{amcExpiringCount}</div>
-              <div className="text-[10px] font-semibold text-teal-600 mt-1 flex items-center gap-0.5">
-                <ArrowUpRight className="w-3 h-3" />
+              <div className="text-xl sm:text-2xl font-black text-slate-900 mt-2 font-mono">{amcExpiringCount}</div>
+              <div className="text-[9.5px] sm:text-[10px] font-semibold text-teal-600 mt-1 flex items-center gap-0.5 truncate">
+                <ArrowUpRight className="w-3 h-3 shrink-0" />
                 <span>Next 30 Days</span>
               </div>
             </div>
@@ -617,9 +617,9 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
               </button>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="table-scroll-container">
               {activeRecentTab === 'complaints' && (
-                <table className="w-full text-left text-xs">
+                <table className="w-full text-left text-xs min-w-[640px]">
                   <thead>
                     <tr className="border-b border-slate-100 text-slate-400 font-semibold text-[11px]">
                       <th className="py-2.5 pr-3">Ticket No.</th>
@@ -670,7 +670,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
               )}
 
               {activeRecentTab === 'amc' && (
-                <table className="w-full text-left text-xs">
+                <table className="w-full text-left text-xs min-w-[640px]">
                   <thead>
                     <tr className="border-b border-slate-100 text-slate-400 font-semibold text-[11px]">
                       <th className="py-2.5 pr-3">Contract No.</th>
@@ -721,7 +721,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
               )}
 
               {activeRecentTab === 'quotations' && (
-                <table className="w-full text-left text-xs">
+                <table className="w-full text-left text-xs min-w-[640px]">
                   <thead>
                     <tr className="border-b border-slate-100 text-slate-400 font-semibold text-[11px]">
                       <th className="py-2.5 pr-3">Quote No.</th>
@@ -774,7 +774,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
               )}
 
               {activeRecentTab === 'payments' && (
-                <table className="w-full text-left text-xs">
+                <table className="w-full text-left text-xs min-w-[640px]">
                   <thead>
                     <tr className="border-b border-slate-100 text-slate-400 font-semibold text-[11px]">
                       <th className="py-2.5 pr-3">Invoice No.</th>
@@ -807,7 +807,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                                 inv.status === 'paid'
                                   ? 'bg-emerald-100 text-emerald-800'
                                   : inv.status === 'overdue'
-                                  ? 'bg-red-100 text-red-800'
+                                  ? 'bg-rose-100 text-rose-800'
                                   : 'bg-amber-100 text-amber-800'
                               }`}
                             >

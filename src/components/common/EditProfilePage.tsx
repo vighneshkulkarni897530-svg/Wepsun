@@ -587,11 +587,11 @@ export const EditProfilePage: React.FC<EditProfilePageProps> = ({ onBack, onSave
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 w-full sm:w-auto">
           <button
             type="button"
             onClick={handleCancel}
-            className="px-4 py-2.5 rounded-2xl border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-bold transition-all cursor-pointer active:scale-95"
+            className="flex-1 sm:flex-initial px-4 py-2.5 rounded-2xl border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-bold transition-all cursor-pointer active:scale-95 text-center min-h-[44px]"
           >
             Cancel
           </button>
@@ -599,17 +599,17 @@ export const EditProfilePage: React.FC<EditProfilePageProps> = ({ onBack, onSave
             type="button"
             disabled={isSaving}
             onClick={() => handleSaveProfile()}
-            className="px-5 py-2.5 rounded-2xl bg-[#0066FF] hover:bg-[#0052cc] disabled:opacity-60 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/20 flex items-center gap-2 cursor-pointer active:scale-95"
+            className="flex-1 sm:flex-initial px-5 py-2.5 rounded-2xl bg-[#0066FF] hover:bg-[#0052cc] disabled:opacity-60 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 cursor-pointer active:scale-95 min-h-[44px]"
           >
             {isSaving ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Saving Changes…</span>
+                <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                <span className="truncate">Saving Changes…</span>
               </>
             ) : (
               <>
-                <Save className="w-4 h-4" />
-                <span>Save Changes</span>
+                <Save className="w-4 h-4 shrink-0" />
+                <span className="truncate">Save Changes</span>
               </>
             )}
           </button>
@@ -1149,10 +1149,10 @@ export const EditProfilePage: React.FC<EditProfilePageProps> = ({ onBack, onSave
       {/* 5. CHANGE PASSWORD MODAL */}
       {/* ========================================================================= */}
       {isPasswordModalOpen && (
-        <div className="fixed inset-0 z-[99990] flex items-center justify-center p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-[99990] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
           <div onClick={() => setIsPasswordModalOpen(false)} className="fixed inset-0 bg-slate-950/65 backdrop-blur-md" />
 
-          <div className="relative z-10 w-full max-w-md bg-white border border-slate-200 rounded-[28px] shadow-2xl p-6 overflow-hidden space-y-4 animate-in zoom-in duration-200">
+          <div className="relative z-10 w-full max-w-md max-h-[92dvh] overflow-y-auto bg-white border border-slate-200 rounded-[28px] shadow-2xl p-5 sm:p-6 space-y-4 animate-in zoom-in duration-200">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <Lock className="w-4 h-4 text-[#0066FF]" />
@@ -1161,7 +1161,8 @@ export const EditProfilePage: React.FC<EditProfilePageProps> = ({ onBack, onSave
               <button
                 type="button"
                 onClick={() => setIsPasswordModalOpen(false)}
-                className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700"
+                aria-label="Close change password modal"
+                className="w-9 h-9 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1263,13 +1264,13 @@ export const EditProfilePage: React.FC<EditProfilePageProps> = ({ onBack, onSave
                 <button
                   type="button"
                   onClick={() => setIsPasswordModalOpen(false)}
-                  className="px-4 py-2.5 rounded-2xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                  className="min-h-[44px] px-4 py-2.5 rounded-2xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer active:scale-95"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-2xl bg-[#0066FF] hover:bg-[#0052cc] text-white text-xs font-bold shadow-md flex items-center gap-1.5 cursor-pointer"
+                  className="min-h-[44px] px-5 py-2.5 rounded-2xl bg-[#0066FF] hover:bg-[#0052cc] text-white text-xs font-bold shadow-md flex items-center gap-1.5 cursor-pointer active:scale-95"
                 >
                   <Lock className="w-3.5 h-3.5" />
                   <span>Update Password</span>

@@ -246,20 +246,22 @@ export const IoTLiftSimulationModal: React.FC<IoTLiftSimulationModalProps> = ({
   const counterweightHeightPercent = 100 - carHeightPercent;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in text-white font-sans">
-      <div className="bg-[#071324] border border-cyan-500/30 rounded-3xl max-w-5xl w-full p-5 sm:p-6 shadow-2xl shadow-cyan-950/50 relative flex flex-col gap-4 max-h-[95vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in text-white font-sans overflow-y-auto">
+      <div className="bg-[#071324] border border-cyan-500/30 rounded-3xl max-w-5xl w-full p-4 sm:p-6 shadow-2xl shadow-cyan-950/50 relative flex flex-col gap-4 max-h-[92dvh] overflow-y-auto">
         {/* Close Button */}
         <button
+          type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors z-10"
+          aria-label="Close IoT simulation"
+          className="absolute top-3 right-3 sm:top-4 sm:right-4 w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors z-10 cursor-pointer active:scale-95"
         >
           <X className="w-5 h-5" />
         </button>
 
         {/* Modal Header */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3 pr-10">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-400 shadow-inner">
+            <div className="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-400 shadow-inner shrink-0">
               <Cpu className="w-5 h-5 animate-pulse" />
             </div>
             <div>

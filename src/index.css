@@ -273,8 +273,88 @@ video::-moz-media-controls {
   animation: fadeIn 0.25s ease-out forwards;
 }
 
-/* Mobile Safe Bottom Navigation */
+/* Mobile Safe Areas and Insets */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Mobile Safe Inset Utilities */
+.safe-top {
+  padding-top: max(0.5rem, env(safe-area-inset-top, 0px));
+}
+
 .safe-bottom {
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0.5rem));
+}
+
+.safe-bottom-nav-spacer {
+  padding-bottom: max(6.5rem, calc(6rem + env(safe-area-inset-bottom, 0px)));
+}
+
+.safe-sidebar-drawer {
+  padding-bottom: max(1.5rem, calc(1rem + env(safe-area-inset-bottom, 0px)));
+}
+
+/* Minimum Accessible Touch Target (44x44px) */
+.touch-target-44 {
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Responsive Table Scroll Container with Momentum Scrolling */
+.table-scroll-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
+  max-width: 100%;
+  position: relative;
+  scrollbar-width: thin;
+}
+
+.table-scroll-container::-webkit-scrollbar {
+  height: 5px;
+}
+
+.table-scroll-container::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+/* Hide Scrollbar Utility */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Balanced Text Wrapping */
+.text-balance {
+  text-wrap: balance;
+}
+
+/* Mobile Card Flex helper */
+@media (max-width: 640px) {
+  .mobile-card-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
 }
 

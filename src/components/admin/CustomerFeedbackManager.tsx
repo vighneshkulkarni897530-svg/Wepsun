@@ -707,7 +707,7 @@ export const CustomerFeedbackManager: React.FC = () => {
             </p>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="table-scroll-container">
             <table className="w-full text-left text-xs whitespace-nowrap">
               <thead>
                 <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider">
@@ -760,11 +760,16 @@ export const CustomerFeedbackManager: React.FC = () => {
 
       {/* Reply Modal */}
       {replyModalFeedback && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl space-y-4 max-h-[92dvh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-base font-bold text-slate-900">Reply to Customer Review</h3>
-              <button onClick={() => setReplyModalFeedback(null)} className="p-1 rounded-lg text-slate-400 hover:text-slate-700">
+              <button
+                type="button"
+                onClick={() => setReplyModalFeedback(null)}
+                aria-label="Close reply modal"
+                className="w-9 h-9 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -788,17 +793,17 @@ export const CustomerFeedbackManager: React.FC = () => {
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2">
+              <div className="flex items-center justify-end gap-2.5 pt-2">
                 <button
                   type="button"
                   onClick={() => setReplyModalFeedback(null)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-semibold"
+                  className="min-h-[44px] px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50 cursor-pointer active:scale-95"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-[#1976D2] hover:bg-blue-700 text-white font-bold shadow-md shadow-blue-600/30 flex items-center gap-1.5"
+                  className="min-h-[44px] px-5 py-2.5 rounded-xl bg-[#1976D2] hover:bg-blue-700 text-white font-bold shadow-md shadow-blue-600/30 flex items-center gap-1.5 cursor-pointer active:scale-95"
                 >
                   <Send className="w-3.5 h-3.5" />
                   <span>Publish Reply</span>
@@ -811,11 +816,16 @@ export const CustomerFeedbackManager: React.FC = () => {
 
       {/* Record Client Review Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl space-y-4 max-h-[92dvh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-base font-bold text-slate-900">Record Client Feedback & Rating</h3>
-              <button onClick={() => setIsAddModalOpen(false)} className="p-1 rounded-lg text-slate-400 hover:text-slate-700">
+              <button
+                type="button"
+                onClick={() => setIsAddModalOpen(false)}
+                aria-label="Close add review modal"
+                className="w-9 h-9 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -833,7 +843,7 @@ export const CustomerFeedbackManager: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="font-bold text-slate-700">Building / Society</label>
                   <input
@@ -851,12 +861,12 @@ export const CustomerFeedbackManager: React.FC = () => {
                     required
                     value={newLiftNumber}
                     onChange={(e) => setNewLiftNumber(e.target.value)}
-                    className="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-[#1976D2] outline-none"
+                    className="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-[#1976D2] outline-none font-mono"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="font-bold text-slate-700">Service Engineer</label>
                   <input
@@ -885,13 +895,13 @@ export const CustomerFeedbackManager: React.FC = () => {
               {/* Overall Star Selection */}
               <div>
                 <label className="font-bold text-slate-700 block mb-1">Overall Star Rating</label>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   {[1, 2, 3, 4, 5].map((s) => (
                     <button
                       type="button"
                       key={s}
                       onClick={() => setNewRating(s)}
-                      className="p-1 hover:scale-110 transition-transform"
+                      className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-amber-50 hover:scale-110 transition-transform active:scale-95 cursor-pointer"
                     >
                       <Star
                         className={`w-7 h-7 ${
@@ -919,17 +929,17 @@ export const CustomerFeedbackManager: React.FC = () => {
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2">
+              <div className="flex items-center justify-end gap-2.5 pt-2">
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-semibold"
+                  className="min-h-[44px] px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50 cursor-pointer active:scale-95"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-[#123B5D] hover:bg-[#0e2f4a] text-white font-bold shadow-md shadow-blue-950/30"
+                  className="min-h-[44px] px-5 py-2.5 rounded-xl bg-[#123B5D] hover:bg-[#0e2f4a] text-white font-bold shadow-md shadow-blue-950/30 cursor-pointer active:scale-95"
                 >
                   Save Review
                 </button>
@@ -941,11 +951,11 @@ export const CustomerFeedbackManager: React.FC = () => {
 
       {/* Share / Copy Feedback Link Generator Modal */}
       {isShareModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in">
-          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-lg w-full shadow-2xl border border-slate-200 space-y-5">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 animate-in fade-in overflow-y-auto">
+          <div className="bg-white rounded-3xl p-5 sm:p-7 max-w-lg w-full shadow-2xl border border-slate-200 space-y-5 max-h-[92dvh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 text-[#1976D2] flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 text-[#1976D2] flex items-center justify-center shrink-0">
                   <Share2 className="w-5 h-5" />
                 </div>
                 <div>
@@ -954,8 +964,10 @@ export const CustomerFeedbackManager: React.FC = () => {
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setIsShareModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                aria-label="Close share modal"
+                className="w-9 h-9 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1025,7 +1037,7 @@ export const CustomerFeedbackManager: React.FC = () => {
               <button
                 type="button"
                 onClick={handleCopyLink}
-                className={`py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                className={`min-h-[44px] py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95 ${
                   copiedLink
                     ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/30'
                     : 'bg-[#1976D2] hover:bg-blue-700 text-white shadow-sm shadow-blue-600/30'
@@ -1041,7 +1053,7 @@ export const CustomerFeedbackManager: React.FC = () => {
                 )}`}
                 target="_blank"
                 rel="noreferrer"
-                className="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm shadow-emerald-600/30 transition-all text-center"
+                className="min-h-[44px] py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm shadow-emerald-600/30 transition-all text-center active:scale-95"
               >
                 <span>WhatsApp</span>
               </a>
@@ -1050,7 +1062,7 @@ export const CustomerFeedbackManager: React.FC = () => {
                 href={getFeedbackLink()}
                 target="_blank"
                 rel="noreferrer"
-                className="py-2.5 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center justify-center gap-2 transition-all text-center"
+                className="min-h-[44px] py-2.5 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center justify-center gap-2 transition-all text-center active:scale-95"
               >
                 <ExternalLink className="w-4 h-4 text-slate-500" />
                 <span>Open Form</span>

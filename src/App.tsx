@@ -827,7 +827,7 @@ export const AppContent: React.FC = () => {
 
           {/* Main Content Canvas */}
           <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ease-in-out ${isSidebarOpen ? 'lg:pl-[240px]' : 'lg:pl-0'}`}>
-            <main className="flex-1 p-4 sm:p-6 lg:p-7 max-w-[1600px] w-full mx-auto pb-20 md:pb-7">
+            <main className="flex-1 p-3 sm:p-6 lg:p-7 max-w-[1600px] w-full mx-auto safe-bottom-nav-spacer md:pb-8">
               <ErrorBoundary key={`${currentRole}-${activeTab}`} fallbackTitle="View Failed to Render">
                 <Suspense fallback={<ViewLoadingFallback />}>
                   {renderMainContent()}
@@ -836,20 +836,20 @@ export const AppContent: React.FC = () => {
             </main>
 
             {/* Clean Corporate Footer */}
-            <footer className="bg-white border-t border-slate-200 py-4 px-6 text-xs text-slate-500 no-print flex flex-col sm:flex-row items-center justify-between gap-3 mb-16 md:mb-0">
+            <footer className="bg-white border-t border-slate-200 py-4 px-4 sm:px-6 text-xs text-slate-500 no-print flex flex-col sm:flex-row items-center justify-between gap-3 mb-20 md:mb-0 safe-bottom">
               <div className="flex items-center gap-2.5">
-                <div className="flex items-center gap-2 font-medium">
+                <div className="flex items-center gap-2 font-medium flex-wrap justify-center sm:justify-start">
                   <span className="font-bold text-[#0E2238] text-xs">WEPSUN Lift Services</span>
                   <span className="text-slate-300">|</span>
                   <span className="text-slate-600">Reliable Service. Safer Tomorrow.</span>
                 </div>
               </div>
-              <div className="flex items-center gap-4 text-[11px] font-mono">
+              <div className="flex items-center gap-3 sm:gap-4 text-[11px] font-mono flex-wrap justify-center sm:justify-end">
                 <span className="flex items-center gap-1.5 text-slate-600">
                   <PhoneCall className="w-3.5 h-3.5 text-[#1976D2]" />
                   24x7 Control Room: +91 98201 55432
                 </span>
-                <span className="text-slate-300">•</span>
+                <span className="text-slate-300 hidden sm:inline">•</span>
                 <span className="capitalize">{currentRole.replace('_', ' ')} Dashboard</span>
               </div>
             </footer>

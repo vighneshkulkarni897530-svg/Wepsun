@@ -1135,8 +1135,8 @@ export const InventoryManager: React.FC = () => {
 
       {/* MODAL 1: Record Transaction Modal */}
       {isMovementModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl text-slate-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 max-w-md w-full space-y-4 shadow-2xl text-slate-800 max-h-[90dvh] overflow-y-auto">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <History className="w-5 h-5 text-[#1976D2]" />
@@ -1144,7 +1144,8 @@ export const InventoryManager: React.FC = () => {
               </h3>
               <button
                 onClick={() => setIsMovementModalOpen(false)}
-                className="text-slate-400 hover:text-slate-800 p-1 rounded-lg hover:bg-slate-100"
+                className="text-slate-400 hover:text-slate-800 p-2 rounded-xl hover:bg-slate-100 min-w-[36px] min-h-[36px] flex items-center justify-center transition-colors"
+                aria-label="Close modal"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1261,8 +1262,8 @@ export const InventoryManager: React.FC = () => {
 
       {/* MODAL 2: Add New Spare Part Modal */}
       {isAddPartModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-lg w-full space-y-4 shadow-2xl text-slate-800 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 max-w-lg w-full space-y-4 shadow-2xl text-slate-800 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <Package className="w-5 h-5 text-[#1976D2]" />
@@ -1270,7 +1271,8 @@ export const InventoryManager: React.FC = () => {
               </h3>
               <button
                 onClick={() => setIsAddPartModalOpen(false)}
-                className="text-slate-400 hover:text-slate-800 p-1 rounded-lg hover:bg-slate-100"
+                className="text-slate-400 hover:text-slate-800 p-2 rounded-xl hover:bg-slate-100 min-w-[36px] min-h-[36px] flex items-center justify-center transition-colors"
+                aria-label="Close modal"
               >
                 <X className="w-4 h-4" />
               </button>

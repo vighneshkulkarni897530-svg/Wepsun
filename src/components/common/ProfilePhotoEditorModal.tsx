@@ -371,20 +371,20 @@ export const ProfilePhotoEditorModal: React.FC<ProfilePhotoEditorModalProps> = (
       />
 
       {/* Modern Card Modal */}
-      <div className="relative z-10 w-full max-w-[460px] sm:max-w-[500px] bg-white border border-slate-200/90 rounded-[32px] shadow-[0_25px_60px_-15px_rgba(11,37,69,0.4)] overflow-hidden flex flex-col max-h-[92vh]">
+      <div className="relative z-10 w-full max-w-[460px] sm:max-w-[500px] bg-white border border-slate-200/90 rounded-[24px] sm:rounded-[32px] shadow-[0_25px_60px_-15px_rgba(11,37,69,0.4)] overflow-hidden flex flex-col max-h-[92dvh] sm:max-h-[92vh]">
         {/* ========================================================================= */}
         {/* MODAL HEADER */}
         {/* ========================================================================= */}
-        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 via-white to-blue-50/40 shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#0066FF] flex items-center justify-center shadow-2xs">
+        <div className="p-3.5 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 via-white to-blue-50/40 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#0066FF] flex items-center justify-center shadow-2xs shrink-0">
               <GeometricBlueWLogo className="w-4 h-3.5" />
             </div>
             <div>
-              <h2 id="photo-editor-title" className="text-sm sm:text-base font-black text-[#0b2545] tracking-tight">
-                UPDATE PROFILE PHOTO
+              <h2 id="photo-editor-title" className="text-xs sm:text-base font-black text-[#0b2545] tracking-tight uppercase">
+                Update Profile Photo
               </h2>
-              <p className="text-[11px] text-slate-500 font-medium">
+              <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium line-clamp-1">
                 Drag, zoom and rotate your photo to fit the frame
               </p>
             </div>
@@ -397,26 +397,26 @@ export const ProfilePhotoEditorModal: React.FC<ProfilePhotoEditorModalProps> = (
               onClose();
             }}
             aria-label="Close photo editor"
-            className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer active:scale-95"
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer active:scale-95 shrink-0"
           >
-            <X className="w-4 h-4" />
+            <X className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
 
         {/* ========================================================================= */}
         {/* MODAL BODY */}
         {/* ========================================================================= */}
-        <div className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1 scrollbar-thin">
+        <div className="p-3 sm:p-6 overflow-y-auto space-y-4 sm:space-y-5 flex-1 scrollbar-thin">
           {/* VIEW: MAIN PHOTO EDITOR WITH DRAG, ZOOM & ROTATION */}
           {viewMode === 'editor' && (
             <>
               {/* Top Quick Actions Bar (Upload new, Camera, Presets, Remove) */}
-              <div className="flex items-center justify-between gap-2 pb-1">
-                <div className="flex items-center gap-1.5">
+              <div className="flex flex-wrap items-center justify-between gap-1.5 pb-1">
+                <div className="flex flex-wrap items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                    className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10.5px] sm:text-[11px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
                   >
                     <Upload className="w-3.5 h-3.5 text-[#0066FF]" />
                     <span>Upload New</span>
@@ -425,7 +425,7 @@ export const ProfilePhotoEditorModal: React.FC<ProfilePhotoEditorModalProps> = (
                   <button
                     type="button"
                     onClick={handleStartCamera}
-                    className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                    className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10.5px] sm:text-[11px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
                   >
                     <Camera className="w-3.5 h-3.5 text-[#0066FF]" />
                     <span>Camera</span>
@@ -434,7 +434,7 @@ export const ProfilePhotoEditorModal: React.FC<ProfilePhotoEditorModalProps> = (
                   <button
                     type="button"
                     onClick={() => setViewMode('presets')}
-                    className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                    className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10.5px] sm:text-[11px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
                   >
                     <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                     <span>Presets</span>
@@ -685,7 +685,7 @@ export const ProfilePhotoEditorModal: React.FC<ProfilePhotoEditorModalProps> = (
                 Select an official avatar to adjust and apply to your profile:
               </p>
 
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 sm:gap-3">
                 {PRESET_AVATARS.map((url, i) => (
                   <button
                     key={i}
@@ -695,7 +695,7 @@ export const ProfilePhotoEditorModal: React.FC<ProfilePhotoEditorModalProps> = (
                       handleReset();
                       setViewMode('editor');
                     }}
-                    className="w-16 h-16 rounded-full overflow-hidden ring-2 ring-transparent hover:ring-[#0066FF] hover:scale-105 transition-all shadow-sm cursor-pointer mx-auto"
+                    className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden ring-2 ring-transparent hover:ring-[#0066FF] hover:scale-105 transition-all shadow-sm cursor-pointer mx-auto"
                   >
                     <img src={url} alt={`Preset ${i}`} className="w-full h-full object-cover" />
                   </button>
@@ -706,7 +706,7 @@ export const ProfilePhotoEditorModal: React.FC<ProfilePhotoEditorModalProps> = (
                 <button
                   type="button"
                   onClick={() => setViewMode('editor')}
-                  className="px-4 py-2 rounded-2xl border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-100 cursor-pointer"
+                  className="min-h-[40px] px-4 py-2 rounded-2xl border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-100 cursor-pointer active:scale-95 transition-all"
                 >
                   Back to Editor
                 </button>
@@ -727,14 +727,14 @@ export const ProfilePhotoEditorModal: React.FC<ProfilePhotoEditorModalProps> = (
         {/* ========================================================================= */}
         {/* MODAL BOTTOM ACTION BUTTONS */}
         {/* ========================================================================= */}
-        <div className="p-4 sm:p-5 border-t border-slate-100 bg-slate-50/70 flex items-center justify-between gap-3 shrink-0">
+        <div className="p-3.5 sm:p-5 border-t border-slate-100 bg-slate-50/70 flex items-center justify-between gap-2.5 sm:gap-3 shrink-0">
           <button
             type="button"
             onClick={() => {
               stopCamera();
               onClose();
             }}
-            className="flex-1 py-3 px-4 rounded-2xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold transition-all cursor-pointer active:scale-95 text-center"
+            className="flex-1 min-h-[44px] py-2.5 sm:py-3 px-3 sm:px-4 rounded-2xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold transition-all cursor-pointer active:scale-95 text-center"
           >
             Cancel
           </button>
@@ -743,10 +743,10 @@ export const ProfilePhotoEditorModal: React.FC<ProfilePhotoEditorModalProps> = (
             type="button"
             disabled={!currentImage}
             onClick={handleApplyCrop}
-            className="flex-1 py-3 px-5 rounded-2xl bg-[#0066FF] hover:bg-[#0052cc] disabled:opacity-50 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+            className="flex-1 min-h-[44px] py-2.5 sm:py-3 px-3 sm:px-5 rounded-2xl bg-[#0066FF] hover:bg-[#0052cc] disabled:opacity-50 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/20 flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer active:scale-95"
           >
-            <Check className="w-4 h-4" />
-            <span>✓ Apply Photo</span>
+            <Check className="w-4 h-4 shrink-0" />
+            <span className="truncate">✓ Apply Photo</span>
           </button>
         </div>
       </div>

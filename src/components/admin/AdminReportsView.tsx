@@ -119,7 +119,7 @@ export const AdminReportsView: React.FC = () => {
           <span>Report Filters</span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2.5 text-xs">
           {/* Date Filter */}
           <div>
             <label className="text-[10px] font-semibold text-slate-500 uppercase block mb-1">Date Period</label>
@@ -245,8 +245,91 @@ export const AdminReportsView: React.FC = () => {
         </div>
       </div>
 
-      {/* Dynamic Report Content Table */}
-      <div className="bg-white border border-slate-200/90 rounded-2xl shadow-sm overflow-hidden">
+      {/* Dynamic Report Content - Mobile Cards (< md) */}
+      <div className="block md:hidden space-y-3">
+        {[
+          {
+            id: '#CMP-10245',
+            site: 'WEPSUN-001 (Skyline Towers)',
+            desc: 'Door sensor alignment & IR beam recalibration',
+            tech: 'Raj Kumar',
+            dateTime: '21 Sep 2026, 10:30 AM',
+            sla: '35 mins',
+            status: 'RESOLVED',
+            statusColor: 'bg-emerald-100 text-emerald-700',
+          },
+          {
+            id: '#SR-10025',
+            site: 'WEPSUN-002 (Sunrise Apts)',
+            desc: 'Routine Monthly Preventive Maintenance (28 Points)',
+            tech: 'Ramesh Kumar',
+            dateTime: '20 Sep 2026, 02:15 PM',
+            sla: '45 mins',
+            status: 'COMPLETED',
+            statusColor: 'bg-blue-100 text-blue-700',
+          },
+          {
+            id: '#EMG-10021',
+            site: 'WEPSUN-004 (Royal Residency)',
+            desc: 'Passenger entrapment between 4th & 5th floor - ARD failure',
+            tech: 'Ajay Singh',
+            dateTime: '18 Sep 2026, 08:45 PM',
+            sla: '18 mins',
+            status: 'CLOSED',
+            statusColor: 'bg-emerald-100 text-emerald-700',
+          },
+          {
+            id: '#QT-10025',
+            site: 'WEPSUN-001 (Skyline Towers)',
+            desc: 'Door Optical Sensor Replacement Kit + Bracket',
+            tech: 'Service Desk',
+            dateTime: '16 Sep 2026, 11:20 AM',
+            sla: '—',
+            status: 'APPROVED',
+            statusColor: 'bg-purple-100 text-purple-700',
+          },
+          {
+            id: '#AMC-2026-09',
+            site: 'WEPSUN-005 (Green Valley)',
+            desc: 'Comprehensive AMC Contract Renewal (1 Year)',
+            tech: 'Finance Dept',
+            dateTime: '15 Sep 2026, 04:00 PM',
+            sla: '—',
+            status: 'ACTIVE 🟢',
+            statusColor: 'bg-emerald-100 text-emerald-700',
+          },
+        ].map((rec) => (
+          <div
+            key={rec.id}
+            className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-sm space-y-2.5 text-xs"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-mono font-bold text-[#1976D2]">{rec.id}</span>
+              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${rec.statusColor}`}>
+                {rec.status}
+              </span>
+            </div>
+            <div>
+              <div className="font-bold text-slate-900">{rec.site}</div>
+              <p className="text-slate-600 mt-0.5">{rec.desc}</p>
+            </div>
+            <div className="bg-[#F5F8FA] p-2.5 rounded-xl border border-slate-200/70 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+              <div>
+                <span className="text-slate-400">Tech: </span>
+                <span className="font-semibold text-slate-800">{rec.tech}</span>
+              </div>
+              <div>
+                <span className="text-slate-400">SLA: </span>
+                <span className="font-mono font-bold text-emerald-600">{rec.sla}</span>
+              </div>
+              <div className="w-full text-slate-400 font-mono text-[10px]">{rec.dateTime}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Dynamic Report Content Table - Desktop (>= md) */}
+      <div className="hidden md:block bg-white border border-slate-200/90 rounded-2xl shadow-sm overflow-hidden">
         <div className="p-4 border-b border-slate-200 flex items-center justify-between">
           <h3 className="font-bold text-sm text-slate-900 capitalize">
             {activeReport.replace('_', ' ')} Master Log
@@ -254,7 +337,7 @@ export const AdminReportsView: React.FC = () => {
           <span className="text-xs text-slate-500">Showing 5 of 128 records</span>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto table-scroll-container">
           <table className="w-full text-left text-xs">
             <thead className="bg-[#F5F8FA] text-slate-600 font-bold uppercase text-[10px] border-b border-slate-200">
               <tr>

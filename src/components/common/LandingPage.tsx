@@ -283,22 +283,22 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </nav>
 
         {/* Right Navigation & Hamburger Menu */}
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           {/* Sign In Button (Visible on all screens: Mobile & Desktop) */}
           <button
             type="button"
             onClick={() => setAuthScreen('signin')}
-            className="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 rounded-full bg-[#0066FF] hover:bg-[#0052cc] text-white text-xs sm:text-sm font-bold transition-all shadow-sm shadow-blue-500/25 active:scale-95 cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-full bg-[#0066FF] hover:bg-[#0052cc] text-white text-xs sm:text-sm font-bold transition-all shadow-sm shadow-blue-500/25 active:scale-95 cursor-pointer"
           >
-            <LogIn className="w-3.5 h-3.5" />
+            <LogIn className="w-3.5 h-3.5 shrink-0" />
             <span>Sign In</span>
           </button>
 
-          {/* Quick Sign Up Button (Visible on all screens beside Sign In) */}
+          {/* Quick Sign Up Button (hidden on narrow 320px screens, visible on xs+) */}
           <button
             type="button"
             onClick={() => setAuthScreen('signup')}
-            className="inline-flex px-3 sm:px-4 py-1.5 rounded-full border border-slate-300 hover:border-slate-400 bg-white text-slate-800 text-xs sm:text-sm font-semibold hover:bg-slate-50 transition-all shadow-sm active:scale-95 cursor-pointer"
+            className="hidden xs:inline-flex px-3 sm:px-4 py-1.5 rounded-full border border-slate-300 hover:border-slate-400 bg-white text-slate-800 text-xs sm:text-sm font-semibold hover:bg-slate-50 transition-all shadow-sm active:scale-95 cursor-pointer"
           >
             Sign Up
           </button>
@@ -307,9 +307,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <button
             type="button"
             onClick={() => setIsDrawerOpen(true)}
-            className="p-1.5 sm:p-2 rounded-xl text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
+            className="p-1.5 sm:p-2 min-w-[42px] min-h-[42px] flex items-center justify-center rounded-xl text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer active:scale-95"
             title="Menu"
-            aria-label="Menu"
+            aria-label="Open Navigation Menu"
           >
             <Menu className="w-6 h-6 text-[#0b2545]" />
           </button>
@@ -1253,10 +1253,146 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   <Phone className="w-3.5 h-3.5" />
                   <span>Direct Hotline: +91 8595940077</span>
                 </a>
-                <span className="text-[11px] text-slate-400 font-medium">24x7 Support</span>
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MOBILE NAVIGATION DRAWER */}
+      {/* ========================================================================= */}
+      {isDrawerOpen && (
+        <div className="fixed inset-0 z-50 flex justify-end animate-in fade-in duration-200">
+          {/* Backdrop */}
+          <div
+            onClick={() => setIsDrawerOpen(false)}
+            className="fixed inset-0 bg-slate-950/65 backdrop-blur-sm"
+          />
+
+          {/* Drawer Surface */}
+          <aside
+            aria-label="Mobile Navigation"
+            className="relative z-10 w-full max-w-[300px] sm:max-w-xs bg-white h-full shadow-2xl flex flex-col justify-between p-5 overflow-y-auto safe-top safe-bottom select-none animate-in slide-in-from-right duration-250"
+          >
+            <div>
+              {/* Drawer Header */}
+              <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <GeometricBlueWLogo className="w-8 h-6.5 shrink-0" />
+                  <div className="flex flex-col leading-none">
+                    <span className="font-sans font-black text-lg text-[#0b2545] tracking-tight">
+                      WEPSUN
+                    </span>
+                    <span className="font-sans font-bold text-[7px] text-slate-600 tracking-[0.2em] mt-0.5">
+                      ENGINEERING SOLUTION
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsDrawerOpen(false)}
+                  className="w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-all cursor-pointer active:scale-90"
+                  aria-label="Close menu"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Navigation Links */}
+              <div className="py-6 space-y-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDrawerOpen(false);
+                    const el = document.getElementById('services-section');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-blue-50/70 text-slate-800 hover:text-[#0066FF] font-bold text-sm text-left transition-colors cursor-pointer"
+                >
+                  <span>Our Services</span>
+                  <ChevronRight className="w-4 h-4 text-slate-400" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDrawerOpen(false);
+                    const el = document.getElementById('about-section');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-blue-50/70 text-slate-800 hover:text-[#0066FF] font-bold text-sm text-left transition-colors cursor-pointer"
+                >
+                  <span>About Us</span>
+                  <ChevronRight className="w-4 h-4 text-slate-400" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDrawerOpen(false);
+                    const el = document.getElementById('why-us-section');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-blue-50/70 text-slate-800 hover:text-[#0066FF] font-bold text-sm text-left transition-colors cursor-pointer"
+                >
+                  <span>Why Choose Us</span>
+                  <ChevronRight className="w-4 h-4 text-slate-400" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDrawerOpen(false);
+                    handleServiceQuoteFlow('Turnkey Lift Installation');
+                  }}
+                  className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-blue-50/70 text-slate-800 hover:text-[#0066FF] font-bold text-sm text-left transition-colors cursor-pointer"
+                >
+                  <span>Request Custom Quote</span>
+                  <ChevronRight className="w-4 h-4 text-slate-400" />
+                </button>
+              </div>
+            </div>
+
+            {/* Bottom Actions & Support info */}
+            <div className="pt-4 border-t border-slate-100 space-y-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDrawerOpen(false);
+                  setAuthScreen('signin');
+                }}
+                className="w-full py-3 rounded-2xl bg-[#0066FF] hover:bg-[#0052cc] text-white font-bold text-sm flex items-center justify-center gap-2 shadow-md shadow-blue-500/20 transition-all cursor-pointer active:scale-95"
+              >
+                <LogIn className="w-4 h-4" />
+                <span>Sign In to Portal</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDrawerOpen(false);
+                  setAuthScreen('signup');
+                }}
+                className="w-full py-3 rounded-2xl border border-slate-300 hover:border-slate-400 bg-white text-slate-800 font-bold text-sm flex items-center justify-center gap-2 hover:bg-slate-50 transition-all cursor-pointer active:scale-95 shadow-xs"
+              >
+                <span>Create New Account</span>
+              </button>
+
+              <a
+                href="tel:+918595940077"
+                className="flex items-center justify-center gap-2 p-3 rounded-2xl bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-xs transition-colors"
+              >
+                <Phone className="w-4 h-4 text-[#0066FF]" />
+                <span>Hotline: +91 8595940077</span>
+              </a>
+
+              <p className="text-[10px] text-slate-400 text-center">
+                ISO 9001:2015 Certified Elevator OEM
+              </p>
+            </div>
+          </aside>
         </div>
       )}
     </div>

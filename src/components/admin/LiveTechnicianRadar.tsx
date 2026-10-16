@@ -63,7 +63,7 @@ export const LiveTechnicianRadar: React.FC = () => {
           </div>
 
           {/* Interactive Simulated Markers */}
-          <div className="relative z-10 my-auto grid grid-cols-2 gap-4 py-8">
+          <div className="relative z-10 my-auto grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 py-4 sm:py-8">
             {technicians.map((tech) => {
               const isSelected = tech.id === selectedTech?.id;
               return (

@@ -61,29 +61,32 @@ export const ServiceReportModal: React.FC<ServiceReportModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-sm overflow-y-auto animate-fade-in">
-      <div className="bg-white border border-slate-200 rounded-3xl max-w-4xl w-full p-5 sm:p-7 shadow-2xl relative text-slate-800 my-auto flex flex-col gap-6 max-h-[92vh] overflow-y-auto">
+      <div className="bg-white border border-slate-200 rounded-3xl max-w-4xl w-full p-4 sm:p-7 shadow-2xl relative text-slate-800 my-auto flex flex-col gap-5 sm:gap-6 max-h-[92dvh] overflow-y-auto">
         {/* Modal Actions Bar (hidden in print) */}
         <div className="no-print flex items-center justify-between pb-3 border-b border-slate-100">
           <div className="flex items-center gap-2">
             <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-[#2E7D32] border border-emerald-200 text-xs font-mono font-bold">
               VERIFIED SERVICE REPORT
             </span>
-            <span className="text-xs text-slate-500 font-mono">
+            <span className="text-xs text-slate-500 font-mono hidden sm:inline">
               ID: {report.reportNumber}
             </span>
           </div>
 
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#1976D2] hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-sm"
+              className="inline-flex items-center gap-1.5 min-h-[40px] px-3.5 py-1.5 rounded-xl bg-[#1976D2] hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-sm cursor-pointer active:scale-95"
             >
-              <Printer className="w-3.5 h-3.5" />
+              <Printer className="w-3.5 h-3.5 shrink-0" />
               <span>Print / Save PDF</span>
             </button>
             <button
+              type="button"
               onClick={onClose}
-              className="p-1.5 rounded-xl text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors"
+              aria-label="Close service report"
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer active:scale-95"
             >
               <X className="w-5 h-5" />
             </button>

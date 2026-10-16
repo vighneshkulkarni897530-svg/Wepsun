@@ -14,6 +14,7 @@ import {
   DollarSign,
   Search,
   Filter,
+  X,
 } from 'lucide-react';
 import { WorkOrder, WorkOrderStatus, WorkOrderPriority } from '../../types';
 
@@ -270,9 +271,17 @@ export const WorkOrderManager: React.FC = () => {
 
       {/* Create Work Order Modal */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-lg w-full space-y-4 shadow-2xl text-slate-800">
-            <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 max-w-lg w-full space-y-4 shadow-2xl text-slate-800 relative max-h-[92vh] overflow-y-auto">
+            <button
+              onClick={() => setIsCreateModalOpen(false)}
+              className="absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-slate-800 hover:bg-slate-100 min-w-[36px] min-h-[36px] flex items-center justify-center transition-colors"
+              aria-label="Close modal"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2 pr-8">
               <ClipboardList className="w-5 h-5 text-[#1976D2]" />
               Create Direct Work Order
             </h3>
