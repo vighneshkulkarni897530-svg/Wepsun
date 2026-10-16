@@ -298,7 +298,7 @@ export const InventoryManager: React.FC = () => {
   return (
     <div className="space-y-6 text-slate-800">
       {/* Top Header Banner matching PRD Section 9 */}
-      <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 shadow-sm space-y-4">
+      <div className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl p-4 sm:p-7 shadow-sm space-y-4">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
             <div className="w-12 h-12 rounded-2xl bg-[#123B5D] text-white flex items-center justify-center font-bold shadow-md shadow-blue-900/20 shrink-0">
@@ -323,14 +323,14 @@ export const InventoryManager: React.FC = () => {
           <div className="flex items-center gap-2 w-full md:w-auto">
             <button
               onClick={() => setIsAddPartModalOpen(true)}
-              className="flex-1 md:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs border border-slate-200 shadow-sm transition-colors"
+              className="flex-1 md:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs border border-slate-200 shadow-sm transition-colors min-h-[44px] touch-manipulation cursor-pointer"
             >
               <Plus className="w-4 h-4 text-[#1976D2]" />
               <span>Add New Part</span>
             </button>
             <button
               onClick={() => setIsMovementModalOpen(true)}
-              className="flex-1 md:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#123B5D] hover:bg-[#0e2f4a] text-white font-bold text-xs shadow-md shadow-blue-900/20 transition-all"
+              className="flex-1 md:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#123B5D] hover:bg-[#0e2f4a] text-white font-bold text-xs shadow-md shadow-blue-900/20 transition-all min-h-[44px] touch-manipulation cursor-pointer"
             >
               <RefreshCw className="w-4 h-4 text-sky-300" />
               <span>Record Stock Movement</span>
@@ -339,70 +339,70 @@ export const InventoryManager: React.FC = () => {
         </div>
 
         {/* 4 Summary KPI Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 pt-2">
           {/* Card 1: Total SKUs */}
-          <div className="bg-[#F5F8FA] border border-slate-200 rounded-2xl p-4 space-y-1">
-            <span className="text-[10px] uppercase font-mono font-bold text-slate-500 block">Total Catalog SKUs</span>
-            <span className="text-2xl font-black font-mono text-slate-900 block">{totalSkuCount} Parts</span>
-            <span className="text-[11px] text-slate-500">{totalStockUnits} Total units in store</span>
+          <div className="bg-[#F5F8FA] border border-slate-200 rounded-2xl p-3 sm:p-4 space-y-1">
+            <span className="text-[10px] uppercase font-mono font-bold text-slate-500 block truncate">Total Catalog SKUs</span>
+            <span className="text-xl sm:text-2xl font-black font-mono text-slate-900 block truncate">{totalSkuCount} Parts</span>
+            <span className="text-[11px] text-slate-500 truncate block">{totalStockUnits} Total units in store</span>
           </div>
 
           {/* Card 2: Low Stock Alerts */}
           <div
             onClick={() => setActiveTab('low_stock')}
-            className={`border rounded-2xl p-4 space-y-1 cursor-pointer transition-all ${
+            className={`border rounded-2xl p-3 sm:p-4 space-y-1 cursor-pointer transition-all touch-manipulation ${
               lowStockItems.length > 0
                 ? 'bg-amber-50/80 border-amber-300 text-amber-900 hover:bg-amber-100'
                 : 'bg-[#F5F8FA] border-slate-200 text-slate-700'
             }`}
           >
-            <span className="text-[10px] uppercase font-mono font-bold text-amber-700 block flex items-center gap-1">
-              <AlertTriangle className="w-3 h-3" /> Min-Stock Alerts
+            <span className="text-[10px] uppercase font-mono font-bold text-amber-700 block flex items-center gap-1 truncate">
+              <AlertTriangle className="w-3 h-3 shrink-0" /> Min-Stock Alerts
             </span>
-            <span className="text-2xl font-black font-mono text-amber-600 block">
+            <span className="text-xl sm:text-2xl font-black font-mono text-amber-600 block truncate">
               {lowStockItems.length} Urgent Reorders
             </span>
-            <span className="text-[11px] font-semibold text-amber-800">Below safety threshold</span>
+            <span className="text-[11px] font-semibold text-amber-800 truncate block">Below safety threshold</span>
           </div>
 
           {/* Card 3: Stock Valuation (Cost) */}
-          <div className="bg-[#F5F8FA] border border-slate-200 rounded-2xl p-4 space-y-1">
-            <span className="text-[10px] uppercase font-mono font-bold text-slate-500 block">Stock Value (At Cost)</span>
-            <span className="text-2xl font-black font-mono text-[#1976D2] block">
+          <div className="bg-[#F5F8FA] border border-slate-200 rounded-2xl p-3 sm:p-4 space-y-1">
+            <span className="text-[10px] uppercase font-mono font-bold text-slate-500 block truncate">Stock Value (At Cost)</span>
+            <span className="text-xl sm:text-2xl font-black font-mono text-[#1976D2] block truncate">
               ₹{totalValuationCost.toLocaleString('en-IN')}
             </span>
-            <span className="text-[11px] text-slate-500">Inventory asset value</span>
+            <span className="text-[11px] text-slate-500 truncate block">Inventory asset value</span>
           </div>
 
           {/* Card 4: Retail Value */}
-          <div className="bg-[#F5F8FA] border border-slate-200 rounded-2xl p-4 space-y-1">
-            <span className="text-[10px] uppercase font-mono font-bold text-slate-500 block">Retail Quotation Value</span>
-            <span className="text-2xl font-black font-mono text-emerald-600 block">
+          <div className="bg-[#F5F8FA] border border-slate-200 rounded-2xl p-3 sm:p-4 space-y-1">
+            <span className="text-[10px] uppercase font-mono font-bold text-slate-500 block truncate">Retail Quotation Value</span>
+            <span className="text-xl sm:text-2xl font-black font-mono text-emerald-600 block truncate">
               ₹{totalValuationSelling.toLocaleString('en-IN')}
             </span>
-            <span className="text-[11px] text-emerald-700 font-semibold">
-              +₹{(totalValuationSelling - totalValuationCost).toLocaleString('en-IN')} Profit potential
+            <span className="text-[11px] text-emerald-700 font-semibold truncate block">
+              +₹{(totalValuationSelling - totalValuationCost).toLocaleString('en-IN')} Profit
             </span>
           </div>
         </div>
 
         {/* 7 Navigation Tabs matching PRD Section 9 */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pt-2 border-t border-slate-100 scrollbar-thin">
+        <div className="flex items-center gap-1.5 overflow-x-auto touch-pan-x scrollbar-none pt-2 border-t border-slate-100 pb-1">
           <button
             onClick={() => setActiveTab('stock')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 min-h-[40px] touch-manipulation cursor-pointer ${
               activeTab === 'stock'
                 ? 'bg-[#1976D2] text-white shadow-sm'
                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
             }`}
           >
-            <Package className="w-4 h-4" />
-            <span>1. Live Stock Catalog ({tenantInventory.length})</span>
+            <Package className="w-4 h-4 shrink-0" />
+            <span className="whitespace-nowrap">1. Live Stock Catalog ({tenantInventory.length})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('low_stock')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 min-h-[40px] touch-manipulation cursor-pointer ${
               activeTab === 'low_stock'
                 ? 'bg-[#D32F2F] text-white shadow-sm'
                 : lowStockItems.length > 0
@@ -410,68 +410,68 @@ export const InventoryManager: React.FC = () => {
                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
             }`}
           >
-            <AlertTriangle className="w-4 h-4" />
-            <span>2. Min-Stock Alerts ({lowStockItems.length})</span>
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span className="whitespace-nowrap">2. Min-Stock Alerts ({lowStockItems.length})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('tech_issued')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 min-h-[40px] touch-manipulation cursor-pointer ${
               activeTab === 'tech_issued'
                 ? 'bg-[#1976D2] text-white shadow-sm'
                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
             }`}
           >
-            <Wrench className="w-4 h-4" />
-            <span>3. Issued to Technicians ({techIssuedMovements.length})</span>
+            <Wrench className="w-4 h-4 shrink-0" />
+            <span className="whitespace-nowrap">3. Issued to Technicians ({techIssuedMovements.length})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('job_consumed')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 min-h-[40px] touch-manipulation cursor-pointer ${
               activeTab === 'job_consumed'
                 ? 'bg-[#1976D2] text-white shadow-sm'
                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
             }`}
           >
-            <Layers className="w-4 h-4" />
-            <span>4. Job Consumption Ledger ({jobConsumedMovements.length})</span>
+            <Layers className="w-4 h-4 shrink-0" />
+            <span className="whitespace-nowrap">4. Job Consumption Ledger ({jobConsumedMovements.length})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('suppliers')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 min-h-[40px] touch-manipulation cursor-pointer ${
               activeTab === 'suppliers'
                 ? 'bg-[#1976D2] text-white shadow-sm'
                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
             }`}
           >
-            <Building className="w-4 h-4" />
-            <span>5. Suppliers & Purchase Records ({suppliersList.length})</span>
+            <Building className="w-4 h-4 shrink-0" />
+            <span className="whitespace-nowrap">5. Suppliers & Purchase Records ({suppliersList.length})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('movements')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 min-h-[40px] touch-manipulation cursor-pointer ${
               activeTab === 'movements'
                 ? 'bg-[#1976D2] text-white shadow-sm'
                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
             }`}
           >
-            <History className="w-4 h-4" />
-            <span>6. Full Audit Ledger ({tenantMovements.length})</span>
+            <History className="w-4 h-4 shrink-0" />
+            <span className="whitespace-nowrap">6. Full Audit Ledger ({tenantMovements.length})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('reports')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 min-h-[40px] touch-manipulation cursor-pointer ${
               activeTab === 'reports'
                 ? 'bg-[#1976D2] text-white shadow-sm'
                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
             }`}
           >
-            <BarChart3 className="w-4 h-4" />
-            <span>7. Stock & Consumption Reports</span>
+            <BarChart3 className="w-4 h-4 shrink-0" />
+            <span className="whitespace-nowrap">7. Stock & Consumption Reports</span>
           </button>
         </div>
       </div>

@@ -246,7 +246,7 @@ export const ComplaintManager: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
           <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl relative text-slate-800 flex flex-col gap-4 max-h-[90dvh] overflow-y-auto">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-[#1976D2]">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-[#1976D2] shrink-0">
                 <UserCheck className="w-5 h-5" />
               </div>
               <div>
@@ -312,7 +312,7 @@ export const ComplaintManager: React.FC = () => {
                   value={etaInput}
                   onChange={(e) => setEtaInput(e.target.value)}
                   placeholder="e.g. Within 30 mins (En Route)"
-                  className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-slate-900 focus:border-[#1976D2] outline-none"
+                  className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-slate-900 focus:border-[#1976D2] outline-none min-h-[42px]"
                 />
               </div>
 

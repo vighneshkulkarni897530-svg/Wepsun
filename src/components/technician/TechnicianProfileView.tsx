@@ -169,41 +169,41 @@ export const TechnicianProfileView: React.FC<TechnicianProfileViewProps> = ({
           </div>
 
           {/* Sync & Actions Controls */}
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
             <button
               onClick={() => setIsEditing(true)}
-              className="px-3.5 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-800 text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+              className="px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-800 text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm min-h-[44px] touch-manipulation cursor-pointer"
             >
-              <Edit3 className="w-3.5 h-3.5 text-[#1976D2]" />
+              <Edit3 className="w-3.5 h-3.5 text-[#1976D2] shrink-0" />
               <span>Edit Profile</span>
             </button>
 
             <button
               onClick={toggleOfflineMode}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border cursor-pointer ${
+              className={`px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border min-h-[44px] touch-manipulation cursor-pointer ${
                 isOfflineMode
                   ? 'bg-amber-50 text-amber-800 border-amber-300'
                   : 'bg-emerald-50 text-emerald-800 border-emerald-300'
               }`}
             >
-              {isOfflineMode ? <WifiOff className="w-4 h-4 text-amber-600" /> : <Wifi className="w-4 h-4 text-emerald-600" />}
-              <span>{isOfflineMode ? 'Offline Mode (Local Cache)' : 'Online Connected'}</span>
+              {isOfflineMode ? <WifiOff className="w-4 h-4 text-amber-600 shrink-0" /> : <Wifi className="w-4 h-4 text-emerald-600 shrink-0" />}
+              <span className="truncate">{isOfflineMode ? 'Offline Mode' : 'Online'}</span>
             </button>
 
             <button
               onClick={handleManualSync}
               disabled={isSyncing}
-              className="px-4 py-2 rounded-xl bg-[#1976D2] hover:bg-blue-700 text-white text-xs font-black shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 sm:px-4 py-2.5 rounded-xl bg-[#1976D2] hover:bg-blue-700 text-white text-xs font-black shadow-sm transition-all flex items-center justify-center gap-1.5 min-h-[44px] touch-manipulation cursor-pointer"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-              <span>{isSyncing ? 'Syncing...' : 'Sync Cloud Data'}</span>
+              <RefreshCw className={`w-3.5 h-3.5 shrink-0 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span>{isSyncing ? 'Syncing...' : 'Sync Cloud'}</span>
             </button>
 
             <button
               onClick={() => showLogoutModal(() => logout())}
-              className="px-3.5 py-2 rounded-xl bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+              className="px-3.5 py-2.5 rounded-xl bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm min-h-[44px] touch-manipulation cursor-pointer"
             >
-              <LogOut className="w-3.5 h-3.5 text-rose-600" />
+              <LogOut className="w-3.5 h-3.5 text-rose-600 shrink-0" />
               <span>Log Out</span>
             </button>
           </div>

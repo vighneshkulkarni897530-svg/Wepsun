@@ -145,7 +145,7 @@ export const AdminProfileSettingsView: React.FC = () => {
         <button
           type="button"
           onClick={() => setIsEditingFull(true)}
-          className="px-4 py-2.5 rounded-2xl bg-[#0066FF] hover:bg-[#0052cc] text-white text-xs font-bold transition-all shadow-sm flex items-center gap-2 cursor-pointer self-start sm:self-center"
+          className="w-full sm:w-auto px-4 py-2.5 rounded-2xl bg-[#0066FF] hover:bg-[#0052cc] text-white text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer min-h-[44px] touch-manipulation"
         >
           <Camera className="w-4 h-4" />
           <span>Edit Full Profile & Photo</span>
@@ -153,10 +153,10 @@ export const AdminProfileSettingsView: React.FC = () => {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200">
+      <div className="flex items-center gap-2 border-b border-slate-200 overflow-x-auto touch-pan-x scrollbar-none pb-0.5">
         <button
           onClick={() => setActiveTab('profile')}
-          className={`pb-3 px-3 text-xs font-bold transition-all border-b-2 ${
+          className={`pb-3 px-3.5 text-xs font-bold transition-all border-b-2 whitespace-nowrap min-h-[44px] flex items-center cursor-pointer ${
             activeTab === 'profile'
               ? 'border-[#1976D2] text-[#1976D2]'
               : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -166,7 +166,7 @@ export const AdminProfileSettingsView: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveTab('security')}
-          className={`pb-3 px-3 text-xs font-bold transition-all border-b-2 ${
+          className={`pb-3 px-3.5 text-xs font-bold transition-all border-b-2 whitespace-nowrap min-h-[44px] flex items-center cursor-pointer ${
             activeTab === 'security'
               ? 'border-[#1976D2] text-[#1976D2]'
               : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -176,7 +176,7 @@ export const AdminProfileSettingsView: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveTab('audit')}
-          className={`pb-3 px-3 text-xs font-bold transition-all border-b-2 ${
+          className={`pb-3 px-3.5 text-xs font-bold transition-all border-b-2 whitespace-nowrap min-h-[44px] flex items-center cursor-pointer ${
             activeTab === 'audit'
               ? 'border-[#1976D2] text-[#1976D2]'
               : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -337,7 +337,7 @@ export const AdminProfileSettingsView: React.FC = () => {
             <div className="pt-2 flex justify-end">
               <button
                 type="submit"
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#1976D2] hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#1976D2] hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 min-h-[44px] touch-manipulation cursor-pointer"
               >
                 <Save className="w-4 h-4" />
                 <span>Save Profile Changes</span>

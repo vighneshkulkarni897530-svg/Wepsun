@@ -79,9 +79,22 @@ export const ProfilePhotoEditorModal: React.FC<ProfilePhotoEditorModalProps> = (
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
 
-  // Crop frame dimensions (circular aperture in px)
-  const CROP_DIAMETER = 260; // diameter of the crop circle
+  // Crop frame dimensions (circular aperture in px - responsive for mobile)
   const OUTPUT_SIZE = 512; // output resolution of exported canvas
+  const [cropDiameter, setCropDiameter] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return Math.min(260, Math.max(180, window.innerWidth - 80));
+    }
+    return 260;
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setCropDiameter(Math.min(260, Math.max(180, window.innerWidth - 80)));
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Reset transforms when initial image changes or modal opens
   useEffect(() => {
@@ -140,7 +153,7 @@ export const ProfilePhotoEditorModal: React.FC<ProfilePhotoEditorModalProps> = (
   const handleImageLoaded = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const { naturalWidth, naturalHeight } = e.currentTarget;
     if (naturalWidth && naturalHeight) {
-      const baseFitScale = Math.max(CROP_DIAMETER / naturalWidth, CROP_DIAMETER / naturalHeight);
+      const baseFitScale = Math.max(cropDiameter / naturalWidth, cropDiameter / naturalHeight);
       setImageSize({
         width: naturalWidth * baseFitScale,
         height: naturalHeight * baseFitScale,
@@ -322,7 +335,7 @@ export const ProfilePhotoEditorModal: React.FC<ProfilePhotoEditorModalProps> = (
     ctx.translate(OUTPUT_SIZE / 2, OUTPUT_SIZE / 2);
 
     // 4. Apply scale ratio between editor viewport crop diameter and output size
-    const scaleFactor = OUTPUT_SIZE / CROP_DIAMETER;
+    const scaleFactor = OUTPUT_SIZE / cropDiameter;
     ctx.scale(scaleFactor, scaleFactor);
 
     // 5. Apply user position translation
@@ -339,7 +352,7 @@ export const ProfilePhotoEditorModal: React.FC<ProfilePhotoEditorModalProps> = (
     const naturalWidth = img.naturalWidth || imageSize.naturalWidth || 400;
     const naturalHeight = img.naturalHeight || imageSize.naturalHeight || 400;
 
-    const baseFitScale = Math.max(CROP_DIAMETER / naturalWidth, CROP_DIAMETER / naturalHeight);
+    const baseFitScale = Math.max(cropDiameter / naturalWidth, cropDiameter / naturalHeight);
     const drawWidth = naturalWidth * baseFitScale;
     const drawHeight = naturalHeight * baseFitScale;
 
@@ -506,7 +519,7 @@ export const ProfilePhotoEditorModal: React.FC<ProfilePhotoEditorModalProps> = (
                         {/* White area = visible dark overlay */}
                         <rect width="100%" height="100%" fill="white" />
                         {/* Black circle = cutout hole */}
-                        <circle cx="50%" cy="50%" r={CROP_DIAMETER / 2} fill="black" />
+                        <circle cx="50%" cy="50%" r={cropDiameter / 2} fill="black" />
                       </mask>
                     </defs>
                     {/* Dark semi-transparent overlay */}
@@ -520,7 +533,7 @@ export const ProfilePhotoEditorModal: React.FC<ProfilePhotoEditorModalProps> = (
 
                   {/* Circular Frame Border with glow */}
                   <div
-                    style={{ width: `${CROP_DIAMETER}px`, height: `${CROP_DIAMETER}px` }}
+                    style={{ width: `${cropDiameter}px`, height: `${cropDiameter}px` }}
                     className="relative rounded-full border-2 border-white/95 pointer-events-none ring-1 ring-blue-500/40"
                   >
                     {/* Fine Crosshair / Grid Alignment Guidelines */}

@@ -102,7 +102,7 @@ export const LiftDirectory: React.FC = () => {
             setEditingLift(null);
             setIsAddModalOpen(true);
           }}
-          className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#1976D2] hover:bg-blue-700 text-white font-bold text-xs shadow-sm shadow-blue-500/20 transition-all self-start sm:self-auto"
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#1976D2] hover:bg-blue-700 text-white font-bold text-xs shadow-sm shadow-blue-500/20 transition-all min-h-[44px] touch-manipulation cursor-pointer"
         >
           <Plus className="w-4 h-4" /> Add New Lift Unit
         </button>
