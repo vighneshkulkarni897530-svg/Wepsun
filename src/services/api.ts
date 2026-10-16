@@ -18,52 +18,90 @@ if (typeof window !== 'undefined' && !(window as any).Capacitor) {
 }
 
 /**
+ * Robustly detects if running inside a native mobile container (Capacitor Android/iOS).
+ */
+export function isNativeApp(): boolean {
+  if (typeof window === 'undefined') return false;
+
+  if (Capacitor.isNativePlatform()) return true;
+  const platform = Capacitor.getPlatform();
+  if (platform === 'android' || platform === 'ios') return true;
+  if ((window as any).Capacitor?.isNativePlatform?.()) return true;
+  if ((window as any).Capacitor?.platform === 'android' || (window as any).Capacitor?.platform === 'ios') return true;
+
+  const protocol = window.location.protocol;
+  if (protocol === 'capacitor:' || protocol === 'ionic:') return true;
+
+  // On Capacitor Android with androidScheme: 'https', origin is https://localhost with empty port
+  if (protocol === 'https:' && window.location.hostname === 'localhost' && !window.location.port) {
+    return true;
+  }
+
+  // Android WebView user-agent check
+  const ua = window.navigator?.userAgent || '';
+  if (/Android.*wv/.test(ua) || (ua.includes('Android') && ua.includes('Version/'))) {
+    return true;
+  }
+
+  return false;
+}
+
+// Background pre-warm Render cloud backend immediately upon app launch
+if (typeof window !== 'undefined') {
+  setTimeout(() => {
+    fetch(`${DEFAULT_CLOUD_API_URL}/health`, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+    }).catch(() => {});
+  }, 100);
+}
+
+/**
  * Resolves the active backend API base URL automatically.
  * Priority order:
- * 1. Runtime User Config (localStorage 'wepsun_custom_api_url')
- * 2. Vite Environment Variable (VITE_API_URL)
- * 3. Default Production Cloud Backend (https://wepsun.onrender.com/api)
+ * 1. Native Mobile (Always connects directly to Render Production Cloud Backend)
+ * 2. Runtime User Config (localStorage 'wepsun_custom_api_url')
+ * 3. Localhost Web Dev Browser with dev server port ('/api')
+ * 4. Default Production Cloud Backend (https://wepsun.onrender.com/api)
  */
 export function getApiBaseUrl(): string {
   if (typeof window !== 'undefined') {
+    // Purge any stale/LAN IP from custom storage
     const custom = localStorage.getItem(STORAGE_API_URL_KEY);
-    if (custom && custom.trim().length > 0 && !custom.includes('192.168.64.5')) {
-      return custom.trim().replace(/\/+$/, '');
+    if (custom) {
+      const isLanOrLocal =
+        custom.includes('192.168.') ||
+        custom.includes('10.') ||
+        custom.includes('172.') ||
+        custom.includes('localhost') ||
+        custom.includes('127.0.0.1');
+
+      if (isNativeApp() || isLanOrLocal) {
+        localStorage.removeItem(STORAGE_API_URL_KEY);
+      } else if (custom.trim().startsWith('https://')) {
+        return custom.trim().replace(/\/+$/, '');
+      }
     }
 
-    const isNative =
-      Capacitor.isNativePlatform() ||
-      Capacitor.getPlatform() !== 'web' ||
-      Boolean((window as any).Capacitor?.isNativePlatform?.()) ||
-      window.location.protocol === 'capacitor:' ||
-      window.location.protocol === 'ionic:';
-
-    // On native Android/iOS app, always connect directly to the secure production cloud backend
-    // to avoid Mixed Content security blocks and unreachable local network IPs.
-    if (isNative) {
-      const envUrl = import.meta.env.VITE_API_URL;
-      if (envUrl && envUrl.startsWith('https://') && !envUrl.includes('192.168.') && !envUrl.includes('localhost')) {
-        return envUrl.trim().replace(/\/+$/, '');
-      }
+    // Native mobile app MUST ALWAYS connect directly to the secure production cloud backend
+    if (isNativeApp()) {
       return DEFAULT_CLOUD_API_URL;
     }
 
-    const isLocalOrLan =
-      window.location.hostname === 'localhost' ||
-      window.location.hostname === '127.0.0.1' ||
-      window.location.hostname === '0.0.0.0' ||
-      window.location.hostname.startsWith('192.168.') ||
-      window.location.hostname.startsWith('10.') ||
-      window.location.hostname.startsWith('172.') ||
-      window.location.hostname.endsWith('.local');
+    // For Web Browser on localhost with local dev port (e.g. 5173 or 3000):
+    const isLocalDevBrowser =
+      (window.location.hostname === 'localhost' ||
+       window.location.hostname === '127.0.0.1' ||
+       window.location.hostname.startsWith('192.168.')) &&
+      Boolean(window.location.port && window.location.port !== '80' && window.location.port !== '443');
 
-    if (isLocalOrLan && !isNative) {
+    if (isLocalDevBrowser) {
       return '/api';
     }
   }
 
   const envUrl = import.meta.env.VITE_API_URL;
-  if (envUrl && envUrl.trim().length > 0 && !envUrl.includes('192.168.64.5')) {
+  if (envUrl && envUrl.trim().startsWith('https://') && !envUrl.includes('localhost')) {
     return envUrl.trim().replace(/\/+$/, '');
   }
 
@@ -171,7 +209,6 @@ export async function apiFetch<T = any>(
   options: ApiRequestOptions = {}
 ): Promise<ApiResponse<T>> {
   const isAuthRoute = endpoint.includes('/auth/');
-  const defaultTimeout = isAuthRoute ? 60000 : 25000;
   const {
     companyId,
     branchId,
@@ -179,7 +216,7 @@ export async function apiFetch<T = any>(
     userId,
     headers,
     skipAuth,
-    timeoutMs = defaultTimeout,
+    timeoutMs,
     ...rest
   } = options;
 
@@ -205,60 +242,65 @@ export async function apiFetch<T = any>(
     ...(headers as Record<string, string>),
   };
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   const startTime = Date.now();
+  const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
 
-  let targetBase = baseUrl;
-
-  try {
-    const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    let response: Response;
-
+  // Helper to fetch with isolated timeout controller
+  const executeFetch = async (targetBase: string, timeLimitMs: number): Promise<Response> => {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), timeLimitMs);
     try {
-      response = await fetch(`${targetBase}${normalizedEndpoint}`, {
+      const res = await fetch(`${targetBase}${normalizedEndpoint}`, {
         headers: requestHeaders,
-        signal: controller.signal,
+        signal: ctrl.signal,
         ...rest,
       });
+      clearTimeout(tid);
+      return res;
+    } catch (err) {
+      clearTimeout(tid);
+      throw err;
+    }
+  };
+
+  let targetBase = baseUrl;
+  let response: Response | null = null;
+  const cloudTimeout = timeoutMs || (isAuthRoute ? 45000 : 25000);
+
+  try {
+    try {
+      // If target is local dev proxy (/api), only wait 3.5s so we failover immediately if local backend isn't up
+      const initialTimeout = targetBase === '/api' ? 3500 : cloudTimeout;
+      response = await executeFetch(targetBase, initialTimeout);
 
       // If local dev server returned 502/503/504 gateway error (backend not running locally),
       // transparently retry against the live production cloud backend
       if (!response.ok && (response.status === 502 || response.status === 503 || response.status === 504 || (response.status === 500 && isAuthRoute)) && targetBase !== DEFAULT_CLOUD_API_URL) {
         console.warn(`[apiFetch] ${targetBase} returned HTTP ${response.status}, failing over to ${DEFAULT_CLOUD_API_URL}`);
         targetBase = DEFAULT_CLOUD_API_URL;
-        response = await fetch(`${targetBase}${normalizedEndpoint}`, {
-          headers: requestHeaders,
-          signal: controller.signal,
-          ...rest,
-        });
+        response = await executeFetch(targetBase, cloudTimeout);
       }
     } catch (initialErr: any) {
-      // If primary endpoint failed (e.g. ECONNREFUSED on localhost or LAN IP), failover to cloud
+      // If primary endpoint failed (e.g. ECONNREFUSED or aborted on localhost), failover directly to cloud
       if (targetBase !== DEFAULT_CLOUD_API_URL) {
         console.warn(`[apiFetch] ${targetBase} unreachable (${initialErr.message}), failing over to ${DEFAULT_CLOUD_API_URL}`);
         targetBase = DEFAULT_CLOUD_API_URL;
-        response = await fetch(`${targetBase}${normalizedEndpoint}`, {
-          headers: requestHeaders,
-          signal: controller.signal,
-          ...rest,
-        });
+        response = await executeFetch(targetBase, cloudTimeout);
       } else {
         throw initialErr;
       }
     }
 
-    clearTimeout(timeoutId);
+    if (!response) {
+      throw new Error('No response received from server.');
+    }
 
     // If 401 Unauthorized, attempt transparent refresh (unless calling auth routes)
     if (response.status === 401 && !endpoint.includes('/auth/login') && !endpoint.includes('/auth/master') && !endpoint.includes('/auth/refresh')) {
       const refreshResult = await refreshActiveSession();
       if (refreshResult.success && refreshResult.accessToken) {
         requestHeaders.Authorization = `Bearer ${refreshResult.accessToken}`;
-        response = await fetch(`${targetBase}${normalizedEndpoint}`, {
-          headers: requestHeaders,
-          ...rest,
-        });
+        response = await executeFetch(targetBase, cloudTimeout);
       }
     }
 
@@ -287,7 +329,6 @@ export async function apiFetch<T = any>(
       latencyMs,
     };
   } catch (err: any) {
-    clearTimeout(timeoutId);
     const latencyMs = Date.now() - startTime;
     const isTimeout = err.name === 'AbortError' || String(err.message || '').toLowerCase().includes('abort');
     const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;

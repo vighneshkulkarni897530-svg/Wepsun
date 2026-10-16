@@ -130,6 +130,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatusText, setSubmitStatusText] = useState('Signing In...');
 
   // Input element refs for precise focus control
   const emailInputRef = useRef<HTMLInputElement>(null);
@@ -246,6 +247,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     }
 
     setIsSubmitting(true);
+    setSubmitStatusText('Signing In...');
+
+    const t1 = setTimeout(() => {
+      setSubmitStatusText('Connecting to server...');
+    }, 2500);
+    const t2 = setTimeout(() => {
+      setSubmitStatusText('Connecting to cloud...');
+    }, 6000);
 
     try {
       const payload = {
@@ -379,7 +388,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         onTryAgain: () => emailInputRef.current?.focus(),
       });
     } finally {
+      clearTimeout(t1);
+      clearTimeout(t2);
       setIsSubmitting(false);
+      setSubmitStatusText('Signing In...');
     }
   };
 
@@ -1414,30 +1426,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                         </div>
                       </div>
 
-                      {devMasterOtp && (
-                        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-900 flex items-center justify-between shadow-xs">
-                          <div className="space-y-0.5">
-                            <div className="font-bold flex items-center gap-1.5 text-emerald-950">
-                              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                              <span>Dev Verification Codes:</span>
-                            </div>
-                            <div className="font-mono text-[11px] text-emerald-800">
-                              Email: <strong className="bg-emerald-100 px-1 py-0.5 rounded text-emerald-950">{devMasterOtp.emailOtp}</strong> | SMS: <strong className="bg-emerald-100 px-1 py-0.5 rounded text-emerald-950">{devMasterOtp.smsOtp}</strong>
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setMasterEmailOtp(devMasterOtp.emailOtp);
-                              setMasterSmsOtp(devMasterOtp.smsOtp);
-                            }}
-                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0"
-                          >
-                            Auto-fill
-                          </button>
-                        </div>
-                      )}
-
                       {/* Email OTP Field */}
                       <div>
                         <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
@@ -1598,8 +1586,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   >
                     {isSubmitting ? (
                       <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        <span>Signing In...</span>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0" />
+                        <span>{submitStatusText}</span>
                       </>
                     ) : (
                       <>
@@ -1876,25 +1864,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     </span>
                   </div>
 
-                  {devSignupOtp && (
-                    <div className="p-3 my-2 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-900 flex items-center justify-between shadow-xs">
-                      <div className="flex items-center gap-1.5">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <span>Dev Verification Code: <strong className="font-mono text-sm tracking-wider text-emerald-950 bg-emerald-100 px-2 py-0.5 rounded">{devSignupOtp}</strong></span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setOtpValue(devSignupOtp);
-                          handleVerifySignupOtp(devSignupOtp);
-                        }}
-                        className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0"
-                      >
-                        Auto-fill
-                      </button>
-                    </div>
-                  )}
-
                   {/* 6-Digit Visual OTP Boxes with Single Overlay Input */}
                   <div
                     className="relative my-3 cursor-text"
@@ -2112,24 +2081,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 <p className="text-xs text-slate-500 mt-1 mb-3">
                   Enter the 6-digit code sent to <strong className="text-slate-800">{forgotIdentifier}</strong> and create your new password.
                 </p>
-
-                {devForgotOtp && (
-                  <div className="p-3 my-2 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-900 flex items-center justify-between shadow-xs">
-                    <div className="flex items-center gap-1.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span>Dev Reset Code: <strong className="font-mono text-sm tracking-wider text-emerald-950 bg-emerald-100 px-2 py-0.5 rounded">{devForgotOtp}</strong></span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setForgotOtpValue(devForgotOtp);
-                      }}
-                      className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0"
-                    >
-                      Auto-fill
-                    </button>
-                  </div>
-                )}
 
                 <form onSubmit={handleVerifyForgotOtpAndReset} className="space-y-3.5">
                   <div>

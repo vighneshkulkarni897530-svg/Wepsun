@@ -744,7 +744,7 @@ export const Header: React.FC<HeaderProps> = ({
                       setIsProfileDropdownOpen(false);
                       showWarningModal(
                         'Reset Application Cache?',
-                        'This will restore default demo data and clear local overrides.',
+                        'This will clear local cache and reload latest data.',
                         () => {
                           resetDemoData();
                         }
