@@ -273,8 +273,60 @@ video::-moz-media-controls {
   animation: fadeIn 0.25s ease-out forwards;
 }
 
-/* Mobile Safe Bottom Navigation */
+/* Mobile Safe Area & Touch Optimization Utilities */
+.safe-top {
+  padding-top: max(0rem, env(safe-area-inset-top, 0rem));
+}
+
 .safe-bottom {
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0.5rem));
+}
+
+.safe-bottom-canvas {
+  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* Touch Targets Standard (WCAG 2.5.5 / Android & iOS 44px standard) */
+.min-tap-target {
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+}
+
+.touch-target-44 {
+  min-height: 44px;
+  touch-action: manipulation;
+}
+
+/* Fluid Horizontal Scroll Containers */
+.touch-scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scroll-behavior: smooth;
+}
+
+.scrollbar-none::-webkit-scrollbar,
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.scrollbar-none,
+.no-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+/* Responsive Table Wrapper */
+.responsive-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 1rem;
 }
 

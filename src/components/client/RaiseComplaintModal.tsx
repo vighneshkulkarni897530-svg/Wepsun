@@ -173,12 +173,13 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 animate-in fade-in">
-      <div className="bg-[#FFFFFF] border border-slate-200 rounded-3xl w-full max-w-lg max-h-[94vh] overflow-y-auto shadow-2xl relative text-slate-800">
+    <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-2.5 sm:p-4 animate-in fade-in">
+      <div className="bg-[#FFFFFF] border border-slate-200 rounded-2xl sm:rounded-3xl w-full max-w-lg max-h-[calc(100dvh-1.5rem)] overflow-y-auto shadow-2xl relative text-slate-800">
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 z-20 w-8 h-8 rounded-full bg-black/20 hover:bg-black/40 text-white flex items-center justify-center transition-colors"
+          aria-label="Close modal"
+          className="absolute top-3.5 right-3.5 z-20 w-8 h-8 rounded-full bg-black/20 hover:bg-black/40 text-white flex items-center justify-center transition-colors cursor-pointer touch-manipulation active:scale-95"
         >
           <X className="w-4 h-4" />
         </button>

@@ -299,93 +299,93 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
           </div>
 
           {/* 5 TOP STAT CARDS */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3">
             {/* 1. Total Clients */}
             <div
               onClick={() => onNavigateTab('clients')}
-              className="bg-white border border-slate-200/90 hover:border-blue-300 rounded-2xl p-4 cursor-pointer transition-all shadow-xs flex flex-col justify-between"
+              className="bg-white border border-slate-200/90 hover:border-blue-300 rounded-2xl p-3 sm:p-4 cursor-pointer transition-all shadow-xs flex flex-col justify-between touch-manipulation"
             >
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-[#1976D2]">
+                <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-[#1976D2] shrink-0">
                   <Users className="w-4 h-4" />
                 </div>
-                <span className="text-xs font-bold text-slate-700">Total Clients</span>
+                <span className="text-[11px] sm:text-xs font-bold text-slate-700 truncate">Total Clients</span>
               </div>
-              <div className="text-2xl font-black text-slate-900 mt-2 font-mono">{totalClients}</div>
+              <div className="text-xl sm:text-2xl font-black text-slate-900 mt-1.5 sm:mt-2 font-mono">{totalClients}</div>
               <div className="text-[10px] font-semibold text-emerald-600 mt-1 flex items-center gap-0.5">
-                <ArrowUpRight className="w-3 h-3" />
-                <span>Active portfolio</span>
+                <ArrowUpRight className="w-3 h-3 shrink-0" />
+                <span className="truncate">Active portfolio</span>
               </div>
             </div>
 
             {/* 2. Total Buildings */}
             <div
               onClick={() => onNavigateTab('buildings')}
-              className="bg-white border border-slate-200/90 hover:border-emerald-300 rounded-2xl p-4 cursor-pointer transition-all shadow-xs flex flex-col justify-between"
+              className="bg-white border border-slate-200/90 hover:border-emerald-300 rounded-2xl p-3 sm:p-4 cursor-pointer transition-all shadow-xs flex flex-col justify-between touch-manipulation"
             >
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
                   <Building className="w-4 h-4" />
                 </div>
-                <span className="text-xs font-bold text-slate-700">Total Buildings</span>
+                <span className="text-[11px] sm:text-xs font-bold text-slate-700 truncate">Total Buildings</span>
               </div>
-              <div className="text-2xl font-black text-slate-900 mt-2 font-mono">{totalBuildings}</div>
+              <div className="text-xl sm:text-2xl font-black text-slate-900 mt-1.5 sm:mt-2 font-mono">{totalBuildings}</div>
               <div className="text-[10px] font-semibold text-emerald-600 mt-1 flex items-center gap-0.5">
-                <ArrowUpRight className="w-3 h-3" />
-                <span>Registered sites</span>
+                <ArrowUpRight className="w-3 h-3 shrink-0" />
+                <span className="truncate">Registered sites</span>
               </div>
             </div>
 
             {/* 3. Total Lifts */}
             <div
               onClick={() => onNavigateTab('lifts')}
-              className="bg-white border border-slate-200/90 hover:border-purple-300 rounded-2xl p-4 cursor-pointer transition-all shadow-xs flex flex-col justify-between"
+              className="bg-white border border-slate-200/90 hover:border-purple-300 rounded-2xl p-3 sm:p-4 cursor-pointer transition-all shadow-xs flex flex-col justify-between touch-manipulation"
             >
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600">
+                <div className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600 shrink-0">
                   <Layers className="w-4 h-4" />
                 </div>
-                <span className="text-xs font-bold text-slate-700">Total Lifts</span>
+                <span className="text-[11px] sm:text-xs font-bold text-slate-700 truncate">Total Lifts</span>
               </div>
-              <div className="text-2xl font-black text-slate-900 mt-2 font-mono">{totalLifts}</div>
+              <div className="text-xl sm:text-2xl font-black text-slate-900 mt-1.5 sm:mt-2 font-mono">{totalLifts}</div>
               <div className="text-[10px] font-semibold text-emerald-600 mt-1 flex items-center gap-0.5">
-                <ArrowUpRight className="w-3 h-3" />
-                <span>Under service</span>
+                <ArrowUpRight className="w-3 h-3 shrink-0" />
+                <span className="truncate">Under service</span>
               </div>
             </div>
 
             {/* 4. Open Complaints */}
             <div
               onClick={() => onNavigateTab('complaints')}
-              className="bg-white border border-slate-200/90 hover:border-red-300 rounded-2xl p-4 cursor-pointer transition-all shadow-xs flex flex-col justify-between"
+              className="bg-white border border-slate-200/90 hover:border-red-300 rounded-2xl p-3 sm:p-4 cursor-pointer transition-all shadow-xs flex flex-col justify-between touch-manipulation"
             >
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center text-red-600">
+                <div className="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center text-red-600 shrink-0">
                   <AlertTriangle className="w-4 h-4" />
                 </div>
-                <span className="text-xs font-bold text-slate-700">Open Complaints</span>
+                <span className="text-[11px] sm:text-xs font-bold text-slate-700 truncate">Open Complaints</span>
               </div>
-              <div className="text-2xl font-black text-slate-900 mt-2 font-mono">{openComplaintsCount}</div>
+              <div className="text-xl sm:text-2xl font-black text-slate-900 mt-1.5 sm:mt-2 font-mono">{openComplaintsCount}</div>
               <div className="text-[10px] font-semibold text-amber-600 mt-1 flex items-center gap-0.5">
-                <span>Active tickets</span>
+                <span className="truncate">Active tickets</span>
               </div>
             </div>
 
             {/* 5. AMC Expiring */}
             <div
               onClick={() => onNavigateTab('amc')}
-              className="bg-white border border-slate-200/90 hover:border-teal-300 rounded-2xl p-4 cursor-pointer transition-all shadow-xs flex flex-col justify-between"
+              className="bg-white border border-slate-200/90 hover:border-teal-300 rounded-2xl p-3 sm:p-4 cursor-pointer transition-all shadow-xs flex flex-col justify-between col-span-2 sm:col-span-1 touch-manipulation"
             >
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-teal-50 flex items-center justify-center text-teal-600">
+                <div className="w-7 h-7 rounded-lg bg-teal-50 flex items-center justify-center text-teal-600 shrink-0">
                   <ShieldCheck className="w-4 h-4" />
                 </div>
-                <span className="text-[11px] font-bold text-slate-700 leading-tight">AMC Expiring</span>
+                <span className="text-[11px] sm:text-xs font-bold text-slate-700 truncate">AMC Expiring</span>
               </div>
-              <div className="text-2xl font-black text-slate-900 mt-2 font-mono">{amcExpiringCount}</div>
+              <div className="text-xl sm:text-2xl font-black text-slate-900 mt-1.5 sm:mt-2 font-mono">{amcExpiringCount}</div>
               <div className="text-[10px] font-semibold text-teal-600 mt-1 flex items-center gap-0.5">
-                <ArrowUpRight className="w-3 h-3" />
-                <span>Next 30 Days</span>
+                <ArrowUpRight className="w-3 h-3 shrink-0" />
+                <span className="truncate">Next 30 Days</span>
               </div>
             </div>
           </div>

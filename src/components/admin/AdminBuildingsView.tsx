@@ -220,10 +220,10 @@ export const AdminBuildingsView: React.FC<AdminBuildingsViewProps> = ({ onNaviga
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 self-start sm:self-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
           <button
             onClick={() => setIsAddBuildingModalOpen(true)}
-            className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-sm transition-all"
+            className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-sm transition-all min-h-[44px] touch-manipulation cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             Add Building / Society
@@ -234,7 +234,7 @@ export const AdminBuildingsView: React.FC<AdminBuildingsViewProps> = ({ onNaviga
               setTargetBuildingIdForAdd(allBuildingsList[0]?.id || '');
               setIsAddLiftModalOpen(true);
             }}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1976D2] hover:bg-blue-700 text-white font-bold text-xs shadow-sm shadow-blue-600/20 transition-all"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#1976D2] hover:bg-blue-700 text-white font-bold text-xs shadow-sm shadow-blue-600/20 transition-all min-h-[44px] touch-manipulation cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             Add Lift
@@ -243,7 +243,7 @@ export const AdminBuildingsView: React.FC<AdminBuildingsViewProps> = ({ onNaviga
       </div>
 
       {/* Search Bar */}
-      <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-sm">
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-3 sm:p-4 shadow-sm">
         <div className="relative max-w-md">
           <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
@@ -251,7 +251,7 @@ export const AdminBuildingsView: React.FC<AdminBuildingsViewProps> = ({ onNaviga
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search Building Name / Address / Society..."
-            className="w-full pl-10 pr-4 py-2.5 bg-[#F5F8FA] hover:bg-slate-100 focus:bg-white text-slate-800 text-xs font-medium placeholder-slate-400 rounded-xl border border-slate-200 focus:border-[#1976D2] focus:outline-none transition-all shadow-inner"
+            className="w-full pl-10 pr-4 py-2.5 bg-[#F5F8FA] hover:bg-slate-100 focus:bg-white text-slate-800 text-xs font-medium placeholder-slate-400 rounded-xl border border-slate-200 focus:border-[#1976D2] focus:outline-none transition-all shadow-inner min-h-[42px]"
           />
         </div>
       </div>

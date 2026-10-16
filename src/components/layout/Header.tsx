@@ -222,7 +222,7 @@ export const Header: React.FC<HeaderProps> = ({
       : 'Admin');
 
   return (
-    <header className="h-16 bg-[#0E2238] border-b border-[#0A1828] sticky top-0 z-50 px-3 sm:px-6 flex items-center justify-between gap-3 sm:gap-4 select-none">
+    <header className="pt-[env(safe-area-inset-top,0px)] h-[calc(4rem+env(safe-area-inset-top,0px))] bg-[#0E2238] border-b border-[#0A1828] sticky top-0 z-50 px-3 sm:px-6 flex items-center justify-between gap-3 sm:gap-4 select-none">
       {/* Left: Hamburger & WEPSUN Lift Services Logo */}
       <div className="flex items-center gap-2 sm:gap-4 shrink-0">
         <button
@@ -414,7 +414,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Attractive & Interactive Notifications Popover */}
           {isNotificationsOpen && (
-            <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white border border-slate-200 rounded-3xl shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 text-slate-800 overflow-hidden ring-1 ring-black/5">
+            <div className="absolute right-0 mt-2 w-[calc(100vw-1.5rem)] max-w-sm sm:w-96 bg-white border border-slate-200 rounded-2xl sm:rounded-3xl shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 text-slate-800 overflow-hidden ring-1 ring-black/5">
               {/* Popover Header */}
               <div className="p-4 bg-gradient-to-r from-slate-900 via-[#0E2238] to-slate-900 text-white flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
@@ -666,7 +666,7 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
 
               {isProfileDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 z-50 animate-in fade-in text-slate-800">
+                <div className="absolute right-0 mt-2 w-[calc(100vw-1.5rem)] max-w-xs sm:w-80 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 z-50 animate-in fade-in text-slate-800">
                   <div className="p-3 border-b border-slate-100 flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 shadow-sm shrink-0 flex items-center justify-center overflow-hidden">
                       {hasUserCustomAvatar ? (

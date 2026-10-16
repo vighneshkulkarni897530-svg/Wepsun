@@ -156,21 +156,21 @@ export const QuotationManager: React.FC = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search quote number, society, elevator..."
-            className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:border-[#1976D2] focus:ring-1 focus:ring-[#1976D2] outline-none shadow-sm"
+            className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-xs text-slate-800 placeholder-slate-400 focus:border-[#1976D2] focus:ring-1 focus:ring-[#1976D2] outline-none shadow-sm min-h-[42px]"
           />
         </div>
 
         <button
           onClick={() => setIsAddModalOpen(true)}
-          className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#1976D2] hover:bg-blue-700 text-white font-bold text-xs shadow-sm shadow-blue-500/20 transition-all"
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#1976D2] hover:bg-blue-700 text-white font-bold text-xs shadow-sm shadow-blue-500/20 transition-all min-h-[44px] touch-manipulation cursor-pointer"
         >
           <Plus className="w-4 h-4" /> Create Repair Quotation
         </button>
       </div>
 
       {/* Quotations Table */}
-      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-left text-xs">
+      <div className="overflow-x-auto touch-pan-x scrollbar-none rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <table className="w-full text-left text-xs min-w-[760px]">
           <thead className="bg-[#F5F8FA] text-slate-600 uppercase font-bold text-[10px] border-b border-slate-200">
             <tr>
               <th className="p-3.5">Quote No.</th>

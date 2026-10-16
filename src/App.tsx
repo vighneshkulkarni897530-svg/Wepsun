@@ -827,7 +827,7 @@ export const AppContent: React.FC = () => {
 
           {/* Main Content Canvas */}
           <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ease-in-out ${isSidebarOpen ? 'lg:pl-[240px]' : 'lg:pl-0'}`}>
-            <main className="flex-1 p-4 sm:p-6 lg:p-7 max-w-[1600px] w-full mx-auto pb-20 md:pb-7">
+            <main className="flex-1 p-3 sm:p-6 lg:p-7 max-w-[1600px] w-full mx-auto pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] md:pb-7">
               <ErrorBoundary key={`${currentRole}-${activeTab}`} fallbackTitle="View Failed to Render">
                 <Suspense fallback={<ViewLoadingFallback />}>
                   {renderMainContent()}
@@ -836,7 +836,7 @@ export const AppContent: React.FC = () => {
             </main>
 
             {/* Clean Corporate Footer */}
-            <footer className="bg-white border-t border-slate-200 py-4 px-6 text-xs text-slate-500 no-print flex flex-col sm:flex-row items-center justify-between gap-3 mb-16 md:mb-0">
+            <footer className="bg-white border-t border-slate-200 py-4 px-4 sm:px-6 text-xs text-slate-500 no-print flex flex-col sm:flex-row items-center justify-between gap-3 mb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] md:mb-0">
               <div className="flex items-center gap-2.5">
                 <div className="flex items-center gap-2 font-medium">
                   <span className="font-bold text-[#0E2238] text-xs">WEPSUN Lift Services</span>

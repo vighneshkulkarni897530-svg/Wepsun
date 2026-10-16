@@ -333,9 +333,10 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
   return (
     <div className="w-full space-y-6 text-slate-800 pb-16">
       {/* 14. TECHNICIAN NAVIGATION MENU (Responsive Horizontal Scrollable Tabs) */}
-      <div className="bg-white border border-slate-200/90 rounded-2xl p-2.5 shadow-sm sticky top-2 z-30 backdrop-blur-md bg-white/95">
-        <div className="flex items-center justify-between gap-2 overflow-x-auto scrollbar-none pb-0.5">
-          <div className="flex items-center gap-1.5 shrink-0">
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-2 sm:p-2.5 shadow-sm sticky top-2 z-30 backdrop-blur-md bg-white/95">
+        <div className="flex items-center justify-between gap-2">
+          {/* Scrollable Tabs */}
+          <div className="flex-1 min-w-0 overflow-x-auto touch-pan-x scrollbar-none pb-0.5 flex items-center gap-1.5">
             {[
               { id: 'dashboard', label: 'Dashboard', icon: Layers },
               { id: 'jobs', label: `Today's Jobs (${assignedJobs.length})`, icon: Calendar },
@@ -356,16 +357,16 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
                 <button
                   key={tabItem.id}
                   onClick={() => navigateTab(tabItem.id as TechNavTab)}
-                  className={`px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 relative ${
+                  className={`px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 relative min-h-[40px] touch-manipulation cursor-pointer ${
                     isActive
                       ? 'bg-[#123B5D] text-white shadow-xs'
                       : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                   }`}
                 >
-                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-sky-300' : 'text-slate-400'}`} />
+                  <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-sky-300' : 'text-slate-400'}`} />
                   <span>{tabItem.label}</span>
                   {tabItem.badge !== undefined && tabItem.badge > 0 && (
-                    <span className="w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center">
+                    <span className="w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center shrink-0">
                       {tabItem.badge}
                     </span>
                   )}
@@ -375,22 +376,22 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
           </div>
 
           {/* Quick AI Trigger & Logout */}
-          <div className="flex items-center gap-1.5 shrink-0 pl-2 border-l border-slate-200">
+          <div className="flex items-center gap-1.5 shrink-0 pl-1.5 sm:pl-2 border-l border-slate-200">
             <button
               onClick={() => setIsAiModalOpen(true)}
               title="Open AI Fault Diagnostic Assistant"
-              className="p-2 rounded-xl bg-sky-50 hover:bg-sky-100 text-[#123B5D] transition-all flex items-center gap-1 text-xs font-bold border border-sky-200"
+              className="p-2 sm:px-2.5 sm:py-2 rounded-xl bg-sky-50 hover:bg-sky-100 text-[#123B5D] transition-all flex items-center gap-1 text-xs font-bold border border-sky-200 min-h-[40px] touch-manipulation cursor-pointer"
             >
-              <Sparkles className="w-4 h-4 text-[#1976D2]" />
+              <Sparkles className="w-4 h-4 text-[#1976D2] shrink-0" />
               <span className="hidden sm:inline">AI Helper</span>
             </button>
 
             <button
               onClick={() => showLogoutModal(() => logout())}
               title="Logout from WEPSUN"
-              className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 transition-all flex items-center gap-1 text-xs font-bold border border-rose-200 cursor-pointer"
+              className="p-2 sm:px-2.5 sm:py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 transition-all flex items-center gap-1 text-xs font-bold border border-rose-200 min-h-[40px] touch-manipulation cursor-pointer"
             >
-              <LogOut className="w-4 h-4 text-rose-600" />
+              <LogOut className="w-4 h-4 text-rose-600 shrink-0" />
               <span className="hidden sm:inline">Logout</span>
             </button>
           </div>

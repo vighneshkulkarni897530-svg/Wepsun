@@ -316,24 +316,24 @@ export const ClientProfileView: React.FC<ClientProfileViewProps> = ({ onLogout }
         </div>
 
         {/* Action CTAs */}
-        <div className="flex items-center gap-2.5 w-full md:w-auto flex-wrap">
+        <div className="grid grid-cols-1 sm:grid-cols-3 md:flex items-center gap-2.5 w-full md:w-auto">
           <button
             onClick={() => setIsEditing(true)}
-            className="flex-1 md:flex-none px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-800 text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+            className="px-4 py-2.5 min-h-[44px] rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-800 text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer touch-manipulation active:scale-[0.98]"
           >
             <Edit3 className="w-4 h-4 text-[#1976D2]" />
             <span>Edit Profile</span>
           </button>
           <button
             onClick={() => setIsPasswordModalOpen(true)}
-            className="flex-1 md:flex-none px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
+            className="px-4 py-2.5 min-h-[44px] rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer touch-manipulation active:scale-[0.98]"
           >
             <KeyRound className="w-4 h-4 text-slate-600" />
             <span>Change Password</span>
           </button>
           <button
             onClick={() => setIsLogoutModalOpen(true)}
-            className="flex-1 md:flex-none px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
+            className="px-4 py-2.5 min-h-[44px] rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer touch-manipulation active:scale-[0.98]"
           >
             <LogOut className="w-4 h-4 text-rose-600" />
             <span>Logout</span>

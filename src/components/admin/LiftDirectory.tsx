@@ -102,15 +102,15 @@ export const LiftDirectory: React.FC = () => {
             setEditingLift(null);
             setIsAddModalOpen(true);
           }}
-          className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#1976D2] hover:bg-blue-700 text-white font-bold text-xs shadow-sm shadow-blue-500/20 transition-all self-start sm:self-auto"
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#1976D2] hover:bg-blue-700 text-white font-bold text-xs shadow-sm shadow-blue-500/20 transition-all min-h-[44px] touch-manipulation cursor-pointer"
         >
           <Plus className="w-4 h-4" /> Add New Lift Unit
         </button>
       </div>
 
       {/* Search & Actions Bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2 flex-1 max-w-md">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-1 max-w-xl">
           <div className="relative flex-1">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
@@ -118,14 +118,14 @@ export const LiftDirectory: React.FC = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search Lift ID / Number / Building / Client..."
-              className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-xs text-slate-800 placeholder-slate-400 focus:border-[#1976D2] focus:ring-1 focus:ring-[#1976D2] outline-none shadow-sm"
+              className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-xs text-slate-800 placeholder-slate-400 focus:border-[#1976D2] focus:ring-1 focus:ring-[#1976D2] outline-none shadow-sm min-h-[42px]"
             />
           </div>
 
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-700 outline-none font-medium shadow-sm focus:border-[#1976D2]"
+            className="bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-700 outline-none font-medium shadow-sm focus:border-[#1976D2] min-h-[42px]"
           >
             <option value="All">All Statuses</option>
             <option value="operational">Operational</option>
@@ -139,8 +139,8 @@ export const LiftDirectory: React.FC = () => {
           Information: Lift ID, Lift Number, Building, Client, Brand, Model, Capacity, Installation Date, AMC, Status
           Buttons: View Digital Passport, Edit Lift, Generate QR
       */}
-      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-left text-xs">
+      <div className="overflow-x-auto touch-pan-x scrollbar-none rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <table className="w-full text-left text-xs min-w-[760px]">
           <thead className="bg-[#F5F8FA] text-slate-600 font-bold uppercase text-[10px] border-b border-slate-200">
             <tr>
               <th className="py-3.5 px-3">Lift ID / Number</th>

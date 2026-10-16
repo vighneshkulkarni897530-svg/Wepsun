@@ -67,8 +67,8 @@ export const ComplaintManager: React.FC = () => {
   return (
     <div className="space-y-5 text-slate-800">
       {/* Search & Filters */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2 flex-1 max-w-lg">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-1 max-w-xl">
           <div className="relative flex-1">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
@@ -76,38 +76,40 @@ export const ComplaintManager: React.FC = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search ticket number, building, elevator..."
-              className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:border-[#1976D2] outline-none shadow-sm"
+              className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-xs text-slate-800 placeholder-slate-400 focus:border-[#1976D2] outline-none shadow-sm min-h-[42px]"
             />
           </div>
 
-          <select
-            value={priorityFilter}
-            onChange={(e) => setPriorityFilter(e.target.value)}
-            className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 outline-none font-medium shadow-sm"
-          >
-            <option value="All">All Priorities</option>
-            <option value="critical">🔴 Critical</option>
-            <option value="high">🟠 High</option>
-            <option value="normal">🔵 Normal</option>
-          </select>
+          <div className="grid grid-cols-2 sm:flex sm:items-center gap-2">
+            <select
+              value={priorityFilter}
+              onChange={(e) => setPriorityFilter(e.target.value)}
+              className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 outline-none font-medium shadow-sm min-h-[42px]"
+            >
+              <option value="All">All Priorities</option>
+              <option value="critical">🔴 Critical</option>
+              <option value="high">🟠 High</option>
+              <option value="normal">🔵 Normal</option>
+            </select>
 
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 outline-none font-medium shadow-sm"
-          >
-            <option value="All">All Statuses</option>
-            <option value="pending">Pending</option>
-            <option value="assigned">Assigned</option>
-            <option value="inspection_repair">In Inspection</option>
-            <option value="closed">Closed</option>
-          </select>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 outline-none font-medium shadow-sm min-h-[42px]"
+            >
+              <option value="All">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="assigned">Assigned</option>
+              <option value="inspection_repair">In Inspection</option>
+              <option value="closed">Closed</option>
+            </select>
+          </div>
         </div>
       </div>
 
       {/* Complaints Table */}
-      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-left text-xs">
+      <div className="overflow-x-auto touch-pan-x scrollbar-none rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <table className="w-full text-left text-xs min-w-[760px]">
           <thead className="bg-[#F5F8FA] text-slate-600 font-bold uppercase text-[10px] border-b border-slate-200">
             <tr>
               <th className="p-3.5">Ticket & Lift</th>
@@ -241,10 +243,10 @@ export const ComplaintManager: React.FC = () => {
 
       {/* Technician Assignment Modal */}
       {assigningTicketId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 shadow-2xl relative text-slate-800 flex flex-col gap-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl max-w-md w-full p-4 sm:p-6 shadow-2xl relative text-slate-800 flex flex-col gap-4 max-h-[calc(100dvh-1.5rem)] overflow-y-auto">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-[#1976D2]">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-[#1976D2] shrink-0">
                 <UserCheck className="w-5 h-5" />
               </div>
               <div>
@@ -310,7 +312,7 @@ export const ComplaintManager: React.FC = () => {
                   value={etaInput}
                   onChange={(e) => setEtaInput(e.target.value)}
                   placeholder="e.g. Within 30 mins (En Route)"
-                  className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-slate-900 focus:border-[#1976D2] outline-none"
+                  className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-slate-900 focus:border-[#1976D2] outline-none min-h-[42px]"
                 />
               </div>
 
@@ -318,13 +320,13 @@ export const ComplaintManager: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setAssigningTicketId(null)}
-                  className="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold"
+                  className="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold min-h-[44px] touch-manipulation cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-[#1976D2] hover:bg-blue-700 text-white font-bold shadow-md"
+                  className="flex-1 py-2.5 rounded-xl bg-[#1976D2] hover:bg-blue-700 text-white font-bold shadow-md min-h-[44px] touch-manipulation cursor-pointer"
                 >
                   Confirm Dispatch
                 </button>

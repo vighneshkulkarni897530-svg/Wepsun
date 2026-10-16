@@ -1183,13 +1183,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       </div>
 
       {/* Top Header / Back Button Area */}
-      <div className="relative z-10 w-full pt-8 pb-4 px-4 sm:px-8 flex flex-col items-center justify-center text-center">
+      <div className="relative z-10 w-full pt-14 sm:pt-8 pb-4 px-4 sm:px-8 flex flex-col items-center justify-center text-center">
         <button
           onClick={() => {
             if (onClose) onClose();
             window.location.hash = 'landing';
           }}
-          className="absolute top-4 left-4 sm:left-8 px-3.5 py-1.5 rounded-full bg-white/20 hover:bg-white/35 text-white backdrop-blur-md text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+          className="absolute top-4 left-4 sm:left-8 px-3.5 py-1.5 rounded-full bg-white/20 hover:bg-white/35 text-white backdrop-blur-md text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer touch-manipulation"
         >
           <span>← Back to Home</span>
         </button>
@@ -1197,7 +1197,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         {onClose && (
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 sm:right-8 p-2 rounded-full bg-white/20 hover:bg-white/35 text-white backdrop-blur-md transition-all shadow-sm cursor-pointer"
+            className="absolute top-4 right-4 sm:right-8 p-2 rounded-full bg-white/20 hover:bg-white/35 text-white backdrop-blur-md transition-all shadow-sm cursor-pointer touch-manipulation"
             title="Close"
           >
             <X className="w-5 h-5" />
@@ -1232,8 +1232,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       </div>
 
       {/* Main Centered Floating Card */}
-      <div className="relative z-10 flex-1 flex items-center justify-center px-4 py-6">
-        <div className="w-full max-w-[440px] bg-white/95 backdrop-blur-md rounded-[28px] shadow-2xl border border-white/60 p-6 sm:p-8 animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative z-10 flex-1 flex items-center justify-center px-3 sm:px-4 py-4 sm:py-6">
+        <div className="w-full max-w-[440px] bg-white/95 backdrop-blur-md rounded-2xl sm:rounded-[28px] shadow-2xl border border-white/60 p-4 sm:p-8 animate-in fade-in zoom-in-95 duration-200">
           
           {/* Top Tabs: Sign In | Sign Up */}
           <div className="mb-6">

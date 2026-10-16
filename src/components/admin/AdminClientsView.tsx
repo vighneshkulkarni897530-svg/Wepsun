@@ -142,7 +142,7 @@ export const AdminClientsView: React.FC = () => {
 
         <button
           onClick={() => setIsAddClientModalOpen(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1976D2] hover:bg-blue-700 text-white font-bold text-xs shadow-sm shadow-blue-600/20 transition-all self-start sm:self-auto"
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#1976D2] hover:bg-blue-700 text-white font-bold text-xs shadow-sm shadow-blue-600/20 transition-all min-h-[44px] touch-manipulation cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           Add Client
@@ -150,7 +150,7 @@ export const AdminClientsView: React.FC = () => {
       </div>
 
       {/* Search Bar matching the exact specification: Search Client / Building / Lift */}
-      <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-sm">
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-3 sm:p-4 shadow-sm">
         <div className="relative max-w-md">
           <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
@@ -158,15 +158,15 @@ export const AdminClientsView: React.FC = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search Client / Building / Lift / Mobile..."
-            className="w-full pl-10 pr-4 py-2.5 bg-[#F5F8FA] hover:bg-slate-100 focus:bg-white text-slate-800 text-xs font-medium placeholder-slate-400 rounded-xl border border-slate-200 focus:border-[#1976D2] focus:outline-none transition-all shadow-inner"
+            className="w-full pl-10 pr-4 py-2.5 bg-[#F5F8FA] hover:bg-slate-100 focus:bg-white text-slate-800 text-xs font-medium placeholder-slate-400 rounded-xl border border-slate-200 focus:border-[#1976D2] focus:outline-none transition-all shadow-inner min-h-[42px]"
           />
         </div>
       </div>
 
       {/* Clients Table: Client | Building | Lifts | AMC | Status | Action */}
       <div className="bg-white border border-slate-200/90 rounded-2xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+        <div className="overflow-x-auto touch-pan-x scrollbar-none">
+          <table className="w-full text-left text-xs min-w-[720px]">
             <thead className="bg-[#F5F8FA] text-slate-600 font-bold uppercase text-[10px] border-b border-slate-200">
               <tr>
                 <th className="py-3.5 px-4">Client</th>

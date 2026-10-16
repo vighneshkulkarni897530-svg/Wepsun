@@ -133,7 +133,7 @@ export const WorkOrderManager: React.FC = () => {
 
         <button
           onClick={() => setIsCreateModalOpen(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1976D2] hover:bg-blue-700 text-white font-bold text-xs shadow-sm shadow-blue-500/20 transition-all"
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#1976D2] hover:bg-blue-700 text-white font-bold text-xs shadow-sm shadow-blue-500/20 transition-all min-h-[44px] touch-manipulation cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           <span>New Work Order</span>
@@ -149,16 +149,16 @@ export const WorkOrderManager: React.FC = () => {
             placeholder="Search work order #, lift, society, technician..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#1976D2] shadow-sm"
+            className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#1976D2] shadow-sm min-h-[42px]"
           />
         </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto">
+        <div className="flex items-center gap-2 overflow-x-auto touch-pan-x scrollbar-none pb-1">
           {['all', 'scheduled', 'assigned', 'in_progress', 'completed'].map((status) => (
             <button
               key={status}
               onClick={() => setStatusFilter(status)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold uppercase font-mono tracking-wider transition-all whitespace-nowrap ${
+              className={`px-3 py-2 rounded-xl text-xs font-bold uppercase font-mono tracking-wider transition-all whitespace-nowrap min-h-[38px] touch-manipulation cursor-pointer ${
                 statusFilter === status
                   ? 'bg-[#1976D2] text-white shadow-sm'
                   : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 shadow-sm'

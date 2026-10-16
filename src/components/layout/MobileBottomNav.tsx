@@ -71,7 +71,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   return (
     <nav
       aria-label="Mobile Navigation Bar"
-      className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-slate-900/98 backdrop-blur-xl border-t border-slate-800 text-slate-400 px-2 py-1.5 shadow-2xl safe-bottom select-none touch-manipulation"
+      className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-slate-900/98 backdrop-blur-xl border-t border-slate-800 text-slate-400 px-1 py-1 shadow-2xl safe-bottom select-none touch-manipulation"
     >
       <div className="flex items-center justify-around relative max-w-lg mx-auto">
         {/* Role-Specific Left Tab 1 */}
@@ -79,12 +79,12 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           <button
             type="button"
             onClick={() => handleTabClick('dashboard')}
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer ${
-              isAdminDashboardActive ? 'text-blue-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200'
+            className={`flex flex-col items-center justify-center flex-1 min-h-[46px] py-1 px-0.5 transition-all cursor-pointer touch-manipulation ${
+              isAdminDashboardActive ? 'text-blue-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200 active:scale-95'
             }`}
           >
-            <LayoutDashboard className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px] tracking-tight">Overview</span>
+            <LayoutDashboard className="w-5 h-5 mb-0.5 shrink-0" />
+            <span className="text-[10px] tracking-tight leading-tight">Overview</span>
           </button>
         )}
 
@@ -92,14 +92,14 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           <button
             type="button"
             onClick={() => handleTabClick('jobs')}
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition-all relative cursor-pointer ${
-              isTechJobsActive ? 'text-blue-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200'
+            className={`flex flex-col items-center justify-center flex-1 min-h-[46px] py-1 px-0.5 transition-all relative cursor-pointer touch-manipulation ${
+              isTechJobsActive ? 'text-blue-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200 active:scale-95'
             }`}
           >
-            <HardHat className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px] tracking-tight">My Jobs</span>
+            <HardHat className="w-5 h-5 mb-0.5 shrink-0" />
+            <span className="text-[10px] tracking-tight leading-tight">My Jobs</span>
             {activeComplaintsCount > 0 && (
-              <span className="absolute top-0 right-3 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center">
+              <span className="absolute top-0.5 right-2 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center ring-1 ring-slate-900">
                 {activeComplaintsCount}
               </span>
             )}
@@ -110,12 +110,12 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           <button
             type="button"
             onClick={() => handleTabClick('home')}
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer ${
-              isClientHomeActive ? 'text-blue-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200'
+            className={`flex flex-col items-center justify-center flex-1 min-h-[46px] py-1 px-0.5 transition-all cursor-pointer touch-manipulation ${
+              isClientHomeActive ? 'text-blue-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200 active:scale-95'
             }`}
           >
-            <Building2 className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px] tracking-tight">My Lifts</span>
+            <Building2 className="w-5 h-5 mb-0.5 shrink-0" />
+            <span className="text-[10px] tracking-tight leading-tight">My Lifts</span>
           </button>
         )}
 
@@ -124,14 +124,14 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           <button
             type="button"
             onClick={() => handleTabClick('complaints')}
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition-all relative cursor-pointer ${
-              isAdminComplaintsActive ? 'text-blue-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200'
+            className={`flex flex-col items-center justify-center flex-1 min-h-[46px] py-1 px-0.5 transition-all relative cursor-pointer touch-manipulation ${
+              isAdminComplaintsActive ? 'text-blue-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200 active:scale-95'
             }`}
           >
-            <AlertTriangle className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px] tracking-tight">Breakdowns</span>
+            <AlertTriangle className="w-5 h-5 mb-0.5 shrink-0" />
+            <span className="text-[10px] tracking-tight leading-tight">Breakdowns</span>
             {activeComplaintsCount > 0 && (
-              <span className="absolute top-0 right-3 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center">
+              <span className="absolute top-0.5 right-2 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center ring-1 ring-slate-900">
                 {activeComplaintsCount}
               </span>
             )}
@@ -142,12 +142,12 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           <button
             type="button"
             onClick={() => handleTabClick('checkin_checkout')}
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer ${
-              isTechAttendanceActive ? 'text-blue-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200'
+            className={`flex flex-col items-center justify-center flex-1 min-h-[46px] py-1 px-0.5 transition-all cursor-pointer touch-manipulation ${
+              isTechAttendanceActive ? 'text-blue-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200 active:scale-95'
             }`}
           >
-            <ShieldCheck className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px] tracking-tight">Attendance</span>
+            <ShieldCheck className="w-5 h-5 mb-0.5 shrink-0" />
+            <span className="text-[10px] tracking-tight leading-tight">Attendance</span>
           </button>
         )}
 
@@ -155,22 +155,22 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           <button
             type="button"
             onClick={() => handleTabClick('reports')}
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer ${
-              isClientReportsActive ? 'text-blue-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200'
+            className={`flex flex-col items-center justify-center flex-1 min-h-[46px] py-1 px-0.5 transition-all cursor-pointer touch-manipulation ${
+              isClientReportsActive ? 'text-blue-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200 active:scale-95'
             }`}
           >
-            <FileText className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px] tracking-tight">Reports</span>
+            <FileText className="w-5 h-5 mb-0.5 shrink-0" />
+            <span className="text-[10px] tracking-tight leading-tight">Reports</span>
           </button>
         )}
 
         {/* Prominent Center Action Button (Emergency Breakdown SOS) */}
-        <div className="flex-1 flex justify-center -mt-5">
+        <div className="flex-1 flex justify-center -mt-5 min-w-[54px] shrink-0">
           <button
             type="button"
             onClick={handleCenterAction}
             aria-label="Report emergency breakdown"
-            className="w-13 h-13 rounded-full bg-gradient-to-tr from-red-600 via-rose-500 to-amber-500 text-white p-3 shadow-lg shadow-red-500/40 border-2 border-slate-900 flex items-center justify-center active:scale-90 transition-transform animate-pulse cursor-pointer"
+            className="w-13 h-13 min-w-[52px] min-h-[52px] rounded-full bg-gradient-to-tr from-red-600 via-rose-500 to-amber-500 text-white p-3 shadow-lg shadow-red-500/40 border-2 border-slate-900 flex items-center justify-center active:scale-90 transition-transform animate-pulse cursor-pointer touch-manipulation"
           >
             <PhoneCall className="w-6 h-6 animate-bounce" />
           </button>
@@ -181,12 +181,12 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           <button
             type="button"
             onClick={() => handleTabClick('amc')}
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer ${
-              isAdminAmcActive ? 'text-blue-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200'
+            className={`flex flex-col items-center justify-center flex-1 min-h-[46px] py-1 px-0.5 transition-all cursor-pointer touch-manipulation ${
+              isAdminAmcActive ? 'text-blue-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200 active:scale-95'
             }`}
           >
-            <ShieldCheck className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px] tracking-tight">AMC</span>
+            <ShieldCheck className="w-5 h-5 mb-0.5 shrink-0" />
+            <span className="text-[10px] tracking-tight leading-tight">AMC</span>
           </button>
         )}
 
@@ -194,12 +194,12 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           <button
             type="button"
             onClick={() => handleTabClick('service_history')}
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer ${
-              isTechJobCardActive ? 'text-blue-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200'
+            className={`flex flex-col items-center justify-center flex-1 min-h-[46px] py-1 px-0.5 transition-all cursor-pointer touch-manipulation ${
+              isTechJobCardActive ? 'text-blue-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200 active:scale-95'
             }`}
           >
-            <Wrench className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px] tracking-tight">Job Card</span>
+            <Wrench className="w-5 h-5 mb-0.5 shrink-0" />
+            <span className="text-[10px] tracking-tight leading-tight">Job Card</span>
           </button>
         )}
 
@@ -207,12 +207,12 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           <button
             type="button"
             onClick={() => handleTabClick('payments')}
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer ${
-              isClientPayActive ? 'text-blue-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200'
+            className={`flex flex-col items-center justify-center flex-1 min-h-[46px] py-1 px-0.5 transition-all cursor-pointer touch-manipulation ${
+              isClientPayActive ? 'text-blue-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200 active:scale-95'
             }`}
           >
-            <ShieldCheck className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px] tracking-tight">AMC & Pay</span>
+            <ShieldCheck className="w-5 h-5 mb-0.5 shrink-0" />
+            <span className="text-[10px] tracking-tight leading-tight">AMC & Pay</span>
           </button>
         )}
 
@@ -221,12 +221,12 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           <button
             type="button"
             onClick={() => handleTabClick('settings')}
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer ${
-              isAdminSettingsActive ? 'text-blue-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200'
+            className={`flex flex-col items-center justify-center flex-1 min-h-[46px] py-1 px-0.5 transition-all cursor-pointer touch-manipulation ${
+              isAdminSettingsActive ? 'text-blue-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200 active:scale-95'
             }`}
           >
-            <Settings className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px] tracking-tight">Settings</span>
+            <Settings className="w-5 h-5 mb-0.5 shrink-0" />
+            <span className="text-[10px] tracking-tight leading-tight">Settings</span>
           </button>
         )}
 
@@ -234,12 +234,12 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           <button
             type="button"
             onClick={() => handleTabClick('service_report')}
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer ${
-              isTechReportActive ? 'text-blue-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200'
+            className={`flex flex-col items-center justify-center flex-1 min-h-[46px] py-1 px-0.5 transition-all cursor-pointer touch-manipulation ${
+              isTechReportActive ? 'text-blue-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200 active:scale-95'
             }`}
           >
-            <FileText className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px] tracking-tight">Report</span>
+            <FileText className="w-5 h-5 mb-0.5 shrink-0" />
+            <span className="text-[10px] tracking-tight leading-tight">Report</span>
           </button>
         )}
 
@@ -247,12 +247,12 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           <button
             type="button"
             onClick={() => handleTabClick('profile')}
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer ${
-              isClientProfileActive ? 'text-blue-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200'
+            className={`flex flex-col items-center justify-center flex-1 min-h-[46px] py-1 px-0.5 transition-all cursor-pointer touch-manipulation ${
+              isClientProfileActive ? 'text-blue-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200 active:scale-95'
             }`}
           >
-            <User className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px] tracking-tight">Profile</span>
+            <User className="w-5 h-5 mb-0.5 shrink-0" />
+            <span className="text-[10px] tracking-tight leading-tight">Profile</span>
           </button>
         )}
       </div>
