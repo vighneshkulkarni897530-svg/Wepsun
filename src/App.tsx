@@ -50,6 +50,8 @@ const ViewLoadingFallback = () => (
 );
 
 const PUBLIC_HASHES = [
+  'home',
+  'landing',
   'login',
   'signin',
   'signup',
@@ -377,8 +379,8 @@ export const AppContent: React.FC = () => {
         }
 
         if (!hash || !PUBLIC_HASHES.includes(hash)) {
-          window.history.replaceState(null, '', '#login');
-          setCurrentHash('login');
+          window.history.replaceState(null, '', '#home');
+          setCurrentHash('home');
         }
         setIsFullLoginPage(true);
         return;

@@ -1554,8 +1554,8 @@ function mapServerServiceReport(sr: any): ServiceReport {
 
       setIsAuthenticated(false);
 
-      window.history.replaceState(null, '', '#login');
-      window.location.hash = 'login';
+      window.history.replaceState(null, '', '#home');
+      window.location.hash = 'home';
       window.dispatchEvent(new HashChangeEvent('hashchange'));
     }
 
