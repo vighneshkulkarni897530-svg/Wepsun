@@ -62,7 +62,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 }) => {
   const {
     loginAsUser,
-    setCurrentRole,
     showToast,
     currentRole,
     users,
@@ -315,7 +314,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           };
 
           loginAsUser(finalUser);
-          setCurrentRole(userRole);
 
           if (pendingQuoteService || (typeof window !== 'undefined' && sessionStorage.getItem('wepsun_pending_quote_service'))) {
             sessionStorage.setItem('wepsun_open_quote_after_login', 'true');
@@ -544,7 +542,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         localStorage.removeItem('wepsun_explicit_logout');
 
         loginAsUser(masterUser);
-        setCurrentRole('master_admin');
 
         try {
           confetti({
@@ -816,7 +813,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         };
 
         loginAsUser(finalUser);
-        setCurrentRole(userRole);
 
         if (pendingQuoteService || (typeof window !== 'undefined' && sessionStorage.getItem('wepsun_pending_quote_service'))) {
           sessionStorage.setItem('wepsun_open_quote_after_login', 'true');
@@ -942,7 +938,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               };
 
               loginAsUser(finalUser);
-              setCurrentRole('client');
 
               try {
                 confetti({

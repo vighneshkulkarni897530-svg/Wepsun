@@ -49,7 +49,7 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
   onSuccess,
   targetRoleHint,
 }) => {
-  const { loginAsUser, setCurrentRole, showToast, users } = useApp();
+  const { loginAsUser, showToast, users } = useApp();
   const {
     showGoogleSuccess,
     showGoogleFailed,
@@ -233,7 +233,6 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
         isActive: true,
       });
 
-      setCurrentRole(activeRole);
       triggerConfetti();
 
       if (sessionStorage.getItem('wepsun_pending_quote_service')) {
@@ -343,7 +342,6 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
               isActive: userRecord.isActive ?? true,
             });
 
-            setCurrentRole(activeRole);
             triggerConfetti();
 
             const targetDest =

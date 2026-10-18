@@ -867,7 +867,8 @@ function mapServerServiceReport(sr: any): ServiceReport {
     }
     const savedUserId = localStorage.getItem(STORAGE_PREFIX + 'userId');
     if (savedUserId) {
-      const found = INITIAL_USERS.find((u) => u.id === savedUserId);
+      const storedUsers = safeStorageParse<User[]>(STORAGE_PREFIX + 'users', INITIAL_USERS);
+      const found = storedUsers.find((u) => u.id === savedUserId) || INITIAL_USERS.find((u) => u.id === savedUserId);
       if (found) {
         if ((found.role === 'company_admin' || found.role === 'master_admin' || found.role === 'super_admin') && !isMasterAdminSessionValid()) {
           return resolveUserAvatar(INITIAL_USERS.find((u) => u.role === 'client') || INITIAL_USERS[2]);
@@ -1284,6 +1285,28 @@ function mapServerServiceReport(sr: any): ServiceReport {
 
     // Check if current user is already of this role
     if (currentUser.role === role) {
+      return;
+    }
+
+    // Preserve active user if they already match the requested role
+    const activeId = activeUserId || (typeof window !== 'undefined' ? (localStorage.getItem(STORAGE_PREFIX + 'userId') || '') : '');
+    if (activeId) {
+      const activeUser = users.find((u) => u.id === activeId) || INITIAL_USERS.find((u) => u.id === activeId);
+      if (activeUser && activeUser.role === role) {
+        setCurrentUserState(activeUser);
+        setActiveUserId(activeUser.id);
+        localStorage.setItem(STORAGE_PREFIX + 'userId', activeUser.id);
+        return;
+      }
+    }
+
+    // Preserve cached session user if they match the requested role
+    const cachedSession = getCachedUserSession();
+    if (cachedSession?.user && (cachedSession.user.role === role || cachedSession.role === role)) {
+      const userToRestore = cachedSession.user;
+      setCurrentUserState(userToRestore);
+      setActiveUserId(userToRestore.id);
+      localStorage.setItem(STORAGE_PREFIX + 'userId', userToRestore.id);
       return;
     }
 
