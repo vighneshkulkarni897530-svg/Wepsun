@@ -375,8 +375,8 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                       <Award className="w-3 h-3" />
                       <span>{masterProfile?.masterId || 'WEP-MASTER'}</span>
                     </span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100/90 text-blue-800 font-mono">
-                      {masterProfile?.badgeTag || 'Executive Admin'}
+                    <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-900 font-mono tracking-wide">
+                      MANAGING DIRECTOR & CEO
                     </span>
                     <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-full flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -389,7 +389,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                   </h1>
 
                   <p className="text-xs sm:text-sm text-slate-600 font-medium line-clamp-1 mt-0.5">
-                    {masterProfile?.designation || "Overview of WEPSUN's real-time elevator service operations."}
+                    <span className="font-bold text-slate-800">Managing Director & CEO</span> • {masterProfile?.executiveFocus || "Overview of WEPSUN's real-time elevator service operations."}
                   </p>
                 </div>
               </div>
@@ -1314,7 +1314,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             {/* Footer link to Profile & Settings */}
             <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
               <span className="text-slate-500 font-mono">
-                Clearance: <strong className="text-slate-700">Level 3 Master</strong>
+                Clearance: <strong className="text-slate-800">Level 5 Supreme Master (MD & CEO)</strong>
               </span>
               <button
                 type="button"

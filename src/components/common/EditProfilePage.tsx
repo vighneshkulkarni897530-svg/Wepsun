@@ -712,7 +712,7 @@ export const EditProfilePage: React.FC<EditProfilePageProps> = ({ onBack, onSave
                   {masterDef ? (
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 text-[#0066FF] border border-blue-200/80 text-[10px] font-bold font-mono">
                       <ShieldCheck className="w-3.5 h-3.5 text-[#0066FF]" />
-                      {masterDef.masterId} • MASTER ADMIN {masterSlot}
+                      {masterDef.masterId} • MANAGING DIRECTOR & CEO
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-[10px] font-bold">

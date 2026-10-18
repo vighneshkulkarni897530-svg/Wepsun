@@ -77,11 +77,11 @@ export const AdminProfileSettingsView: React.FC = () => {
   const [email, setEmail] = useState(() => savedProfile?.email || currentUser.email || masterDef?.email || 'admin@wepsun.com');
   const [phone, setPhone] = useState(() => savedProfile?.phone || currentUser.phone || masterDef?.phone || '+91 98201 55432');
   const [masterId] = useState(() => masterDef?.masterId || 'WEP-MASTER');
-  const [designation, setDesignation] = useState(() => savedProfile?.designation || currentUser.designation || masterDef?.designation || 'Operations Head & Director');
-  const [department, setDepartment] = useState(() => savedProfile?.department || masterDef?.department || 'Executive Administration');
+  const [designation, setDesignation] = useState(() => savedProfile?.designation || currentUser.designation || masterDef?.designation || 'Managing Director & CEO');
+  const [department, setDepartment] = useState(() => savedProfile?.department || masterDef?.department || 'Executive Directorate');
   const [companyName, setCompanyName] = useState(() => savedProfile?.companyName || currentUser.companyName || activeCompany.name || 'WEPSUN Engineering Solution');
   const [address, setAddress] = useState(() => savedProfile?.address || currentUser.address || 'Plot No. 18, MIDC Industrial Estate, Thane West, Mumbai - 400604');
-  const [bio, setBio] = useState(() => savedProfile?.bio || currentUser.bio || masterDef?.bio || 'Managing elevator service operations, preventive maintenance pipelines, and client SLA compliance.');
+  const [bio, setBio] = useState(() => savedProfile?.bio || currentUser.bio || masterDef?.bio || 'Co-Managing Director & CEO overseeing vertical transportation operations, contract governance, and client SLA compliance.');
   const [avatar, setAvatar] = useState(() => isValidCustomAvatar(effectiveAdminAvatar) ? effectiveAdminAvatar : (masterDef?.defaultAvatar || ''));
   const [isCustomAvatarOpen, setIsCustomAvatarOpen] = useState(false);
   const [customAvatarUrl, setCustomAvatarUrl] = useState('');
@@ -95,8 +95,8 @@ export const AdminProfileSettingsView: React.FC = () => {
     setName(sp?.name || currentUser.name || masterDef?.name || '');
     setEmail(sp?.email || currentUser.email || masterDef?.email || '');
     setPhone(sp?.phone || currentUser.phone || masterDef?.phone || '');
-    setDesignation(sp?.designation || currentUser.designation || masterDef?.designation || 'Operations Head & Director');
-    setDepartment(sp?.department || masterDef?.department || 'Executive Administration');
+    setDesignation(sp?.designation || currentUser.designation || masterDef?.designation || 'Managing Director & CEO');
+    setDepartment(sp?.department || masterDef?.department || 'Executive Directorate');
     setCompanyName(sp?.companyName || currentUser.companyName || activeCompany.name);
     setAddress(sp?.address || currentUser.address || 'Plot No. 18, MIDC Industrial Estate, Thane West, Mumbai - 400604');
     setBio(sp?.bio || currentUser.bio || masterDef?.bio || 'Managing elevator service operations, preventive maintenance pipelines, and client SLA compliance.');
@@ -305,8 +305,8 @@ export const AdminProfileSettingsView: React.FC = () => {
               </div>
 
               <div className="flex sm:flex-col items-center sm:items-end justify-between gap-2 border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100">
-                <span className="px-3 py-1 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[11px] font-bold uppercase tracking-wide shadow-xs">
-                  {masterSlot === 1 ? 'MASTER ADMIN 1' : masterSlot === 2 ? 'MASTER ADMIN 2' : 'MASTER ADMIN'}
+                <span className="px-3 py-1 rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white text-[11px] font-black uppercase tracking-wide shadow-xs">
+                  MANAGING DIRECTOR & CEO
                 </span>
                 <span className="text-[11px] text-slate-400 font-medium">
                   {department}
