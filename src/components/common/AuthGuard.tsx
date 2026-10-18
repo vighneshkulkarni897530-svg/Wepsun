@@ -26,8 +26,11 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({
   useEffect(() => {
     if (!isAuthLoading && !isAuthenticated) {
       if (typeof window !== 'undefined') {
-        window.history.replaceState(null, '', `#${fallbackHash}`);
-        window.location.hash = fallbackHash;
+        const cur = window.location.hash.toLowerCase().replace('#', '').split('?')[0];
+        if (cur !== fallbackHash && cur !== 'home' && cur !== 'landing' && cur !== '') {
+          window.history.replaceState(null, '', `#${fallbackHash}`);
+          window.location.hash = fallbackHash;
+        }
       }
     }
   }, [isAuthenticated, isAuthLoading, fallbackHash]);

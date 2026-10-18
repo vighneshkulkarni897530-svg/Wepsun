@@ -220,9 +220,11 @@ export const AppContent: React.FC = () => {
       sessionStorage.getItem('wepsun_user_session') ||
       localStorage.getItem('wepsun_lift_saas_v2_currentUser');
 
-    // If no tokens or session exist at all, unauthenticated -> show login
+    // If no tokens or session exist at all, unauthenticated -> show login/landing screen
     if (!token && !refresh && !cachedSession) {
-      if (PUBLIC_HASHES.includes(hash)) return false;
+      if (hash === 'feedback-form' || hash === 'rate-service' || hash === 'customer-review' || hash === 'public-feedback' || hash === 'rate') {
+        return false;
+      }
       return true;
     }
 
@@ -276,9 +278,13 @@ export const AppContent: React.FC = () => {
               ? 'dashboard'
               : 'home';
 
-          window.history.replaceState(null, '', `#${defaultTab}`);
-          setCurrentHash(defaultTab);
-          setActiveTab(defaultTab);
+          if (hash !== defaultTab) {
+            window.history.replaceState(null, '', `#${defaultTab}`);
+            setCurrentHash(defaultTab);
+          }
+          if (activeTab !== defaultTab) {
+            setActiveTab(defaultTab);
+          }
           setIsFullLoginPage(false);
           return;
         }
@@ -300,9 +306,13 @@ export const AppContent: React.FC = () => {
 
         if (isForbiddenAdminRoute) {
           const fallback = currentRole === 'client' ? 'home' : 'jobs';
-          window.history.replaceState(null, '', `#${fallback}`);
-          setCurrentHash(fallback);
-          setActiveTab(fallback as NavTabId);
+          if (hash !== fallback) {
+            window.history.replaceState(null, '', `#${fallback}`);
+            setCurrentHash(fallback);
+          }
+          if (activeTab !== fallback) {
+            setActiveTab(fallback as NavTabId);
+          }
           setIsFullLoginPage(false);
           showToast('warning', 'Master Authentication Required', 'Please enter your authorized Master ID to access the Admin Dashboard.');
           return;
@@ -379,8 +389,10 @@ export const AppContent: React.FC = () => {
         }
 
         if (!hash || !PUBLIC_HASHES.includes(hash)) {
-          window.history.replaceState(null, '', '#home');
-          setCurrentHash('home');
+          if (hash !== 'home') {
+            window.history.replaceState(null, '', '#home');
+            setCurrentHash('home');
+          }
         }
         setIsFullLoginPage(true);
         return;
@@ -394,7 +406,7 @@ export const AppContent: React.FC = () => {
       window.removeEventListener('hashchange', handleHashChange);
       window.removeEventListener('popstate', handleHashChange);
     };
-  }, [lifts, currentRole, isAuthenticated, isAuthLoading]);
+  }, [currentRole, isAuthenticated, isAuthLoading]);
 
   const clientUsers = users.filter((u) => u.role === 'client');
 
@@ -439,8 +451,20 @@ export const AppContent: React.FC = () => {
 
     // Admin / Operations / Management Portal (Protected: Requires Verified Master Admin Session)
     if (!isMasterAdminAuthenticated()) {
-      window.location.hash = 'login-technician';
-      return null;
+      return (
+        <div className="max-w-md mx-auto my-12 p-8 bg-white rounded-2xl border border-slate-200 text-center shadow-sm">
+          <h2 className="text-lg font-bold text-slate-900 mb-2">Master Admin Access Required</h2>
+          <p className="text-xs text-slate-500 mb-6">Please sign in with your authorized Master Admin credentials.</p>
+          <button
+            onClick={() => {
+              window.location.hash = 'login';
+            }}
+            className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition cursor-pointer"
+          >
+            Go to Master Login
+          </button>
+        </div>
+      );
     }
 
     switch (activeTab) {

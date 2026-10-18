@@ -1293,8 +1293,10 @@ function mapServerServiceReport(sr: any): ServiceReport {
     if (activeId) {
       const activeUser = users.find((u) => u.id === activeId) || INITIAL_USERS.find((u) => u.id === activeId);
       if (activeUser && activeUser.role === role) {
-        setCurrentUserState(activeUser);
-        setActiveUserId(activeUser.id);
+        if (currentUser.id !== activeUser.id) {
+          setCurrentUserState(activeUser);
+          setActiveUserId(activeUser.id);
+        }
         localStorage.setItem(STORAGE_PREFIX + 'userId', activeUser.id);
         return;
       }
@@ -1304,16 +1306,20 @@ function mapServerServiceReport(sr: any): ServiceReport {
     const cachedSession = getCachedUserSession();
     if (cachedSession?.user && (cachedSession.user.role === role || cachedSession.role === role)) {
       const userToRestore = cachedSession.user;
-      setCurrentUserState(userToRestore);
-      setActiveUserId(userToRestore.id);
+      if (currentUser.id !== userToRestore.id) {
+        setCurrentUserState(userToRestore);
+        setActiveUserId(userToRestore.id);
+      }
       localStorage.setItem(STORAGE_PREFIX + 'userId', userToRestore.id);
       return;
     }
 
     const roleUser = users.find((u) => u.role === role) || INITIAL_USERS.find((u) => u.role === role);
     if (roleUser) {
-      setCurrentUserState(roleUser);
-      setActiveUserId(roleUser.id);
+      if (currentUser.id !== roleUser.id) {
+        setCurrentUserState(roleUser);
+        setActiveUserId(roleUser.id);
+      }
       localStorage.setItem(STORAGE_PREFIX + 'userId', roleUser.id);
       if (roleUser.companyId) {
         setActiveCompanyIdState(roleUser.companyId);
