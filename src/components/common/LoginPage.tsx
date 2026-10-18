@@ -258,9 +258,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     }, 6000);
 
     try {
+      const isMasterCandidate = cleanIdentifier.toLowerCase().startsWith('wep-');
       const payload = {
-        email: cleanIdentifier.includes('@') ? cleanIdentifier : undefined,
-        phone: !cleanIdentifier.includes('@') ? cleanIdentifier : undefined,
+        email: cleanIdentifier.includes('@') || isMasterCandidate ? cleanIdentifier : undefined,
+        phone: !cleanIdentifier.includes('@') && !isMasterCandidate ? cleanIdentifier : undefined,
         password: password,
       };
 
@@ -276,14 +277,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         }
         if (authData.user) {
           const userRole = (authData.user.role || targetRole).toLowerCase() as UserRole;
-          const isAdminRole = userRole === 'company_admin' || userRole === 'super_admin' || userRole === 'master_admin';
+          const isMasterAdmin = userRole === 'master_admin';
 
-          if (isAdminRole) {
+          if (isMasterAdmin) {
             localStorage.setItem('wepsun_master_authenticated', 'true');
             sessionStorage.setItem('wepsun_master_authenticated', 'true');
             const expiry = Date.now() + 30 * 24 * 60 * 60 * 1000;
             localStorage.setItem('wepsun_master_session_expiry', String(expiry));
             sessionStorage.setItem('wepsun_master_session_expiry', String(expiry));
+            localStorage.setItem('wepsun_role', 'master_admin');
+            sessionStorage.setItem('wepsun_role', 'master_admin');
           }
 
           const rawAvatar = authData.user.avatarUrl || authData.user.avatar || '';

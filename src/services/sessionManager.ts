@@ -316,8 +316,19 @@ export function isMasterAdminSessionValid(): boolean {
   }
 
   const roleStr = String(payload.role || '').toUpperCase();
-  const isAdminRole = roleStr === 'MASTER_ADMIN' || roleStr === 'SUPER_ADMIN' || roleStr === 'COMPANY_ADMIN';
-  if (!isAdminRole) {
+  // ONLY Master Admin accounts with verified Master ID session are permitted to access the Admin Dashboard
+  const isMasterAdminRole = roleStr === 'MASTER_ADMIN';
+  if (!isMasterAdminRole) {
+    return false;
+  }
+
+  // Strictly verify the token identity belongs to one of the authorized Executive Master Admin slots
+  const userEmail = String(payload.email || '').toLowerCase().trim();
+  const authorizedMasterEmails = [
+    'jaiswalsumit2812@gmail.com',
+    'gauravsaini0004@gmail.com'
+  ];
+  if (userEmail && !authorizedMasterEmails.includes(userEmail)) {
     return false;
   }
 
@@ -772,7 +783,7 @@ export async function restoreAuthenticatedSession(): Promise<RestoredSessionResu
     const claims = decodeJwtPayload(tokenToDecode);
     if (claims && claims.sub) {
       const claimRole = (claims.role || '').toLowerCase();
-      const isClaimAdmin = claimRole === 'master_admin' || claimRole === 'company_admin' || claimRole === 'super_admin';
+      const isClaimAdmin = claimRole === 'master_admin';
       const fallbackRole: UserRole =
         claimRole === 'technician'
           ? 'technician'

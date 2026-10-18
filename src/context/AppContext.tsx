@@ -1274,6 +1274,10 @@ function mapServerServiceReport(sr: any): ServiceReport {
   };
 
   const setCurrentRole = (role: UserRole) => {
+    if ((role === 'company_admin' || role === 'master_admin' || role === 'super_admin') && !isMasterAdminSessionValid()) {
+      showToast('warning', 'Master Authentication Required', 'Only authorized Master Admins can access administrative roles.');
+      return;
+    }
     if (role === currentRole && currentUser.role === role) return;
     setCurrentRoleState(role);
     localStorage.setItem(STORAGE_PREFIX + 'role', role);

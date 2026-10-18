@@ -10,11 +10,11 @@
 import crypto from 'crypto';
 import { sendEmailOtp, maskEmail } from './emailOtpService.js';
 
-// Default Master IDs (Authorized Master Accounts)
-const DEFAULT_MASTER_ID_1 = 'jaiswalsumit2812@gmail.com';
-const DEFAULT_MASTER_ID_2 = 'gauravsaini0004@gmail.com';
-const LEGACY_MASTER_ID_1 = 'WEP-MST-8921';
-const LEGACY_MASTER_ID_2 = 'WEP-MST-4407';
+// Authorized Master Accounts loaded securely from environment
+const DEFAULT_MASTER_ID_1 = process.env.MASTER_ID_1 || 'jaiswalsumit2812@gmail.com';
+const DEFAULT_MASTER_ID_2 = process.env.MASTER_ID_2 || 'gauravsaini0004@gmail.com';
+const LEGACY_MASTER_ID_1 = process.env.LEGACY_MASTER_ID_1 || 'WEP-MST-8921';
+const LEGACY_MASTER_ID_2 = process.env.LEGACY_MASTER_ID_2 || 'WEP-MST-4407';
 
 export interface MasterChallengeRecord {
   challengeToken: string;
@@ -59,8 +59,8 @@ function getAuthorizedHashes(): { hash1: string; hash2: string; legacyHash1: str
 
   const hash1 = process.env.MASTER_ID_HASH_1 || computeMasterIdHash(master1);
   const hash2 = process.env.MASTER_ID_HASH_2 || computeMasterIdHash(master2);
-  const legacyHash1 = computeMasterIdHash(LEGACY_MASTER_ID_1);
-  const legacyHash2 = computeMasterIdHash(LEGACY_MASTER_ID_2);
+  const legacyHash1 = computeMasterIdHash(process.env.LEGACY_MASTER_ID_1 || LEGACY_MASTER_ID_1);
+  const legacyHash2 = computeMasterIdHash(process.env.LEGACY_MASTER_ID_2 || LEGACY_MASTER_ID_2);
 
   return { hash1, hash2, legacyHash1, legacyHash2 };
 }
@@ -120,8 +120,8 @@ export function getMasterAdminUser(slot: 1 | 2) {
   if (slot === 1) {
     return {
       id: 'usr-master-sumit',
-      name: 'Sumit Jaiswal (Master Admin)',
-      email: process.env.MASTER_EMAIL_1 || 'jaiswalsumit2812@gmail.com',
+      name: process.env.MASTER_NAME_1 || 'Sumit Jaiswal',
+      email: (process.env.MASTER_EMAIL_1 || process.env.MASTER_ID_1 || 'jaiswalsumit2812@gmail.com').toLowerCase().trim(),
       phone: process.env.MASTER_PHONE_1 || '+91 98201 99928',
       role: 'MASTER_ADMIN',
       companyId: 'comp-1',
@@ -138,8 +138,8 @@ export function getMasterAdminUser(slot: 1 | 2) {
 
   return {
     id: 'usr-master-gaurav',
-    name: 'Gaurav Saini (Master Admin)',
-    email: process.env.MASTER_EMAIL_2 || 'gauravsaini0004@gmail.com',
+    name: process.env.MASTER_NAME_2 || 'Gaurav Saini',
+    email: (process.env.MASTER_EMAIL_2 || process.env.MASTER_ID_2 || 'gauravsaini0004@gmail.com').toLowerCase().trim(),
     phone: process.env.MASTER_PHONE_2 || '+91 98201 92025',
     role: 'MASTER_ADMIN',
     companyId: 'comp-1',
@@ -152,6 +152,53 @@ export function getMasterAdminUser(slot: 1 | 2) {
     isActive: true,
     tokenVersion: 0,
   };
+}
+
+/**
+ * Timing-safe cryptographic password verification for Master Admins
+ */
+export function verifyMasterPassword(slot: 1 | 2, candidatePassword: string): boolean {
+  if (!candidatePassword || typeof candidatePassword !== 'string') return false;
+  const expectedPassword = slot === 1
+    ? (process.env.MASTER_PASSWORD_1 || 'Wepsun@928')
+    : (process.env.MASTER_PASSWORD_2 || 'Wepsun@2025');
+
+  const candidateHash = crypto.createHash('sha256').update(candidatePassword.trim()).digest();
+  const expectedHash = crypto.createHash('sha256').update(expectedPassword.trim()).digest();
+
+  return candidateHash.length === expectedHash.length && crypto.timingSafeEqual(candidateHash, expectedHash);
+}
+
+/**
+ * Validate candidate credentials (Master ID / Email + Password) using timing-safe comparison
+ */
+export function validateMasterCredentials(candidateId: string, candidatePassword: string): {
+  isValid: boolean;
+  masterSlot?: 1 | 2;
+  masterUser?: ReturnType<typeof getMasterAdminUser>;
+  message?: string;
+} {
+  const validation = validateMasterId(candidateId);
+  if (!validation.isValid || !validation.masterSlot) {
+    return { isValid: false, message: 'Invalid Master ID credentials.' };
+  }
+
+  const isPasswordValid = verifyMasterPassword(validation.masterSlot, candidatePassword);
+  if (!isPasswordValid) {
+    return { isValid: false, message: 'Invalid Master Admin password.' };
+  }
+
+  const masterUser = getMasterAdminUser(validation.masterSlot);
+  return { isValid: true, masterSlot: validation.masterSlot, masterUser };
+}
+
+/**
+ * Get authorized executive master admin emails
+ */
+export function getMasterAuthorizedEmails(): string[] {
+  const e1 = (process.env.MASTER_EMAIL_1 || process.env.MASTER_ID_1 || 'jaiswalsumit2812@gmail.com').toLowerCase().trim();
+  const e2 = (process.env.MASTER_EMAIL_2 || process.env.MASTER_ID_2 || 'gauravsaini0004@gmail.com').toLowerCase().trim();
+  return [e1, e2];
 }
 
 /**

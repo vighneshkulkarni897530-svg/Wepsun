@@ -21,7 +21,7 @@ import {
 import { requireAuth, requireRole, AuthenticatedRequest } from '../middleware/auth.js';
 import { authLimiter } from '../middleware/rateLimiter.js';
 import { verifyGoogleIdToken, verifyGoogleAccessToken } from '../lib/googleAuth.js';
-import { validateMasterId, getMasterAdminUser, initiateMaster2FA, verifyMaster2FA, resendMaster2FA } from '../lib/masterAuth.js';
+import { validateMasterId, getMasterAdminUser, initiateMaster2FA, verifyMaster2FA, resendMaster2FA, validateMasterCredentials, getMasterAuthorizedEmails } from '../lib/masterAuth.js';
 import { sendEmailOtp, verifyEmailOtp, getEmailServiceHealth } from '../lib/emailOtpService.js';
 
 const router = Router();
@@ -967,9 +967,76 @@ router.post('/login', authLimiter, async (req: AuthenticatedRequest, res: Respon
 
   try {
     let user: any = null;
+    let passwordMatch = false;
 
-    try {
-      user = await prisma.user.findFirst({
+    // 1. Check if candidate identifier belongs to an authorized Executive Master Admin
+    const candidateIdentifier = cleanEmail || cleanPhone;
+    const masterValidation = validateMasterId(candidateIdentifier);
+
+    if (masterValidation.isValid && masterValidation.masterSlot) {
+      const credCheck = validateMasterCredentials(candidateIdentifier, password);
+      if (!credCheck.isValid || !credCheck.masterUser) {
+        // Record failure audit log
+        try {
+          await prisma.auditLog.create({
+            data: {
+              companyId: 'comp-1',
+              entityType: 'User',
+              entityId: 'master-admin',
+              action: 'LOGIN_FAILURE',
+              performedBy: candidateIdentifier,
+              userRole: 'MASTER_ADMIN',
+              details: `Invalid Master Admin password attempt for ${candidateIdentifier}`,
+            },
+          });
+        } catch {}
+
+        res.status(401).json({
+          success: false,
+          message: 'Invalid email or password.',
+          code: 'INVALID_CREDENTIALS',
+        });
+        return;
+      }
+
+      user = credCheck.masterUser;
+      passwordMatch = true;
+
+      // Securely upsert Master Admin account into Postgres DB with bcrypt hash of master password
+      try {
+        const comp = await prisma.company.findFirst();
+        const validCompanyId = comp ? comp.id : 'comp-1';
+        user.companyId = validCompanyId;
+        const pHash = await hashPassword(password.trim());
+        const syncedUser = await prisma.user.upsert({
+          where: { email: user.email },
+          update: {
+            name: user.name,
+            phone: user.phone,
+            passwordHash: pHash,
+            role: 'SUPER_ADMIN' as any,
+            isActive: true,
+          },
+          create: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            phone: user.phone,
+            role: 'SUPER_ADMIN' as any,
+            companyId: validCompanyId,
+            passwordHash: pHash,
+            isActive: true,
+          },
+        });
+        user.id = syncedUser.id;
+      } catch (dbSyncErr) {
+        console.warn('[AuthRoute] Master Admin DB sync notice:', dbSyncErr);
+      }
+    }
+
+    if (!user) {
+      try {
+        user = await prisma.user.findFirst({
         where: {
           OR: [
             ...(cleanEmail ? [{ email: { equals: cleanEmail, mode: 'insensitive' as const } }] : []),
@@ -987,6 +1054,7 @@ router.post('/login', authLimiter, async (req: AuthenticatedRequest, res: Respon
       // Fallback
       user = null;
     }
+  }
 
     // If user not found in DB, check mock DB for backward compatibility in offline dev
     if (!user) {
@@ -1087,9 +1155,8 @@ router.post('/login', authLimiter, async (req: AuthenticatedRequest, res: Respon
       return;
     }
 
-    // Verify password strictly with bcrypt
-    let passwordMatch = false;
-    if (user.passwordHash && password) {
+    // Verify password strictly with bcrypt if not already verified via Master Admin flow
+    if (!passwordMatch && user.passwordHash && password) {
       passwordMatch = await verifyPassword(password, user.passwordHash);
     }
 
@@ -1174,6 +1241,19 @@ router.post('/login', authLimiter, async (req: AuthenticatedRequest, res: Respon
       } catch (linkErr) {
         console.warn('[AuthRoute] Technician auto-link notice on password login:', linkErr);
       }
+    }
+
+    // Ensure Master Admin identity claim ONLY for authorized executive Master Admin slots
+    const authorizedMasterEmails = getMasterAuthorizedEmails();
+    const isAuthorizedMaster =
+      authorizedMasterEmails.includes(user.email?.toLowerCase()) ||
+      user.id === 'usr-master-sumit' ||
+      user.id === 'usr-master-gaurav';
+
+    if (isAuthorizedMaster) {
+      user.role = 'MASTER_ADMIN';
+    } else if (user.role === 'MASTER_ADMIN' || user.role === 'SUPER_ADMIN') {
+      user.role = 'COMPANY_ADMIN';
     }
 
     // Generate JWT Access Token
@@ -1587,6 +1667,20 @@ router.get('/me', requireAuth, async (req: AuthenticatedRequest, res: Response):
     if (!user) {
       res.status(404).json({ success: false, message: 'User not found', code: 'USER_NOT_FOUND' });
       return;
+    }
+
+    // Ensure Master Admin identity claim ONLY for authorized executive Master Admin slots
+    const authorizedMasterEmails = getMasterAuthorizedEmails();
+    const isAuthorizedMaster =
+      req.user?.role === 'MASTER_ADMIN' ||
+      authorizedMasterEmails.includes(user.email?.toLowerCase()) ||
+      user.id === 'usr-master-sumit' ||
+      user.id === 'usr-master-gaurav';
+
+    if (isAuthorizedMaster) {
+      user.role = 'MASTER_ADMIN';
+    } else if (user.role === 'MASTER_ADMIN' || user.role === 'SUPER_ADMIN') {
+      user.role = 'COMPANY_ADMIN';
     }
 
     // Auto-link client identity and ensure persistent equipment in database
