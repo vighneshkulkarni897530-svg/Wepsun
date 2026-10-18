@@ -41,3 +41,42 @@ services:
         sync: false
       - key: SMTP_FROM
         sync: false
+      - key: DIRECT_URL
+        sync: false
+      # Executive Master Admin Credentials (Safer Path)
+      - key: MASTER_ID_1
+        value: "WEP-MST-8921"
+      - key: LEGACY_MASTER_ID_1
+        value: "WEP-MST-8921"
+      - key: MASTER_NAME_1
+        value: "Sumit Jaiswal"
+      - key: MASTER_EMAIL_1
+        value: "jaiswalsumit2812@gmail.com"
+      - key: MASTER_PHONE_1
+        value: "+919820155432"
+      - key: MASTER_PASSWORD_1
+        sync: false
+      - key: MASTER_ID_2
+        value: "WEP-MST-4407"
+      - key: LEGACY_MASTER_ID_2
+        value: "WEP-MST-4407"
+      - key: MASTER_NAME_2
+        value: "Gaurav Saini"
+      - key: MASTER_EMAIL_2
+        value: "gauravsaini0004@gmail.com"
+      - key: MASTER_PHONE_2
+        value: "+919876543210"
+      - key: MASTER_PASSWORD_2
+        sync: false
+
+  - type: static
+    name: wepsun-frontend
+    buildCommand: npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        value: https://wepsun.onrender.com/api

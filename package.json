@@ -24,6 +24,7 @@
     "test:sync": "tsx backend/src/tests/crossDeviceSync.test.ts",
     "test:all": "tsx backend/src/tests/dbIntegration.test.ts && tsx backend/src/tests/authSecurity.test.ts && tsx backend/src/tests/sessionRestoration.test.ts && tsx backend/src/tests/crossDeviceSync.test.ts",
     "test": "npm run test:all",
+    "audit:prod": "tsx scripts/verify-production-env.ts",
     "cap:sync": "npm run build && cap sync",
     "cap:open:android": "cap open android",
     "cap:build:apk": "npm run build && cap sync android && cd android && gradlew assembleDebug && cd ..",
