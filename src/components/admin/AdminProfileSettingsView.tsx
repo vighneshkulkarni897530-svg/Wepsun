@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   User,
   Mail,
@@ -18,11 +18,16 @@ import {
   Camera,
   Briefcase,
   FileText,
+  Copy,
+  Check,
+  Award,
+  Sparkles,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { AuditLogViewer } from './AuditLogViewer';
 import { EditProfilePage } from '../common/EditProfilePage';
 import { getEffectiveProfilePhoto, isValidCustomAvatar } from '../../utils/avatarUtils';
+import { detectMasterAdminSlot, MASTER_ADMIN_PROFILES } from '../../utils/masterAdminProfiles';
 
 export const AdminProfileSettingsView: React.FC = () => {
   const {
@@ -51,37 +56,71 @@ export const AdminProfileSettingsView: React.FC = () => {
     };
   }, []);
 
-  const effectiveAdminAvatar = getEffectiveProfilePhoto(currentUser.avatar, null, currentUser.id);
+  const masterSlot = detectMasterAdminSlot(currentUser);
+  const masterDef = masterSlot ? MASTER_ADMIN_PROFILES[masterSlot] : null;
 
-  // Profile Information Fields synced from currentUser
-  const [name, setName] = useState(currentUser.name || 'WEPSUN Administrator');
-  const [email, setEmail] = useState(currentUser.email || 'admin@wepsun.com');
-  const [phone, setPhone] = useState(currentUser.phone || '+91 98201 55432');
-  const [designation, setDesignation] = useState(currentUser.designation || 'Operations Head & Director');
-  const [companyName, setCompanyName] = useState(currentUser.companyName || activeCompany.name || 'WEPSUN Engineering Solution');
-  const [address, setAddress] = useState(currentUser.address || 'Plot No. 18, MIDC Industrial Estate, Thane West, Mumbai - 400604');
-  const [bio, setBio] = useState(currentUser.bio || 'Managing elevator service operations, preventive maintenance pipelines, and client SLA compliance.');
-  const [avatar, setAvatar] = useState(isValidCustomAvatar(effectiveAdminAvatar) ? effectiveAdminAvatar : '');
+  // Stored profile cache per user ID
+  const savedProfile = useMemo(() => {
+    if (typeof window === 'undefined' || !currentUser.id) return null;
+    try {
+      const raw = localStorage.getItem('wepsun_master_profile_' + currentUser.id);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }, [currentUser.id]);
+
+  const effectiveAdminAvatar = getEffectiveProfilePhoto(currentUser.avatar, null, currentUser.id) || masterDef?.defaultAvatar || '';
+
+  // Profile Information Fields synced from currentUser & master metadata
+  const [name, setName] = useState(() => savedProfile?.name || currentUser.name || masterDef?.name || 'WEPSUN Administrator');
+  const [email, setEmail] = useState(() => savedProfile?.email || currentUser.email || masterDef?.email || 'admin@wepsun.com');
+  const [phone, setPhone] = useState(() => savedProfile?.phone || currentUser.phone || masterDef?.phone || '+91 98201 55432');
+  const [masterId] = useState(() => masterDef?.masterId || 'WEP-MASTER');
+  const [designation, setDesignation] = useState(() => savedProfile?.designation || currentUser.designation || masterDef?.designation || 'Operations Head & Director');
+  const [department, setDepartment] = useState(() => savedProfile?.department || masterDef?.department || 'Executive Administration');
+  const [companyName, setCompanyName] = useState(() => savedProfile?.companyName || currentUser.companyName || activeCompany.name || 'WEPSUN Engineering Solution');
+  const [address, setAddress] = useState(() => savedProfile?.address || currentUser.address || 'Plot No. 18, MIDC Industrial Estate, Thane West, Mumbai - 400604');
+  const [bio, setBio] = useState(() => savedProfile?.bio || currentUser.bio || masterDef?.bio || 'Managing elevator service operations, preventive maintenance pipelines, and client SLA compliance.');
+  const [avatar, setAvatar] = useState(() => isValidCustomAvatar(effectiveAdminAvatar) ? effectiveAdminAvatar : (masterDef?.defaultAvatar || ''));
   const [isCustomAvatarOpen, setIsCustomAvatarOpen] = useState(false);
   const [customAvatarUrl, setCustomAvatarUrl] = useState('');
+  const [isCopiedId, setIsCopiedId] = useState(false);
+  const [auditFilterMode, setAuditFilterMode] = useState<'all' | 'mine'>('mine');
 
   // Update local fields when currentUser changes (e.g. user switch)
   useEffect(() => {
-    setName(currentUser.name || '');
-    setEmail(currentUser.email || '');
-    setPhone(currentUser.phone || '');
-    setDesignation(currentUser.designation || (currentUser.role === 'super_admin' ? 'Global Platform Super Admin' : 'Operations Head & Director'));
-    setCompanyName(currentUser.companyName || activeCompany.name);
-    setAddress(currentUser.address || 'Plot No. 18, MIDC Industrial Estate, Thane West, Mumbai - 400604');
-    setBio(currentUser.bio || 'Managing elevator service operations, preventive maintenance pipelines, and client SLA compliance.');
-    const eff = getEffectiveProfilePhoto(currentUser.avatar, null, currentUser.id);
-    setAvatar(isValidCustomAvatar(eff) ? eff : '');
-  }, [currentUser, activeCompany]);
+    const raw = typeof window !== 'undefined' && currentUser.id ? localStorage.getItem('wepsun_master_profile_' + currentUser.id) : null;
+    const sp = raw ? JSON.parse(raw) : null;
+    setName(sp?.name || currentUser.name || masterDef?.name || '');
+    setEmail(sp?.email || currentUser.email || masterDef?.email || '');
+    setPhone(sp?.phone || currentUser.phone || masterDef?.phone || '');
+    setDesignation(sp?.designation || currentUser.designation || masterDef?.designation || 'Operations Head & Director');
+    setDepartment(sp?.department || masterDef?.department || 'Executive Administration');
+    setCompanyName(sp?.companyName || currentUser.companyName || activeCompany.name);
+    setAddress(sp?.address || currentUser.address || 'Plot No. 18, MIDC Industrial Estate, Thane West, Mumbai - 400604');
+    setBio(sp?.bio || currentUser.bio || masterDef?.bio || 'Managing elevator service operations, preventive maintenance pipelines, and client SLA compliance.');
+    const eff = getEffectiveProfilePhoto(currentUser.avatar, null, currentUser.id) || masterDef?.defaultAvatar || '';
+    setAvatar(isValidCustomAvatar(eff) ? eff : (masterDef?.defaultAvatar || ''));
+  }, [currentUser, activeCompany, masterDef]);
   
-  // Notification Preferences
-  const [emailAlerts, setEmailAlerts] = useState(true);
-  const [smsAlerts, setSmsAlerts] = useState(true);
-  const [whatsappAlerts, setWhatsappAlerts] = useState(true);
+  // Notification Preferences (saved per admin)
+  const notifPrefKey = `wepsun_admin_notifs_${currentUser.id || 'default'}`;
+  const [emailAlerts, setEmailAlerts] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    const saved = localStorage.getItem(notifPrefKey + '_email');
+    return saved !== null ? saved === 'true' : true;
+  });
+  const [smsAlerts, setSmsAlerts] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    const saved = localStorage.getItem(notifPrefKey + '_sms');
+    return saved !== null ? saved === 'true' : true;
+  });
+  const [whatsappAlerts, setWhatsappAlerts] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    const saved = localStorage.getItem(notifPrefKey + '_whatsapp');
+    return saved !== null ? saved === 'true' : true;
+  });
   const [criticalBreakdownAlerts, setCriticalBreakdownAlerts] = useState(true);
 
   // Security Fields
@@ -90,9 +129,18 @@ export const AdminProfileSettingsView: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(true);
 
+  const handleCopyMasterId = () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(masterId);
+      setIsCopiedId(true);
+      setTimeout(() => setIsCopiedId(false), 2000);
+      showToast('success', 'Master ID Copied', `${masterId} copied to clipboard.`);
+    }
+  };
+
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
-    updateUserProfile({
+    const updated = {
       name: name.trim(),
       email: email.trim(),
       phone: phone.trim(),
@@ -101,7 +149,22 @@ export const AdminProfileSettingsView: React.FC = () => {
       address: address.trim(),
       bio: bio.trim(),
       avatar: avatar.trim(),
-    });
+    };
+
+    if (typeof window !== 'undefined' && currentUser.id) {
+      try {
+        localStorage.setItem('wepsun_master_profile_' + currentUser.id, JSON.stringify({ ...updated, department }));
+        localStorage.setItem(notifPrefKey + '_email', String(emailAlerts));
+        localStorage.setItem(notifPrefKey + '_sms', String(smsAlerts));
+        localStorage.setItem(notifPrefKey + '_whatsapp', String(whatsappAlerts));
+      } catch {}
+    }
+
+    updateUserProfile(updated);
+    showSuccessModal(
+      'Profile Updated Successfully',
+      `${name.trim()}'s profile and administrative preferences have been saved.`
+    );
   };
 
   const handlePasswordChange = (e: React.FormEvent) => {
@@ -190,32 +253,63 @@ export const AdminProfileSettingsView: React.FC = () => {
       {activeTab === 'profile' && (
         <form onSubmit={handleSaveProfile} className="space-y-6">
           <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm space-y-5">
-            <div className="flex items-center gap-4 pb-5 border-b border-slate-100">
-              <div className="relative group shrink-0">
-                {isValidCustomAvatar(effectiveAdminAvatar) ? (
-                  <img
-                    src={effectiveAdminAvatar}
-                    alt={name}
-                    className="w-16 h-16 rounded-2xl object-cover ring-4 ring-blue-50 shadow-sm border border-slate-200"
-                  />
-                ) : (
-                  <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 ring-4 ring-blue-50 shadow-sm border border-slate-200">
-                    <User className="w-8 h-8 text-slate-400" />
+            {/* Executive Identity Card */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
+              <div className="flex items-center gap-4">
+                <div className="relative group shrink-0">
+                  {isValidCustomAvatar(effectiveAdminAvatar) ? (
+                    <img
+                      src={effectiveAdminAvatar}
+                      alt={name}
+                      className="w-16 h-16 rounded-2xl object-cover ring-4 ring-blue-50 shadow-sm border border-slate-200"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center text-[#1976D2] ring-4 ring-blue-50 shadow-sm border border-slate-200 font-bold text-xl">
+                      {name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
+                    </div>
+                  )}
+                  <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white ring-2 ring-emerald-500/20" title="Online & Active" />
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingFull(true)}
+                    className="absolute -bottom-1 -right-1 w-6 h-6 rounded-lg bg-[#0066FF] hover:bg-[#0052cc] text-white flex items-center justify-center shadow-md border-2 border-white transition-transform hover:scale-110 cursor-pointer"
+                    title="Update Profile Photo"
+                  >
+                    <Camera className="w-3 h-3" />
+                  </button>
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="font-bold text-base text-slate-900">{name}</h3>
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+                      <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                      Verified Root Admin
+                    </span>
                   </div>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setIsEditingFull(true)}
-                  className="absolute -bottom-1 -right-1 w-6 h-6 rounded-lg bg-[#0066FF] hover:bg-[#0052cc] text-white flex items-center justify-center shadow-md border-2 border-white transition-transform hover:scale-110 cursor-pointer"
-                  title="Update Photo"
-                >
-                  <Camera className="w-3 h-3" />
-                </button>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">{designation}</p>
+                  <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                    <button
+                      type="button"
+                      onClick={handleCopyMasterId}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-[#0066FF] font-mono text-[11px] font-bold border border-blue-200/80 transition-all cursor-pointer"
+                      title="Click to copy Master ID"
+                    >
+                      <span>{masterId}</span>
+                      {isCopiedId ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                    </button>
+                    <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-mono text-[10px] font-bold">
+                      CLEARANCE: LVL-5
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div>
-                <h3 className="font-bold text-base text-slate-900">{name}</h3>
-                <span className="inline-block mt-0.5 px-2.5 py-0.5 rounded-full bg-blue-50 text-[#1976D2] font-bold text-[11px] uppercase">
-                  {currentRole.replace('_', ' ')}
+
+              <div className="flex sm:flex-col items-center sm:items-end justify-between gap-2 border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100">
+                <span className="px-3 py-1 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[11px] font-bold uppercase tracking-wide shadow-xs">
+                  {masterSlot === 1 ? 'MASTER ADMIN 1' : masterSlot === 2 ? 'MASTER ADMIN 2' : 'MASTER ADMIN'}
+                </span>
+                <span className="text-[11px] text-slate-400 font-medium">
+                  {department}
                 </span>
               </div>
             </div>
@@ -223,52 +317,127 @@ export const AdminProfileSettingsView: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
               <div>
                 <label className="font-semibold text-slate-700 block mb-1">Full Name</label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-[#F5F8FA] border border-slate-200 rounded-xl p-2.5 text-slate-900 focus:border-[#1976D2] outline-none font-medium"
-                />
+                <div className="relative">
+                  <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full bg-[#F5F8FA] border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-slate-900 focus:border-[#1976D2] outline-none font-medium"
+                  />
+                </div>
               </div>
 
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">Email Address</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-[#F5F8FA] border border-slate-200 rounded-xl p-2.5 text-slate-900 focus:border-[#1976D2] outline-none font-medium"
-                />
+                <label className="font-semibold text-slate-700 block mb-1">Master Administrator ID</label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    readOnly
+                    value={masterId}
+                    className="w-full bg-slate-100/80 border border-slate-200 text-slate-600 rounded-xl pl-9 pr-16 py-2.5 font-mono font-bold cursor-not-allowed select-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCopyMasterId}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-[#0066FF] hover:text-[#0052cc] px-2 py-1 rounded cursor-pointer"
+                  >
+                    {isCopiedId ? 'Copied' : 'Copy'}
+                  </button>
+                </div>
               </div>
 
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">Mobile Number</label>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full bg-[#F5F8FA] border border-slate-200 rounded-xl p-2.5 text-slate-900 focus:border-[#1976D2] outline-none font-medium font-mono"
-                />
+                <label className="font-semibold text-slate-700 block mb-1">Executive Designation</label>
+                <div className="relative">
+                  <Award className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={designation}
+                    onChange={(e) => setDesignation(e.target.value)}
+                    className="w-full bg-[#F5F8FA] border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-slate-900 focus:border-[#1976D2] outline-none font-medium"
+                  />
+                </div>
               </div>
 
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">Company / Society Name</label>
-                <input
-                  type="text"
-                  value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                  className="w-full bg-[#F5F8FA] border border-slate-200 rounded-xl p-2.5 text-slate-900 focus:border-[#1976D2] outline-none font-medium"
-                />
+                <label className="font-semibold text-slate-700 block mb-1">Department / Executive Portfolio</label>
+                <div className="relative">
+                  <Briefcase className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={department}
+                    onChange={(e) => setDepartment(e.target.value)}
+                    className="w-full bg-[#F5F8FA] border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-slate-900 focus:border-[#1976D2] outline-none font-medium"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Email Address (Login Credential)</label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full bg-[#F5F8FA] border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-slate-900 focus:border-[#1976D2] outline-none font-medium"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Mobile Hotline</label>
+                <div className="relative">
+                  <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="w-full bg-[#F5F8FA] border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-slate-900 focus:border-[#1976D2] outline-none font-medium font-mono"
+                  />
+                </div>
               </div>
 
               <div className="sm:col-span-2">
-                <label className="font-semibold text-slate-700 block mb-1">Official Address</label>
-                <textarea
-                  rows={2}
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  className="w-full bg-[#F5F8FA] border border-slate-200 rounded-xl p-2.5 text-slate-900 focus:border-[#1976D2] outline-none font-medium"
-                />
+                <label className="font-semibold text-slate-700 block mb-1">Company / Organization</label>
+                <div className="relative">
+                  <Building2 className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    className="w-full bg-[#F5F8FA] border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-slate-900 focus:border-[#1976D2] outline-none font-medium"
+                  />
+                </div>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="font-semibold text-slate-700 block mb-1">Head Office Address</label>
+                <div className="relative">
+                  <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  <textarea
+                    rows={2}
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    className="w-full bg-[#F5F8FA] border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-slate-900 focus:border-[#1976D2] outline-none font-medium"
+                  />
+                </div>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="font-semibold text-slate-700 block mb-1">Executive Bio & Strategic Focus</label>
+                <div className="relative">
+                  <FileText className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  <textarea
+                    rows={2}
+                    value={bio}
+                    onChange={(e) => setBio(e.target.value)}
+                    placeholder="Enter your executive overview or department scope..."
+                    className="w-full bg-[#F5F8FA] border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-slate-900 focus:border-[#1976D2] outline-none font-medium"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -485,7 +654,42 @@ export const AdminProfileSettingsView: React.FC = () => {
       {/* Tab 3: System Audit Trail */}
       {activeTab === 'audit' && (
         <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm space-y-4">
-          <AuditLogViewer />
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-700">Audit Scope:</span>
+              <div className="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setAuditFilterMode('mine')}
+                  className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                    auditFilterMode === 'mine'
+                      ? 'bg-white text-[#0066FF] shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  My Actions ({name.split(' ')[0]})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAuditFilterMode('all')}
+                  className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                    auditFilterMode === 'all'
+                      ? 'bg-white text-[#0066FF] shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  All System Logs
+                </button>
+              </div>
+            </div>
+            <p className="text-[11px] text-slate-400">
+              {auditFilterMode === 'mine' ? `Filtered by ${name}` : 'Showing all tenant events across company'}
+            </p>
+          </div>
+          <AuditLogViewer
+            actorFilter={auditFilterMode === 'mine' ? name : undefined}
+            onClearActorFilter={() => setAuditFilterMode('all')}
+          />
         </div>
       )}
     </div>

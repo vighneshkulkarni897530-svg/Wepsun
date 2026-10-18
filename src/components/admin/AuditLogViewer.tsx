@@ -14,7 +14,12 @@ import {
   Package,
 } from 'lucide-react';
 
-export const AuditLogViewer: React.FC = () => {
+interface AuditLogViewerProps {
+  actorFilter?: string;
+  onClearActorFilter?: () => void;
+}
+
+export const AuditLogViewer: React.FC<AuditLogViewerProps> = ({ actorFilter, onClearActorFilter }) => {
   const { tenantAuditLogs, activeCompany } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
   const [entityFilter, setEntityFilter] = useState<string>('all');
@@ -27,7 +32,8 @@ export const AuditLogViewer: React.FC = () => {
       log.entityId.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchEntity = entityFilter === 'all' || log.entityType === entityFilter;
-    return matchSearch && matchEntity;
+    const matchActor = !actorFilter || log.performedBy.toLowerCase().includes(actorFilter.toLowerCase());
+    return matchSearch && matchEntity && matchActor;
   });
 
   const getEntityIcon = (type: string) => {
@@ -54,11 +60,26 @@ export const AuditLogViewer: React.FC = () => {
       {/* Top Banner */}
       <div className="bg-[#F5F8FA] p-5 rounded-2xl border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="px-2.5 py-0.5 rounded bg-blue-100 border border-blue-200 text-[#1976D2] font-mono text-xs font-bold uppercase tracking-wider">
               IMMUTABLE AUDIT TRAIL
             </span>
             <span className="text-xs text-slate-500 font-mono">• {activeCompany.name}</span>
+            {actorFilter && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-[#0066FF] text-xs font-bold">
+                Showing logs for: <span className="font-mono">{actorFilter}</span>
+                {onClearActorFilter && (
+                  <button
+                    type="button"
+                    onClick={onClearActorFilter}
+                    className="hover:text-blue-900 font-black ml-1 cursor-pointer text-xs leading-none"
+                    title="Clear filter"
+                  >
+                    ×
+                  </button>
+                )}
+              </span>
+            )}
           </div>
           <h2 className="text-xl font-bold font-display text-slate-900 mt-1">
             System Activity & Security Audit Logs

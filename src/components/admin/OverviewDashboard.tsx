@@ -25,11 +25,21 @@ import {
   Plus,
   ArrowUpRight,
   ArrowDownRight,
+  CheckSquare,
+  Square,
+  Trash2,
+  ExternalLink,
+  Award,
+  Phone,
+  Mail,
+  Edit3,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { NavTabId } from '../layout/Sidebar';
 import elevatorLobbyImg from '../../assets/elevator-lobby.jpg';
 import { RaiseComplaintModal } from '../client/RaiseComplaintModal';
+import { detectMasterAdminSlot, getActiveMasterAdminProfile, MASTER_ADMIN_PROFILES } from '../../utils/masterAdminProfiles';
+import { getEffectiveProfilePhoto, isValidCustomAvatar } from '../../utils/avatarUtils';
 
 interface OverviewDashboardProps {
   onNavigateTab: (tab: NavTabId) => void;
@@ -39,6 +49,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
   onNavigateTab,
 }) => {
   const {
+    currentUser,
     tenantComplaints,
     tenantAmcContracts,
     tenantLifts,
@@ -54,6 +65,77 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
   const [activeRecentTab, setActiveRecentTab] = useState<'complaints' | 'amc' | 'quotations' | 'payments'>('complaints');
   const [isRaiseModalOpen, setIsRaiseModalOpen] = useState(false);
   const [selectedRange, setSelectedRange] = useState('Last 7 Days');
+
+  // Master Admin Personalized Profile Resolution
+  const masterSlot = detectMasterAdminSlot(currentUser);
+  const masterProfile = masterSlot ? MASTER_ADMIN_PROFILES[masterSlot] : null;
+
+  // Stored Custom Profile overrides
+  const customSavedProfile = useMemo(() => {
+    if (typeof window === 'undefined' || !currentUser.id) return null;
+    try {
+      const raw = localStorage.getItem('wepsun_master_profile_' + currentUser.id);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }, [currentUser.id]);
+
+  const adminDisplayName = customSavedProfile?.name || currentUser.name || masterProfile?.name || 'Executive Admin';
+  const adminFirstName = adminDisplayName.split(' ')[0] || 'Admin';
+  const adminEffectiveAvatar = getEffectiveProfilePhoto(currentUser.avatar, null, currentUser.id) || masterProfile?.defaultAvatar || '';
+
+  // Executive Personal Workspace Notes State (Stored uniquely per Admin ID)
+  const notesStorageKey = `wepsun_admin_notes_${currentUser.id || (masterSlot ? `master-${masterSlot}` : 'default')}`;
+  const [adminNotes, setAdminNotes] = useState<{ id: string; text: string; completed: boolean }[]>(() => {
+    if (typeof window === 'undefined') return masterProfile?.defaultNotes || [];
+    try {
+      const saved = localStorage.getItem(notesStorageKey);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return masterProfile?.defaultNotes || [];
+  });
+  const [newNoteText, setNewNoteText] = useState('');
+  const [isAddingNote, setIsAddingNote] = useState(false);
+
+  const handleToggleNote = (noteId: string) => {
+    setAdminNotes((prev) => {
+      const updated = prev.map((n) => (n.id === noteId ? { ...n, completed: !n.completed } : n));
+      try {
+        localStorage.setItem(notesStorageKey, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  };
+
+  const handleAddNote = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newNoteText.trim()) return;
+    const item = {
+      id: `note-${Date.now()}`,
+      text: newNoteText.trim(),
+      completed: false,
+    };
+    setAdminNotes((prev) => {
+      const updated = [item, ...prev];
+      try {
+        localStorage.setItem(notesStorageKey, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+    setNewNoteText('');
+    setIsAddingNote(false);
+  };
+
+  const handleDeleteNote = (noteId: string) => {
+    setAdminNotes((prev) => {
+      const updated = prev.filter((n) => n.id !== noteId);
+      try {
+        localStorage.setItem(notesStorageKey, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  };
 
   // Dynamic today date
   const todayFormatted = useMemo(() => {
@@ -262,40 +344,107 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* LEFT MAIN COLUMN (8 Cols) */}
         <div className="lg:col-span-8 space-y-5">
-          {/* HERO BANNER */}
-          <div className="bg-gradient-to-r from-[#EBF5FB] via-[#E8F4F8] to-[#E3F2FD] border border-blue-100/90 rounded-2xl p-5 sm:p-6 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm relative overflow-hidden">
-            <div className="flex items-center gap-4 z-10">
-              <div className="w-12 h-12 rounded-2xl bg-[#1976D2] text-white flex items-center justify-center font-bold shadow-md shrink-0">
-                <Layers className="w-6 h-6" />
-              </div>
-              <div>
-                <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                  Welcome, Admin!
-                </h1>
-                <p className="text-xs sm:text-sm text-slate-600 font-medium">
-                  Here's an overview of your lift service operations.
-                </p>
-              </div>
-            </div>
+          {/* PERSONALIZED EXECUTIVE HERO BANNER */}
+          <div className="bg-gradient-to-r from-[#EBF5FB] via-[#F0F7FD] to-[#E3F2FD] border border-blue-200/80 rounded-3xl p-5 sm:p-6 shadow-sm relative overflow-hidden">
+            {/* Ambient executive glow */}
+            <div className={`absolute -right-12 -bottom-12 w-64 h-64 rounded-full blur-3xl opacity-25 pointer-events-none ${masterSlot === 2 ? 'bg-emerald-400' : 'bg-blue-400'}`} />
 
-            {/* Middle/Right: Modern Elevator Lobby Graphic + Date */}
-            <div className="flex items-center gap-4 z-10">
-              <div className="w-32 sm:w-40 h-20 sm:h-24 rounded-xl overflow-hidden border border-blue-200/80 shadow-md shrink-0 bg-slate-200 hidden sm:block">
-                <img
-                  src={elevatorLobbyImg}
-                  alt="Modern Elevator Lobby"
-                  className="w-full h-full object-cover"
-                />
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5 relative z-10">
+              {/* Left: Avatar + Identity + Personal Greeting */}
+              <div className="flex items-center gap-4 sm:gap-5 min-w-0">
+                <div className="relative shrink-0">
+                  <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-2xl overflow-hidden bg-white border-2 border-white shadow-md ring-4 ring-blue-100 flex items-center justify-center">
+                    {adminEffectiveAvatar ? (
+                      <img src={adminEffectiveAvatar} alt={adminDisplayName} className="w-full h-full object-cover" />
+                    ) : (
+                      <User className="w-8 h-8 text-blue-600" />
+                    )}
+                  </div>
+                  {/* Verified Shield Badge on Avatar */}
+                  <div
+                    className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center text-white shadow-sm ring-2 ring-white ${masterSlot === 2 ? 'bg-emerald-600' : 'bg-blue-600'}`}
+                    title="Verified Executive Master Admin"
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wide uppercase text-white shadow-xs bg-gradient-to-r ${masterProfile?.badgeGradient || 'from-blue-600 to-indigo-700'}`}>
+                      <Award className="w-3 h-3" />
+                      <span>{masterProfile?.masterId || 'WEP-MASTER'}</span>
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100/90 text-blue-800 font-mono">
+                      {masterProfile?.badgeTag || 'Executive Admin'}
+                    </span>
+                    <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      Online
+                    </span>
+                  </div>
+
+                  <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2 truncate">
+                    Welcome back, {adminDisplayName}!
+                  </h1>
+
+                  <p className="text-xs sm:text-sm text-slate-600 font-medium line-clamp-1 mt-0.5">
+                    {masterProfile?.designation || "Overview of WEPSUN's real-time elevator service operations."}
+                  </p>
+                </div>
               </div>
 
-              <div className="text-right flex items-center gap-2 bg-white/80 backdrop-blur-sm px-3.5 py-2 rounded-xl border border-blue-100 shadow-xs">
-                <Calendar className="w-4 h-4 text-[#1976D2]" />
-                <div className="text-left leading-tight">
-                  <span className="text-[10px] text-slate-400 font-medium block">Today</span>
-                  <span className="text-xs font-bold text-slate-800 font-mono block">{todayFormatted}</span>
+              {/* Right: Modern Elevator Graphic + Date & Profile Link */}
+              <div className="flex items-center gap-3 self-stretch md:self-auto justify-between md:justify-end shrink-0">
+                <div className="w-28 sm:w-36 h-18 sm:h-20 rounded-xl overflow-hidden border border-blue-200/80 shadow-md shrink-0 bg-slate-200 hidden lg:block">
+                  <img
+                    src={elevatorLobbyImg}
+                    alt="Modern Elevator Lobby"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onNavigateTab('settings')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-blue-50/80 border border-blue-200/80 text-[#1976D2] text-xs font-bold shadow-2xs transition-all cursor-pointer hover:shadow-xs active:scale-95"
+                    title="View your dedicated Executive Profile & Settings"
+                  >
+                    <User className="w-3.5 h-3.5" />
+                    <span>My Profile</span>
+                  </button>
+
+                  <div className="text-right flex items-center gap-2 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-xl border border-blue-100 shadow-2xs">
+                    <Calendar className="w-4 h-4 text-[#1976D2]" />
+                    <div className="text-left leading-tight">
+                      <span className="text-[9px] text-slate-400 font-semibold block uppercase">Today</span>
+                      <span className="text-xs font-bold text-slate-800 font-mono block">{todayFormatted}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
+
+            {/* Personalized Executive Focus Bar */}
+            {masterProfile && (
+              <div className="mt-4 pt-3.5 border-t border-blue-100/90 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
+                <div className="flex items-center gap-2 text-slate-700 min-w-0">
+                  <span className="font-bold text-[#1976D2] shrink-0 flex items-center gap-1">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                    Executive Focus:
+                  </span>
+                  <span className="truncate text-slate-700 font-semibold">
+                    {masterProfile.executiveFocus}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 text-[11px] text-slate-500 font-mono shrink-0">
+                  <span>Master ID: <strong className="text-slate-800">{masterProfile.masterId}</strong></span>
+                  <span>•</span>
+                  <span>Direct: <strong className="text-slate-800">{currentUser.phone || masterProfile.phone}</strong></span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 5 TOP STAT CARDS */}
@@ -1065,6 +1214,119 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
 
         {/* RIGHT SIDEBAR COLUMN (4 Cols) */}
         <div className="lg:col-span-4 space-y-5">
+          {/* PERSONALIZED EXECUTIVE WORKSPACE & SCRATCHPAD */}
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-sm space-y-3.5">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-white shadow-xs ${masterSlot === 2 ? 'bg-emerald-600' : 'bg-blue-600'}`}>
+                  <Award className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-xs sm:text-sm text-slate-900 leading-tight">
+                    {adminFirstName}'s Executive Focus
+                  </h3>
+                  <span className="text-[10px] text-slate-500 font-mono">
+                    {masterProfile?.masterId || 'WEP-MASTER'} • Private Scratchpad
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsAddingNote(!isAddingNote)}
+                className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-[#1976D2] text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Note</span>
+              </button>
+            </div>
+
+            {/* Note input form */}
+            {isAddingNote && (
+              <form onSubmit={handleAddNote} className="space-y-2 pt-1 animate-in fade-in">
+                <input
+                  type="text"
+                  value={newNoteText}
+                  onChange={(e) => setNewNoteText(e.target.value)}
+                  placeholder={`Add priority note for ${adminFirstName}...`}
+                  autoFocus
+                  className="w-full text-xs px-3 py-2 rounded-xl bg-slate-50 border border-blue-200 focus:border-[#1976D2] outline-none font-medium"
+                />
+                <div className="flex items-center justify-end gap-2 text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingNote(false)}
+                    className="px-2.5 py-1 text-slate-500 hover:text-slate-700 font-semibold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-3 py-1 rounded-lg bg-[#0066FF] hover:bg-blue-600 text-white font-bold cursor-pointer"
+                  >
+                    Save Note
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Notes checklist */}
+            <div className="space-y-1.5 max-h-56 overflow-y-auto scrollbar-thin pr-1">
+              {adminNotes.length === 0 ? (
+                <p className="text-[11px] text-slate-400 italic py-2 text-center">No notes currently added.</p>
+              ) : (
+                adminNotes.map((note) => (
+                  <div
+                    key={note.id}
+                    className={`flex items-start gap-2.5 p-2 rounded-xl border transition-all text-xs ${
+                      note.completed
+                        ? 'bg-slate-50/70 border-slate-100 text-slate-400'
+                        : 'bg-white hover:bg-blue-50/40 border-slate-100 hover:border-blue-100 text-slate-700'
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleToggleNote(note.id)}
+                      className="mt-0.5 text-slate-400 hover:text-[#1976D2] transition-colors shrink-0 cursor-pointer"
+                    >
+                      {note.completed ? (
+                        <CheckSquare className="w-4 h-4 text-emerald-600" />
+                      ) : (
+                        <Square className="w-4 h-4 text-slate-400" />
+                      )}
+                    </button>
+                    <span className={`flex-1 leading-snug break-words ${note.completed ? 'line-through text-slate-400' : 'font-medium'}`}>
+                      {note.text}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteNote(note.id)}
+                      className="text-slate-300 hover:text-rose-500 transition-colors p-0.5 shrink-0 cursor-pointer"
+                      title="Delete note"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Footer link to Profile & Settings */}
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+              <span className="text-slate-500 font-mono">
+                Clearance: <strong className="text-slate-700">Level 3 Master</strong>
+              </span>
+              <button
+                type="button"
+                onClick={() => onNavigateTab('settings')}
+                className="text-[#1976D2] hover:underline font-bold flex items-center gap-1 cursor-pointer"
+              >
+                <span>Edit {adminFirstName}'s Profile</span>
+                <ArrowRight className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
+
           {/* QUICK ACTIONS: 6 COLORED GRID TILES */}
           <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-sm space-y-3.5">
             <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
