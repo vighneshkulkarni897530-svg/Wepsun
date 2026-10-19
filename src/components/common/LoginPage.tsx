@@ -1185,7 +1185,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         <button
           onClick={() => {
             if (onClose) onClose();
-            window.location.hash = 'landing';
+            window.location.hash = 'home';
           }}
           className="absolute top-4 left-4 sm:left-8 px-3.5 py-1.5 rounded-full bg-white/20 hover:bg-white/35 text-white backdrop-blur-md text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer touch-manipulation"
         >
@@ -1207,7 +1207,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           className="cursor-pointer flex flex-col items-center group transition-transform hover:scale-102 active:scale-98"
           onClick={() => {
             if (onClose) onClose();
-            window.location.hash = 'landing';
+            window.location.hash = 'home';
           }}
         >
           <div className="flex items-center gap-3">

@@ -735,7 +735,26 @@ export const AppContent: React.FC = () => {
     );
   }
 
-  if (isFullLoginPage && !isAuthenticated) {
+  if (isPublicFeedbackPage) {
+    return (
+      <div className="min-h-screen bg-slate-950">
+        {renderSplashOverlay()}
+        <Suspense fallback={<ViewLoadingFallback />}>
+          <PublicFeedbackPage
+            onClose={() => {
+              setIsPublicFeedbackPage(false);
+              window.location.hash = 'home';
+            }}
+          />
+        </Suspense>
+        <ToastContainer />
+        <WepsunModalContainer />
+      </div>
+    );
+  }
+
+  // Unauthenticated visitors: always render either the explicit Login/Signup page OR the Modern Home Landing Page
+  if (!isAuthenticated) {
     const hash = currentHash;
 
     const defaultRole: 'technician' | 'client' = hash.includes('technician')
@@ -781,7 +800,7 @@ export const AppContent: React.FC = () => {
       );
     }
 
-    // Default is the complete Modern Landing Page
+    // Default for unauthenticated users is always the Modern Home Landing Page
     return (
       <div className="min-h-screen">
         {renderSplashOverlay()}
@@ -804,24 +823,6 @@ export const AppContent: React.FC = () => {
             }
           }}
         />
-        <ToastContainer />
-        <WepsunModalContainer />
-      </div>
-    );
-  }
-
-  if (isPublicFeedbackPage) {
-    return (
-      <div className="min-h-screen bg-slate-950">
-        {renderSplashOverlay()}
-        <Suspense fallback={<ViewLoadingFallback />}>
-          <PublicFeedbackPage
-            onClose={() => {
-              setIsPublicFeedbackPage(false);
-              window.location.hash = 'feedback';
-            }}
-          />
-        </Suspense>
         <ToastContainer />
         <WepsunModalContainer />
       </div>

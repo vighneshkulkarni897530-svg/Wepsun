@@ -1554,47 +1554,59 @@ function mapServerServiceReport(sr: any): ServiceReport {
   }, [isAuthenticated, currentRole]);
 
   const logout = useCallback(async () => {
-    await terminateSession();
-    clearTokens();
+    // 1. Immediately and synchronously navigate to public #home
     if (typeof window !== 'undefined') {
-      const clientUser = INITIAL_USERS.find((u) => u.role === 'client') || INITIAL_USERS[2];
-      setCurrentUserState({
-        ...clientUser,
-        clientId: undefined,
-        technicianId: undefined,
-        name: '',
-        email: '',
-        avatar: '',
-      });
-      setCurrentRoleState('client');
-      setActiveUserId('');
-      setActiveClientId('');
-      setActiveTechnicianId('');
-
-      setBuildings([]);
-      setLifts([]);
-      setComplaints([]);
-      setPmRecords([]);
-      setAmcContracts([]);
-      setQuotations([]);
-      setWorkOrders([]);
-      setInvoices([]);
-      setServiceReports([]);
-      setFeedbacks([]);
-      setClientNotifications([]);
-      setAppNotifications([]);
-      setGpsCheckIns([]);
-
-      setIsAuthenticated(false);
-
-      window.history.replaceState(null, '', '#home');
-      window.location.hash = 'home';
-      window.dispatchEvent(new HashChangeEvent('hashchange'));
+      try {
+        localStorage.setItem('wepsun_explicit_logout', 'true');
+        sessionStorage.removeItem('wepsun_open_quote_after_login');
+        sessionStorage.removeItem('wepsun_pending_quote_service');
+        window.history.replaceState(null, '', '#home');
+        window.location.hash = 'home';
+        window.dispatchEvent(new HashChangeEvent('hashchange'));
+      } catch (e) {
+        console.warn('Logout window state reset error:', e);
+      }
     }
 
+    // 2. Synchronously clear client auth and state
     setIsAuthenticated(false);
-    // Clear all existing toasts so no notifications pop up on logout
+    clearTokens();
+
+    const clientUser = INITIAL_USERS.find((u) => u.role === 'client') || INITIAL_USERS[2];
+    setCurrentUserState({
+      ...clientUser,
+      clientId: undefined,
+      technicianId: undefined,
+      name: '',
+      email: '',
+      avatar: '',
+    });
+    setCurrentRoleState('client');
+    setActiveUserId('');
+    setActiveClientId('');
+    setActiveTechnicianId('');
+
+    setBuildings([]);
+    setLifts([]);
+    setComplaints([]);
+    setPmRecords([]);
+    setAmcContracts([]);
+    setQuotations([]);
+    setWorkOrders([]);
+    setInvoices([]);
+    setServiceReports([]);
+    setFeedbacks([]);
+    setClientNotifications([]);
+    setAppNotifications([]);
+    setGpsCheckIns([]);
     setToasts([]);
+
+    // 3. Invalidate session token on server (non-blocking)
+    try {
+      await terminateSession();
+    } catch (e) {
+      console.warn('Backend session termination non-blocking error:', e);
+    }
   }, []);
 
   // Audit Log Mutator

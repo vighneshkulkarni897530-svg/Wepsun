@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { LoginPage } from './LoginPage';
+import { LandingPage } from './LandingPage';
 import { GeometricBlueWLogo } from './WepsunLogo';
 import { UserRole } from '../../types';
 
@@ -19,7 +20,7 @@ interface AuthGuardProps {
 export const AuthGuard: React.FC<AuthGuardProps> = ({
   children,
   allowedRoles,
-  fallbackHash = 'login',
+  fallbackHash = 'home',
 }) => {
   const { isAuthenticated, isAuthLoading, currentRole, showToast } = useApp();
 
@@ -52,9 +53,17 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({
     );
   }
 
-  // If unauthenticated, redirect to Sign In
+  // If unauthenticated, redirect to Home / Landing Page
   if (!isAuthenticated) {
-    return <LoginPage isOpen={true} isModal={false} />;
+    return (
+      <LandingPage
+        onClose={() => {
+          if (typeof window !== 'undefined') {
+            window.location.hash = 'home';
+          }
+        }}
+      />
+    );
   }
 
   // Role-Based Access Control (RBAC) Guard
