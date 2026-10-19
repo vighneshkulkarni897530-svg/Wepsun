@@ -17,6 +17,7 @@ import { MobileBottomNav } from './components/layout/MobileBottomNav';
 import { isMasterAdminAuthenticated } from './lib/masterAuthClient';
 import { WepsunModalContainer } from './components/common/WepsunModalContainer';
 import { AuthGuard } from './components/common/AuthGuard';
+import { NotificationHub } from './components/common/NotificationHub';
 
 // Lazy-loaded sub-dashboards and views for optimal Android startup & bundle splitting
 const OverviewDashboard = lazy(() => import('./components/admin/OverviewDashboard').then(m => ({ default: m.OverviewDashboard })));
@@ -194,6 +195,28 @@ export const AppContent: React.FC = () => {
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<NavTabId>('dashboard');
+  const [previousTab, setPreviousTab] = useState<NavTabId | null>(null);
+
+  const handleNavigateTab = (tab: NavTabId | string) => {
+    if (tab !== 'notifications' && activeTab !== 'notifications') {
+      setPreviousTab(activeTab);
+    }
+    setActiveTab(tab as NavTabId);
+    window.location.hash = tab;
+  };
+
+  const handleBackFromNotifications = () => {
+    const defaultFallback: NavTabId =
+      currentRole === 'client'
+        ? 'home'
+        : currentRole === 'technician'
+        ? 'jobs'
+        : 'dashboard';
+    const target = previousTab && previousTab !== 'notifications' ? previousTab : defaultFallback;
+    setActiveTab(target);
+    window.location.hash = target;
+  };
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
@@ -412,6 +435,16 @@ export const AppContent: React.FC = () => {
 
   // Render view based on role and active tab
   const renderMainContent = () => {
+    // 1. Direct Full-screen Notification Hub (accessible directly by all roles with Back navigation)
+    if (activeTab === 'notifications') {
+      return (
+        <NotificationHub
+          onBack={handleBackFromNotifications}
+          onNavigateTab={handleNavigateTab}
+        />
+      );
+    }
+
     // If technician or client view was switched in header
     if (currentRole === 'technician') {
       return (
@@ -672,7 +705,12 @@ export const AppContent: React.FC = () => {
         return <AdminReportsView />;
 
       case 'notifications':
-        return <AdminNotificationsView onNavigateTab={(tab) => setActiveTab(tab as NavTabId)} />;
+        return (
+          <NotificationHub
+            onBack={handleBackFromNotifications}
+            onNavigateTab={handleNavigateTab}
+          />
+        );
 
       case 'settings':
         return <AdminProfileSettingsView />;
@@ -838,7 +876,8 @@ export const AppContent: React.FC = () => {
           onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
           onOpenRaiseComplaint={() => setIsEmergencyModalOpen(true)}
           onOpenLoginModal={() => setIsLoginModalOpen(true)}
-          onNavigateTab={setActiveTab}
+          onNavigateTab={handleNavigateTab}
+          currentTab={activeTab}
         />
 
         {/* Main Body with Left Sidebar and Page Canvas */}
@@ -846,7 +885,7 @@ export const AppContent: React.FC = () => {
           {/* Left Dark Navy Sidebar */}
           <Sidebar
             activeTab={activeTab}
-            onSelectTab={setActiveTab}
+            onSelectTab={handleNavigateTab}
             isOpen={isSidebarOpen}
             onCloseMobile={() => setIsSidebarOpen(false)}
             onOpenLoginModal={() => setIsLoginModalOpen(true)}

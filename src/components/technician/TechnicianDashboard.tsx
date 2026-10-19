@@ -1035,6 +1035,22 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
                 notifications={notifications}
                 onMarkAsRead={handleMarkNotifRead}
                 onClearAll={handleClearAllNotifs}
+                onBack={() => {
+                  if (onNavigateTab) {
+                    onNavigateTab('jobs');
+                  } else {
+                    setActiveTab('jobs');
+                    window.location.hash = 'jobs';
+                  }
+                }}
+                onNavigateTab={(t) => {
+                  if (onNavigateTab) {
+                    onNavigateTab(t as any);
+                  } else {
+                    setActiveTab(t as any);
+                    window.location.hash = t;
+                  }
+                }}
                 onSelectJobId={(jobId) => {
                   const targetJob = assignedJobs.find((j) => j.jobId === jobId || j.id === jobId);
                   if (targetJob) {

@@ -66,7 +66,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   const isAdminDashboardActive = activeTab === 'dashboard' || activeTab === 'home' || !activeTab;
   const isAdminComplaintsActive = activeTab === 'complaints' || activeTab === 'service_jobs' || activeTab === 'work_orders';
   const isAdminAmcActive = activeTab === 'amc' || activeTab === 'pm' || activeTab === 'invoices' || activeTab === 'quotations';
-  const isAdminSettingsActive = activeTab === 'settings' || activeTab === 'edit_profile' || activeTab === 'notifications';
+  const isAdminSettingsActive = activeTab === 'settings' || activeTab === 'edit_profile';
 
   return (
     <nav

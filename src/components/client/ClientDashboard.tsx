@@ -461,9 +461,7 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
 
           {/* 10. Notifications View */}
           {activeTab === 'notifications' && (
-            <div className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 lg:p-7 shadow-sm">
-              <ClientNotificationsView />
-            </div>
+            <ClientNotificationsView onNavigateTab={(t) => switchTab(t as any)} onBack={() => switchTab('home')} />
           )}
 
           {/* 11. Profile View */}

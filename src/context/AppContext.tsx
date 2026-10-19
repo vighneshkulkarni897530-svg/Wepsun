@@ -2223,6 +2223,7 @@ function mapServerServiceReport(sr: any): ServiceReport {
   }, [activeCompanyId, activeBranchId, currentRole, activeUserId]);
 
   const markAllNotificationsRead = useCallback(() => {
+    const unreadRoleNotifs = roleNotifications.filter((n) => !n.isRead);
     const roleIds = new Set(roleNotifications.map((n) => n.id));
     setAppNotifications((prev) =>
       prev.map((n) => (roleIds.has(n.id) ? { ...n, isRead: true } : n))
@@ -2230,7 +2231,17 @@ function mapServerServiceReport(sr: any): ServiceReport {
     setClientNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
     playNotificationSound('markRead');
     showToast('success', 'All Caught Up!', 'All notifications marked as read.');
-  }, [roleNotifications, showToast]);
+
+    // Asynchronously synchronize with backend for all unread notifications
+    unreadRoleNotifs.forEach((n) => {
+      apiService.markNotificationRead(n.id, {
+        companyId: activeCompanyId,
+        branchId: activeBranchId,
+        userRole: currentRole,
+        userId: activeUserId,
+      }).catch((err) => console.warn('[AppContext] Background markNotificationRead API sync:', err));
+    });
+  }, [roleNotifications, showToast, activeCompanyId, activeBranchId, currentRole, activeUserId]);
 
   const deleteNotification = useCallback((id: string) => {
     setAppNotifications((prev) => prev.filter((n) => n.id !== id));

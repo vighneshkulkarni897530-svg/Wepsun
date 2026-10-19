@@ -157,6 +157,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'quotations', label: 'Quotations', icon: <FileSpreadsheet className="w-[18px] h-[18px]" />, badge: pendingQuotesCount > 0 ? pendingQuotesCount : undefined },
     { id: 'payments', label: 'Payments', icon: <CreditCard className="w-[18px] h-[18px]" />, badge: pendingInvoicesCount > 0 ? pendingInvoicesCount : undefined },
     { id: 'reports', label: 'Reports', icon: <BarChart3 className="w-[18px] h-[18px]" /> },
+    { id: 'notifications', label: 'Notifications', icon: <Bell className="w-[18px] h-[18px]" />, badge: unreadNotificationsCount > 0 ? unreadNotificationsCount : undefined },
     { id: 'profile', label: 'My Profile', icon: <User className="w-[18px] h-[18px]" /> },
   ];
 
