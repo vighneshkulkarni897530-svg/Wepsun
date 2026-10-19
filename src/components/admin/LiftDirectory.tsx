@@ -17,14 +17,10 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { Lift, LiftType, MachineType } from '../../types';
-import { IoTLiftSimulationModal } from '../common/IoTLiftSimulationModal';
-import { Activity, Cpu } from 'lucide-react';
-
 export const LiftDirectory: React.FC = () => {
   const { lifts, buildings, addNewLift, amcContracts } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
-  const [selectedLiftForIoT, setSelectedLiftForIoT] = useState<Lift | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingLift, setEditingLift] = useState<Lift | null>(null);
 
@@ -218,17 +214,9 @@ export const LiftDirectory: React.FC = () => {
                   </span>
                 </td>
 
-                {/* Actions: Launch IoT, Edit Lift */}
+                {/* Actions: Edit Lift */}
                 <td className="py-3.5 px-3 text-right">
                   <div className="flex items-center justify-end gap-1.5">
-                    <button
-                      onClick={() => setSelectedLiftForIoT(lift)}
-                      className="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-cyan-400 font-bold text-[11px] border border-cyan-500/40 shadow-sm transition-all flex items-center gap-1"
-                      title="Launch Live IoT Telemetry & 3D Twin"
-                    >
-                      <Activity className="w-3 h-3 text-cyan-400 animate-pulse" />
-                      <span>IoT Live</span>
-                    </button>
 
                     <button
                       onClick={() => {
@@ -390,15 +378,6 @@ export const LiftDirectory: React.FC = () => {
           </div>
         </div>
       )}
-
-
-
-      {/* IoT Lift Telemetry & 3D Simulation Modal */}
-      <IoTLiftSimulationModal
-        lift={selectedLiftForIoT}
-        isOpen={!!selectedLiftForIoT}
-        onClose={() => setSelectedLiftForIoT(null)}
-      />
     </div>
   );
 };

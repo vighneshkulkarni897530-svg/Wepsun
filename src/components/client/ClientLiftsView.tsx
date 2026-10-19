@@ -17,12 +17,10 @@ import {
   Building,
   FileCheck,
   Download,
-  Activity,
 } from 'lucide-react';
 import { Lift } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { downloadLiftSpecificationPdf } from '../../services/pdfGenerator';
-import { IoTLiftSimulationModal } from '../common/IoTLiftSimulationModal';
 
 interface ClientLiftsViewProps {
   lifts: Lift[];
@@ -39,7 +37,6 @@ export const ClientLiftsView: React.FC<ClientLiftsViewProps> = ({
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'operational' | 'under_maintenance' | 'breakdown'>('all');
-  const [selectedIoTLift, setSelectedIoTLift] = useState<Lift | null>(null);
 
   const filteredLifts = lifts.filter((l) => {
     const q = searchQuery.toLowerCase();
@@ -267,20 +264,11 @@ export const ClientLiftsView: React.FC<ClientLiftsViewProps> = ({
               </div>
 
               {/* Action Buttons */}
-              <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedIoTLift(lift)}
-                  className="px-3 py-2.5 min-h-[44px] rounded-xl bg-slate-900 hover:bg-slate-800 text-cyan-400 font-bold text-xs border border-cyan-500/30 transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer active:scale-95"
-                  title="Real-time IoT Telemetry & 3D Simulation"
-                >
-                  <Activity className="w-3.5 h-3.5 text-cyan-400 animate-pulse shrink-0" />
-                  <span>IoT Live</span>
-                </button>
+              <div className="pt-3 border-t border-slate-100 grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => downloadLiftSpecificationPdf(lift, activeCompany)}
-                  className="flex-1 min-h-[44px] py-2.5 rounded-xl bg-slate-50 hover:bg-blue-50 text-[#1976D2] font-bold text-xs border border-slate-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                  className="min-h-[44px] py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-blue-50 text-[#1976D2] font-bold text-xs border border-slate-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                   title="Download Technical Specification PDF"
                 >
                   <Download className="w-3.5 h-3.5 shrink-0" />
@@ -289,7 +277,7 @@ export const ClientLiftsView: React.FC<ClientLiftsViewProps> = ({
                 <button
                   type="button"
                   onClick={() => onRaiseComplaint(lift.id)}
-                  className="flex-1 min-h-[44px] py-2.5 rounded-xl bg-[#123B5D] hover:bg-[#0e2f4a] text-white font-bold text-xs shadow-sm transition-colors flex items-center justify-center gap-1 cursor-pointer active:scale-95"
+                  className="min-h-[44px] py-2.5 px-3 rounded-xl bg-[#123B5D] hover:bg-[#0e2f4a] text-white font-bold text-xs shadow-sm transition-colors flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                 >
                   <AlertTriangle className="w-3.5 h-3.5 text-amber-300 shrink-0" />
                   <span className="truncate">Report</span>
@@ -345,14 +333,6 @@ export const ClientLiftsView: React.FC<ClientLiftsViewProps> = ({
                     <td className="p-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
-                          onClick={() => setSelectedIoTLift(lift)}
-                          className="px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-cyan-400 font-bold text-xs border border-cyan-500/30 transition-all flex items-center gap-1 shadow-sm"
-                          title="Real-time IoT Telemetry & 3D Simulation"
-                        >
-                          <Activity className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
-                          <span>IoT</span>
-                        </button>
-                        <button
                           onClick={() => downloadLiftSpecificationPdf(lift, activeCompany)}
                           className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1"
                           title="Download Technical Specification Sheet"
@@ -375,13 +355,6 @@ export const ClientLiftsView: React.FC<ClientLiftsViewProps> = ({
           </div>
         </div>
       )}
-
-      {/* Real-time IoT 3D Simulation & Telemetry Modal */}
-      <IoTLiftSimulationModal
-        lift={selectedIoTLift}
-        isOpen={!!selectedIoTLift}
-        onClose={() => setSelectedIoTLift(null)}
-      />
     </div>
   );
 };
