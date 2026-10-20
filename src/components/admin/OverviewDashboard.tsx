@@ -33,6 +33,12 @@ import {
   Phone,
   Mail,
   Edit3,
+  UserCheck,
+  UserX,
+  ShieldAlert,
+  GraduationCap,
+  Briefcase,
+  FileText,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { NavTabId } from '../layout/Sidebar';
@@ -40,6 +46,7 @@ import elevatorLobbyImg from '../../assets/elevator-lobby.jpg';
 import { RaiseComplaintModal } from '../client/RaiseComplaintModal';
 import { detectMasterAdminSlot, getActiveMasterAdminProfile, MASTER_ADMIN_PROFILES } from '../../utils/masterAdminProfiles';
 import { getEffectiveProfilePhoto, isValidCustomAvatar } from '../../utils/avatarUtils';
+import { apiService } from '../../services/api';
 
 interface OverviewDashboardProps {
   onNavigateTab: (tab: NavTabId) => void;
@@ -60,7 +67,70 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
     tenantQuotations,
     tenantBuildings,
     users,
+    showSuccessModal,
   } = useApp();
+
+  // Pending Technician Onboarding Requests
+  const [pendingTechnicians, setPendingTechnicians] = useState<any[]>([]);
+  const [loadingPendingTechs, setLoadingPendingTechs] = useState<boolean>(false);
+  const [techActionLoadingId, setTechActionLoadingId] = useState<string | null>(null);
+
+  const fetchPendingTechnicians = React.useCallback(async () => {
+    setLoadingPendingTechs(true);
+    try {
+      const res = await apiService.getPendingTechnicians();
+      if (res && res.success && res.data) {
+        setPendingTechnicians(res.data.pendingTechnicians || []);
+      }
+    } catch (err) {
+      console.warn('[OverviewDashboard] Pending technicians fetch notice:', err);
+    } finally {
+      setLoadingPendingTechs(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    fetchPendingTechnicians();
+  }, [fetchPendingTechnicians]);
+
+  const handleApproveTechnician = async (techId: string, name: string) => {
+    setTechActionLoadingId(techId);
+    try {
+      const res = await apiService.approveTechnician(techId);
+      if (res && res.success) {
+        showSuccessModal(
+          'Technician Approved',
+          `Application for ${name} has been approved! Assigned Permanent ID: ${res.data?.permanentId || 'Generated'}. Branded approval email dispatched.`
+        );
+        fetchPendingTechnicians();
+      }
+    } catch (err: any) {
+      console.error('Approve technician error:', err);
+    } finally {
+      setTechActionLoadingId(null);
+    }
+  };
+
+  const handleRejectTechnician = async (techId: string, name: string) => {
+    const reason = prompt(`Enter rejection reason for ${name} (will be emailed to applicant):`);
+    if (reason === null) return;
+
+    setTechActionLoadingId(techId);
+    try {
+      const res = await apiService.rejectTechnician(techId, reason.trim() || 'Application criteria not met');
+      if (res && res.success) {
+        showSuccessModal(
+          'Application Rejected',
+          `Application for ${name} has been rejected. Notification email sent.`
+        );
+        fetchPendingTechnicians();
+      }
+    } catch (err: any) {
+      console.error('Reject technician error:', err);
+    } finally {
+      setTechActionLoadingId(null);
+    }
+  };
 
   const [activeRecentTab, setActiveRecentTab] = useState<'complaints' | 'amc' | 'quotations' | 'payments'>('complaints');
   const [isRaiseModalOpen, setIsRaiseModalOpen] = useState(false);
@@ -537,6 +607,126 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                 <span>Next 30 Days</span>
               </div>
             </div>
+          </div>
+
+          {/* TECHNICIAN REQUESTS SECTION */}
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-sm space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold">
+                  <UserCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-sm text-slate-900">Technician Requests</h3>
+                    {pendingTechnicians.length > 0 && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                        {pendingTechnicians.length} Pending Approval
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[11px] text-slate-500">
+                    Review and verify incoming field engineer onboarding applications.
+                  </span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => onNavigateTab('technician_records')}
+                className="text-xs font-bold text-[#0066FF] hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                <span>View All Technician Records</span>
+                <span>→</span>
+              </button>
+            </div>
+
+            {loadingPendingTechs ? (
+              <div className="py-6 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+                <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                <span>Checking pending applications...</span>
+              </div>
+            ) : pendingTechnicians.length === 0 ? (
+              <div className="py-6 px-4 rounded-xl bg-slate-50/70 border border-slate-200/70 text-center flex flex-col items-center justify-center space-y-1.5">
+                <ShieldCheck className="w-6 h-6 text-emerald-500" />
+                <p className="text-xs font-bold text-slate-700">All caught up! No pending technician requests.</p>
+                <p className="text-[11px] text-slate-500">
+                  New registrations submitted by field engineers will automatically appear here for one-click approval.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-1">
+                {pendingTechnicians.map((pt) => {
+                  const isProcessing = techActionLoadingId === pt.id;
+                  return (
+                    <div
+                      key={pt.id}
+                      className="p-4 rounded-2xl bg-amber-50/40 border border-amber-200/90 shadow-xs flex flex-col justify-between space-y-3"
+                    >
+                      <div className="space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <span className="font-bold text-slate-900 text-sm block">{pt.name}</span>
+                            <div className="flex items-center gap-2 text-xs text-slate-600 mt-0.5">
+                              <Mail className="w-3 h-3 text-slate-400" />
+                              <span className="truncate">{pt.email}</span>
+                            </div>
+                          </div>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 shrink-0">
+                            Awaiting Approval
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600 pt-1 border-t border-amber-100">
+                          <div>
+                            <span className="text-slate-400 block text-[10px]">Mobile:</span>
+                            <span className="font-semibold text-slate-800">{pt.phone || 'N/A'}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block text-[10px]">Registered:</span>
+                            <span className="font-semibold">{pt.registeredAt ? new Date(pt.registeredAt).toLocaleDateString() : 'Recent'}</span>
+                          </div>
+                          {pt.qualifications && (
+                            <div className="col-span-2">
+                              <span className="text-slate-400 block text-[10px]">Qualifications:</span>
+                              <span className="font-medium text-slate-800 truncate block">
+                                {pt.qualifications} {pt.experienceYears ? `(${pt.experienceYears} yrs exp)` : ''}
+                              </span>
+                            </div>
+                          )}
+                          {pt.documents && (
+                            <div className="col-span-2">
+                              <span className="text-slate-400 block text-[10px]">Documents / License:</span>
+                              <span className="font-mono text-slate-700 text-[10.5px] truncate block">{pt.documents}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-amber-100">
+                        <button
+                          type="button"
+                          disabled={isProcessing}
+                          onClick={() => handleRejectTechnician(pt.id, pt.name)}
+                          className="px-3 py-1.5 rounded-xl border border-red-200 bg-white hover:bg-red-50 text-red-600 font-bold text-xs transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          Reject
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isProcessing}
+                          onClick={() => handleApproveTechnician(pt.id, pt.name)}
+                          className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        >
+                          {isProcessing && <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Approve & Issue ID</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* 2 ANALYTICS CHARTS ROW (Complaints Overview Donut & Service Requests Trend) */}

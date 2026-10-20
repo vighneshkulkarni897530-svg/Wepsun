@@ -25,6 +25,14 @@ enum UserRole {
   CLIENT
 }
 
+enum TechnicianAccountStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  BLOCKED
+  SUSPENDED
+}
+
 enum LiftType {
   PASSENGER
   HOSPITAL_STRETCHER
@@ -264,6 +272,7 @@ model User {
   failedLoginAttempts Int       @default(0)
   lockedUntil         DateTime?
   tokenVersion        Int       @default(0)
+  lastLoginAt         DateTime?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
@@ -515,28 +524,47 @@ model ComplaintTimeline {
 // --------------------------------------------------------
 
 model Technician {
-  id                         String              @id @default(uuid())
+  id                         String                    @id @default(uuid())
   companyId                  String
   branchId                   String
   name                       String
-  employeeCode               String              @unique
+  employeeCode               String                    @unique
+  permanentId                String?                   @unique
+  accountStatus              TechnicianAccountStatus   @default(PENDING_APPROVAL)
   phone                      String
-  email                      String              @unique
+  email                      String                    @unique
   avatarUrl                  String?
-  zone                       String
-  currentStatus              String              @default("available")
+  zone                       String                    @default("Main Hub")
+  address                    String?
+  qualifications             String?
+  experienceYears            Float?                    @default(0)
+  documents                  String?
+  currentStatus              String                    @default("available")
   currentLocationName        String?
   latitude                   Float?
   longitude                  Float?
-  totalResolved              Int                 @default(0)
-  avgResolutionMinutes       Int                 @default(45)
-  customerRating             Float               @default(4.8)
-  totalRatingsCount          Int                 @default(0)
-  createdAt                  DateTime            @default(now())
-  updatedAt                  DateTime            @updatedAt
+  totalResolved              Int                       @default(0)
+  avgResolutionMinutes       Int                       @default(45)
+  customerRating             Float                     @default(4.8)
+  totalRatingsCount          Int                       @default(0)
+  registeredAt               DateTime                  @default(now())
+  approvedAt                 DateTime?
+  approvedBy                 String?
+  rejectedAt                 DateTime?
+  rejectedBy                 String?
+  rejectionReason            String?
+  blockedAt                  DateTime?
+  blockedBy                  String?
+  blockReason                String?
+  unblockedAt                DateTime?
+  unblockedBy                String?
+  unblockReason              String?
+  lastLoginAt                DateTime?
+  createdAt                  DateTime                  @default(now())
+  updatedAt                  DateTime                  @updatedAt
 
-  company                    Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  branch                     Branch              @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  company                    Company                   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch                     Branch                    @relation(fields: [branchId], references: [id], onDelete: Cascade)
   user                       User?
   assignedComplaints         Complaint[]
   workOrders                 WorkOrder[]
@@ -547,6 +575,8 @@ model Technician {
   inventoryMovements         InventoryMovement[]
 
   @@index([companyId, branchId])
+  @@index([companyId, accountStatus])
+  @@index([permanentId])
   @@map("technicians")
 }
 

@@ -29,6 +29,7 @@ const router = Router();
 // Helper to sanitize user object (never return password hashes or internal security fields)
 function sanitizeUser(user: any) {
   const avatar = user.avatarUrl || user.avatar || null;
+  const tech = user.technician;
   return {
     id: user.id,
     name: user.name,
@@ -39,6 +40,8 @@ function sanitizeUser(user: any) {
     branchId: user.branchId || null,
     clientId: user.clientId || null,
     technicianId: user.technicianId || null,
+    technicianPermanentId: tech?.permanentId || user.technicianPermanentId || null,
+    accountStatus: tech?.accountStatus || (user.isActive ? 'APPROVED' : 'PENDING_APPROVAL'),
     avatarUrl: avatar,
     avatar: avatar,
     isActive: user.isActive ?? true,
@@ -937,12 +940,12 @@ router.post('/master-login', authLimiter, handleMasterIdAuth);
 
 // POST /api/auth/login — Production Cryptographic Login
 router.post('/login', authLimiter, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  const { email, phone, password, role } = req.body;
+  const { email, phone, password, role, technicianId } = req.body;
 
-  if (!email && !phone) {
+  if (!email && !phone && !technicianId) {
     res.status(400).json({
       success: false,
-      message: 'Email or mobile phone number is required.',
+      message: 'Email, mobile phone number, or Technician ID is required.',
       code: 'AUTH_IDENTIFIER_REQUIRED',
     });
     return;
@@ -962,6 +965,7 @@ router.post('/login', authLimiter, async (req: AuthenticatedRequest, res: Respon
 
   const cleanEmail = email ? String(email).trim().toLowerCase() : '';
   const cleanPhone = phone ? String(phone).trim() : '';
+  const cleanTechId = technicianId ? String(technicianId).trim().toUpperCase() : '';
   const rawPhoneDigits = cleanPhone.replace(/\D/g, '');
   const last10Digits = rawPhoneDigits.length >= 10 ? rawPhoneDigits.slice(-10) : rawPhoneDigits;
 
@@ -1034,27 +1038,56 @@ router.post('/login', authLimiter, async (req: AuthenticatedRequest, res: Respon
       }
     }
 
+    // Lookup via Technician ID if provided or if identifier format matches
+    if (!user && (cleanTechId || candidateIdentifier.toUpperCase().startsWith('WEPSUN') || candidateIdentifier.toUpperCase().startsWith('WES-TECH-') || candidateIdentifier.toUpperCase().startsWith('TECH-'))) {
+      const searchTechId = cleanTechId || candidateIdentifier;
+      try {
+        const techMatch = await prisma.technician.findFirst({
+          where: {
+            OR: [
+              { permanentId: { equals: searchTechId, mode: 'insensitive' } },
+              { employeeCode: { equals: searchTechId, mode: 'insensitive' } },
+            ],
+          },
+          include: {
+            company: true,
+            branch: true,
+            user: true,
+          },
+        });
+        if (techMatch?.user) {
+          user = {
+            ...techMatch.user,
+            company: techMatch.company,
+            branch: techMatch.branch,
+            technician: techMatch,
+          };
+        }
+      } catch {}
+    }
+
     if (!user) {
       try {
         user = await prisma.user.findFirst({
-        where: {
-          OR: [
-            ...(cleanEmail ? [{ email: { equals: cleanEmail, mode: 'insensitive' as const } }] : []),
-            ...(cleanPhone ? [{ phone: cleanPhone }] : []),
-            ...(rawPhoneDigits ? [{ phone: rawPhoneDigits }] : []),
-            ...(last10Digits ? [{ phone: { endsWith: last10Digits } }] : []),
-          ],
-        },
-        include: {
-          company: true,
-          branch: true,
-        },
-      });
-    } catch {
-      // Fallback
-      user = null;
+          where: {
+            OR: [
+              ...(cleanEmail ? [{ email: { equals: cleanEmail, mode: 'insensitive' as const } }] : []),
+              ...(cleanPhone ? [{ phone: cleanPhone }] : []),
+              ...(rawPhoneDigits ? [{ phone: rawPhoneDigits }] : []),
+              ...(last10Digits ? [{ phone: { endsWith: last10Digits } }] : []),
+            ],
+          },
+          include: {
+            company: true,
+            branch: true,
+            technician: true,
+          },
+        });
+      } catch {
+        // Fallback
+        user = null;
+      }
     }
-  }
 
     // If user not found in DB, check mock DB for backward compatibility in offline dev
     if (!user) {
@@ -1220,27 +1253,119 @@ router.post('/login', authLimiter, async (req: AuthenticatedRequest, res: Respon
       data: { failedLoginAttempts: 0, lockedUntil: null },
     }).catch(() => {});
 
-    // Ensure client or technician role has valid identity linkage
+    // Ensure client or technician role has valid identity linkage and validate technician status
     if (user.role === 'CLIENT' || String(user.role).toUpperCase() === 'CLIENT') {
       await ensureClientAccountWithEquipment(user);
-    } else if (user.role === 'TECHNICIAN' && !user.technicianId) {
-      try {
-        let techRec = await prisma.technician.findFirst({
-          where: {
-            companyId: user.companyId,
-            email: { equals: user.email, mode: 'insensitive' as const },
-          },
-        });
-        if (techRec) {
+    } else if (user.role === 'TECHNICIAN' || String(user.role).toUpperCase() === 'TECHNICIAN') {
+      let technicianRecord = user.technician;
+      if (!technicianRecord) {
+        try {
+          technicianRecord = await prisma.technician.findFirst({
+            where: {
+              OR: [
+                { userId: user.id },
+                ...(user.technicianId ? [{ id: user.technicianId }] : []),
+                { email: { equals: user.email, mode: 'insensitive' as const } },
+              ],
+            },
+          });
+        } catch (findErr) {
+          console.warn('[AuthRoute] Technician lookup notice:', findErr);
+        }
+      }
+
+      if (technicianRecord) {
+        if (!user.technicianId) {
           await prisma.user.update({
             where: { id: user.id },
-            data: { technicianId: techRec.id },
-          });
-          user.technicianId = techRec.id;
+            data: { technicianId: technicianRecord.id },
+          }).catch(() => {});
+          user.technicianId = technicianRecord.id;
         }
-      } catch (linkErr) {
-        console.warn('[AuthRoute] Technician auto-link notice on password login:', linkErr);
+
+        // Validate Technician ID if supplied or if technician has permanentId
+        const enteredTechId = cleanTechId || (
+          candidateIdentifier.toUpperCase().startsWith('WEPSUN') || candidateIdentifier.toUpperCase().startsWith('WES-TECH-')
+            ? candidateIdentifier.trim()
+            : ''
+        );
+        const techIdToValidate = cleanTechId || enteredTechId;
+        if (techIdToValidate) {
+          const permMatch = technicianRecord.permanentId && technicianRecord.permanentId.toUpperCase() === techIdToValidate.toUpperCase();
+          const empMatch = technicianRecord.employeeCode && technicianRecord.employeeCode.toUpperCase() === techIdToValidate.toUpperCase();
+          if (!permMatch && !empMatch) {
+            res.status(401).json({
+              success: false,
+              message: 'Invalid Technician ID.',
+              code: 'INVALID_TECHNICIAN_ID',
+            });
+            return;
+          }
+        }
+
+        // Validate Technician Account Status
+        if (technicianRecord.accountStatus === 'PENDING_APPROVAL') {
+          res.status(403).json({
+            success: false,
+            message: 'Your account is awaiting admin approval.',
+            code: 'ACCOUNT_PENDING_APPROVAL',
+          });
+          return;
+        }
+
+        if (technicianRecord.accountStatus === 'BLOCKED') {
+          res.status(403).json({
+            success: false,
+            message: 'Your account has been blocked. Please contact the administrator.',
+            code: 'ACCOUNT_BLOCKED',
+            reason: technicianRecord.blockReason || undefined,
+          });
+          return;
+        }
+
+        if (technicianRecord.accountStatus === 'REJECTED') {
+          res.status(403).json({
+            success: false,
+            message: 'Your technician registration was rejected. Please contact the administrator.',
+            code: 'ACCOUNT_REJECTED',
+            reason: technicianRecord.rejectionReason || undefined,
+          });
+          return;
+        }
+
+        if (technicianRecord.accountStatus === 'SUSPENDED') {
+          res.status(403).json({
+            success: false,
+            message: 'Your account has been suspended. Please contact the administrator.',
+            code: 'ACCOUNT_SUSPENDED',
+          });
+          return;
+        }
+
+        if (technicianRecord.accountStatus !== 'APPROVED') {
+          res.status(403).json({
+            success: false,
+            message: 'Your account is awaiting admin approval.',
+            code: 'ACCOUNT_NOT_APPROVED',
+          });
+          return;
+        }
+
+        user.technician = technicianRecord;
+        user.technicianPermanentId = technicianRecord.permanentId;
+
+        // Update last login timestamp on Technician
+        prisma.technician.update({
+          where: { id: technicianRecord.id },
+          data: { lastLoginAt: new Date() },
+        }).catch(() => {});
       }
+
+      // Update last login timestamp on User
+      prisma.user.update({
+        where: { id: user.id },
+        data: { lastLoginAt: new Date() },
+      }).catch(() => {});
     }
 
     // Ensure Master Admin identity claim ONLY for authorized executive Master Admin slots

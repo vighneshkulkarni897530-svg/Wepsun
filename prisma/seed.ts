@@ -183,13 +183,23 @@ export async function seedDatabase() {
   console.log('👷 Seeding Field Technicians...');
   const tech1 = await prisma.technician.upsert({
     where: { employeeCode: 'TECH-001' },
-    update: {},
+    update: {
+      permanentId: 'Wepsun0001',
+      accountStatus: 'APPROVED' as any,
+      approvedAt: new Date('2026-01-01'),
+      approvedBy: 'Sunil Mehta',
+      qualifications: 'Diploma in Electrical & Lift Engineering',
+      experienceYears: 6.5,
+      address: 'Andheri West, Mumbai',
+    },
     create: {
       id: 'tech-1',
       companyId: wepsun.id,
       branchId: brMum.id,
       name: 'Rajesh Sharma',
       employeeCode: 'TECH-001',
+      permanentId: 'Wepsun0001',
+      accountStatus: 'APPROVED' as any,
       phone: '+91 98203 11223',
       email: 'rajesh.sharma@wepsun.com',
       zone: 'Pune West (Baner, Hinjewadi, Aundh)',
@@ -201,18 +211,33 @@ export async function seedDatabase() {
       avgResolutionMinutes: 38,
       customerRating: 4.9,
       totalRatingsCount: 118,
+      qualifications: 'Diploma in Electrical & Lift Engineering',
+      experienceYears: 6.5,
+      address: 'Andheri West, Mumbai',
+      approvedAt: new Date('2026-01-01'),
+      approvedBy: 'Sunil Mehta',
     },
   });
 
   const tech2 = await prisma.technician.upsert({
     where: { employeeCode: 'TECH-002' },
-    update: {},
+    update: {
+      permanentId: 'Wepsun0002',
+      accountStatus: 'APPROVED' as any,
+      approvedAt: new Date('2026-01-05'),
+      approvedBy: 'Sunil Mehta',
+      qualifications: 'ITI Wireman & Mechanical Maintenance',
+      experienceYears: 4.0,
+      address: 'Vashi Sector 17, Navi Mumbai',
+    },
     create: {
       id: 'tech-2',
       companyId: wepsun.id,
       branchId: brThn.id,
       name: 'Amit Patel',
       employeeCode: 'TECH-002',
+      permanentId: 'Wepsun0002',
+      accountStatus: 'APPROVED' as any,
       phone: '+91 98204 44556',
       email: 'amit.patel@wepsun.com',
       zone: 'Pune East (Kharadi, Viman Nagar, Hadapsar)',
@@ -224,6 +249,11 @@ export async function seedDatabase() {
       avgResolutionMinutes: 44,
       customerRating: 4.8,
       totalRatingsCount: 82,
+      qualifications: 'ITI Wireman & Mechanical Maintenance',
+      experienceYears: 4.0,
+      address: 'Vashi Sector 17, Navi Mumbai',
+      approvedAt: new Date('2026-01-05'),
+      approvedBy: 'Sunil Mehta',
     },
   });
 

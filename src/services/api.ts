@@ -362,7 +362,7 @@ export const apiService = {
     apiFetch('/auth/master-id/resend', { method: 'POST', body: JSON.stringify(payload), skipAuth: true }),
   verifyMasterId: (payload: { masterId: string; rememberMe?: boolean }) =>
     apiFetch('/auth/master-id', { method: 'POST', body: JSON.stringify(payload), skipAuth: true }),
-  login: (payload: { email?: string; phone?: string; password?: string; otp?: string; companyCode?: string }) =>
+  login: (payload: { email?: string; phone?: string; password?: string; otp?: string; companyCode?: string; technicianId?: string; role?: string }) =>
     apiFetch('/auth/login', { method: 'POST', body: JSON.stringify(payload), skipAuth: true }),
   googleLogin: (payload: {
     credential?: string;
@@ -501,11 +501,61 @@ export const apiService = {
       ...options,
     }),
 
-  // Field Technicians & GPS Check-ins
+  // Field Technicians & Approval Management
   getTechnicians: (options?: ApiRequestOptions) => apiFetch('/technicians', options),
   getTechnicianById: (id: string, options?: ApiRequestOptions) => apiFetch(`/technicians/${id}`, options),
   recordGpsCheckIn: (payload: any, options?: ApiRequestOptions) =>
     apiFetch('/technicians/check-in', { method: 'POST', body: JSON.stringify(payload), ...options }),
+
+  registerTechnician: (payload: {
+    name: string;
+    email: string;
+    phone: string;
+    address?: string;
+    qualifications?: string;
+    experienceYears?: number;
+    documents?: string;
+    password?: string;
+    companyId?: string;
+  }, options?: ApiRequestOptions) =>
+    apiFetch('/technicians/register', { method: 'POST', body: JSON.stringify(payload), skipAuth: true, ...options }),
+
+  getPendingTechnicians: (options?: ApiRequestOptions) =>
+    apiFetch('/admin/technicians/pending', options),
+
+  getTechnicianRecords: (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  }, options?: ApiRequestOptions) => {
+    const q = new URLSearchParams();
+    if (params?.page) q.set('page', String(params.page));
+    if (params?.limit) q.set('limit', String(params.limit));
+    if (params?.search) q.set('search', params.search);
+    if (params?.status) q.set('status', params.status);
+    if (params?.sortBy) q.set('sortBy', params.sortBy);
+    if (params?.sortOrder) q.set('sortOrder', params.sortOrder);
+    const queryStr = q.toString() ? `?${q.toString()}` : '';
+    return apiFetch(`/admin/technicians${queryStr}`, options);
+  },
+
+  getTechnicianRecordById: (id: string, options?: ApiRequestOptions) =>
+    apiFetch(`/admin/technicians/${id}`, options),
+
+  approveTechnician: (id: string, options?: ApiRequestOptions) =>
+    apiFetch(`/admin/technicians/${id}/approve`, { method: 'POST', ...options }),
+
+  rejectTechnician: (id: string, reason?: string, options?: ApiRequestOptions) =>
+    apiFetch(`/admin/technicians/${id}/reject`, { method: 'POST', body: JSON.stringify({ reason }), ...options }),
+
+  blockTechnician: (id: string, reason?: string, options?: ApiRequestOptions) =>
+    apiFetch(`/admin/technicians/${id}/block`, { method: 'POST', body: JSON.stringify({ reason }), ...options }),
+
+  unblockTechnician: (id: string, reason?: string, options?: ApiRequestOptions) =>
+    apiFetch(`/admin/technicians/${id}/unblock`, { method: 'POST', body: JSON.stringify({ reason }), ...options }),
 
   // Preventive Maintenance (PM)
   getPmSchedules: (options?: ApiRequestOptions) => apiFetch('/pm/schedules', options),

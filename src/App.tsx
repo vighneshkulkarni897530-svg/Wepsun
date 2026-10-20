@@ -29,6 +29,7 @@ const WorkOrderManager = lazy(() => import('./components/admin/WorkOrderManager'
 const InventoryManager = lazy(() => import('./components/admin/InventoryManager').then(m => ({ default: m.InventoryManager })));
 const TechnicianPerformance = lazy(() => import('./components/admin/TechnicianPerformance').then(m => ({ default: m.TechnicianPerformance })));
 const LiveTechnicianRadar = lazy(() => import('./components/admin/LiveTechnicianRadar').then(m => ({ default: m.LiveTechnicianRadar })));
+const TechnicianRecordsView = lazy(() => import('./components/admin/TechnicianRecordsView').then(m => ({ default: m.TechnicianRecordsView })));
 const AuditLogViewer = lazy(() => import('./components/admin/AuditLogViewer').then(m => ({ default: m.AuditLogViewer })));
 const DesignSystemShowcase = lazy(() => import('./components/admin/DesignSystemShowcase').then(m => ({ default: m.DesignSystemShowcase })));
 const SystemFlowchartViewer = lazy(() => import('./components/admin/SystemFlowchartViewer').then(m => ({ default: m.SystemFlowchartViewer })));
@@ -145,6 +146,7 @@ const ADMIN_EXCLUSIVE_TABS = [
   'buildings',
   'clients',
   'technicians',
+  'technician_records',
   'inventory',
   'analytics',
   'service_jobs',
@@ -166,6 +168,7 @@ const ADMIN_PROTECTED_TABS = [
   'quotations',
   'inventory',
   'technicians',
+  'technician_records',
   'feedback',
   'companies',
   'branches',
@@ -362,6 +365,7 @@ export const AppContent: React.FC = () => {
               'quotations',
               'inventory',
               'technicians',
+              'technician_records',
               'feedback',
               'companies',
               'branches',
@@ -590,6 +594,9 @@ export const AppContent: React.FC = () => {
           </div>
         );
 
+      case 'technician_records':
+        return <TechnicianRecordsView />;
+
       case 'feedback':
         return (
           <div className="bg-white border border-slate-200/90 rounded-2xl p-5 sm:p-6 shadow-sm">
@@ -703,14 +710,6 @@ export const AppContent: React.FC = () => {
       case 'reports':
       case 'analytics':
         return <AdminReportsView />;
-
-      case 'notifications':
-        return (
-          <NotificationHub
-            onBack={handleBackFromNotifications}
-            onNavigateTab={handleNavigateTab}
-          />
-        );
 
       case 'settings':
         return <AdminProfileSettingsView />;

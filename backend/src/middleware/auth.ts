@@ -57,10 +57,60 @@ export async function requireAuth(
     try {
       const user = await prisma.user.findUnique({
         where: { id: payload.userId || payload.sub },
-        select: { id: true, isActive: true, tokenVersion: true, companyId: true, role: true },
+        select: {
+          id: true,
+          isActive: true,
+          tokenVersion: true,
+          companyId: true,
+          role: true,
+          technicianId: true,
+          technician: {
+            select: {
+              accountStatus: true,
+              permanentId: true,
+            },
+          },
+        },
       });
 
       if (user) {
+        // Enforce technician account status security
+        if (user.role === 'TECHNICIAN' && user.technician) {
+          const status = user.technician.accountStatus;
+          if (status === 'BLOCKED') {
+            res.status(403).json({
+              success: false,
+              message: 'Your account has been blocked. Please contact the administrator.',
+              code: 'ACCOUNT_BLOCKED',
+            });
+            return;
+          }
+          if (status === 'PENDING_APPROVAL') {
+            res.status(403).json({
+              success: false,
+              message: 'Your account is awaiting admin approval.',
+              code: 'ACCOUNT_PENDING_APPROVAL',
+            });
+            return;
+          }
+          if (status === 'REJECTED') {
+            res.status(403).json({
+              success: false,
+              message: 'Your account registration was rejected. Please contact the administrator.',
+              code: 'ACCOUNT_REJECTED',
+            });
+            return;
+          }
+          if (status === 'SUSPENDED') {
+            res.status(403).json({
+              success: false,
+              message: 'Your account is suspended. Please contact the administrator.',
+              code: 'ACCOUNT_SUSPENDED',
+            });
+            return;
+          }
+        }
+
         if (!user.isActive) {
           res.status(403).json({
             success: false,
@@ -70,7 +120,7 @@ export async function requireAuth(
           return;
         }
 
-        // Invalidate token if tokenVersion changed (e.g. after password reset)
+        // Invalidate token if tokenVersion changed (e.g. after password reset or block)
         if (payload.tokenVersion !== undefined && user.tokenVersion !== payload.tokenVersion) {
           res.status(401).json({
             success: false,

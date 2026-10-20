@@ -39,6 +39,7 @@ router.use('/amc', amcRoutes);
 router.use('/quotations', quotationsRoutes);
 router.use('/invoices', invoicesRoutes);
 router.use('/technicians', techniciansRoutes);
+router.use('/admin/technicians', techniciansRoutes);
 router.use('/ai', aiRoutes);
 router.use('/feedback', feedbackRoutes);
 router.use('/notifications', notificationsRoutes);

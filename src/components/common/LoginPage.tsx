@@ -22,10 +22,12 @@ import {
   Loader2,
   MailCheck,
   RefreshCw,
-  Shield,
-  Key,
-  Smartphone,
   Check,
+  MapPin,
+  GraduationCap,
+  Briefcase,
+  FileText,
+  BadgeCheck,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useAuthPopup } from '../../hooks/useAuthPopup';
@@ -91,8 +93,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     showGoogleCancelled,
     showGoogleFailed,
     showGoogleSuccess,
-    showMasterInvalid,
-    showMasterSuccess,
     closePopup,
   } = useAuthPopup();
 
@@ -113,9 +113,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     if (currentRole === 'technician') return 'technician';
     return 'client';
   });
-
-  // Technician Portal Mode: Normal Technician Credentials vs Authorized Master ID Entry
-  const [techMode, setTechMode] = useState<'standard' | 'master'>('standard');
 
   // Sign In Form Fields
   const [pendingQuoteService, setPendingQuoteService] = useState<string | null>(() => {
@@ -141,28 +138,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const regPasswordInputRef = useRef<HTMLInputElement>(null);
   const regConfirmPasswordInputRef = useRef<HTMLInputElement>(null);
   const termsCheckboxRef = useRef<HTMLInputElement>(null);
-  const masterIdInputRef = useRef<HTMLInputElement>(null);
-  const masterEmailOtpRef = useRef<HTMLInputElement>(null);
-  const masterSmsOtpRef = useRef<HTMLInputElement>(null);
   const otpInputRef = useRef<HTMLInputElement>(null);
   const forgotEmailInputRef = useRef<HTMLInputElement>(null);
   const forgotOtpInputRef = useRef<HTMLInputElement>(null);
   const forgotPasswordInputRef = useRef<HTMLInputElement>(null);
   const forgotConfirmPasswordInputRef = useRef<HTMLInputElement>(null);
-
-  // Master ID Dual-Factor Authentication State (Executive Admin Flow)
-  const [masterIdInput, setMasterIdInput] = useState('');
-  const [masterStep, setMasterStep] = useState<'id_entry' | 'otp_verify'>('id_entry');
-  const [masterChallengeToken, setMasterChallengeToken] = useState<string | null>(null);
-  const [masterMaskedEmail, setMasterMaskedEmail] = useState('');
-  const [masterMaskedPhone, setMasterMaskedPhone] = useState('');
-  const [masterEmailOtp, setMasterEmailOtp] = useState('');
-  const [masterSmsOtp, setMasterSmsOtp] = useState('');
-  const [masterTimer, setMasterTimer] = useState<number>(60);
-  const [canResendMasterOtp, setCanResendMasterOtp] = useState<boolean>(false);
-  const [isInitiatingMaster, setIsInitiatingMaster] = useState(false);
-  const [isVerifyingMaster, setIsVerifyingMaster] = useState(false);
-  const [devMasterOtp, setDevMasterOtp] = useState<{ emailOtp: string; smsOtp: string } | null>(null);
 
   // Sign Up Form Fields (Client Registration)
   const [regFullName, setRegFullName] = useState('');
@@ -175,6 +155,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [regShowConfirmPassword, setRegShowConfirmPassword] = useState(false);
   const [regAgreeTerms, setRegAgreeTerms] = useState(false);
   const [regIsSubmitting, setRegIsSubmitting] = useState(false);
+
+  // Technician Specific Login & Registration Fields
+  const [technicianId, setTechnicianId] = useState('');
+  const techIdInputRef = useRef<HTMLInputElement>(null);
+  const [techAddress, setTechAddress] = useState('');
+  const [techQualifications, setTechQualifications] = useState('');
+  const [techExperienceYears, setTechExperienceYears] = useState('2');
+  const [techDocuments, setTechDocuments] = useState('');
+  const [technicianPendingSuccess, setTechnicianPendingSuccess] = useState(false);
 
   // Email OTP Verification State for Sign Up
   const [signUpStep, setSignUpStep] = useState<'form' | 'otp'>('form');
@@ -212,8 +201,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   // Role Tab Change: Exactly Client or Technician
   const handleRoleChange = (role: 'client' | 'technician') => {
     setSelectedRole(role);
-    setTechMode('standard');
-    setMasterStep('id_entry');
   };
 
   // Sign In Submission Handler
@@ -258,10 +245,27 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
     try {
       const isMasterCandidate = cleanIdentifier.toLowerCase().startsWith('wep-');
-      const payload = {
+      const cleanTechId = technicianId.trim();
+      const isCandidateTechId =
+        cleanIdentifier.toUpperCase().startsWith('WEPSUN') ||
+        cleanIdentifier.toUpperCase().startsWith('WES-TECH-') ||
+        cleanIdentifier.toUpperCase().startsWith('TECH-');
+
+      if (selectedRole === 'technician' && !cleanTechId && !isCandidateTechId) {
+        showMissingFields({
+          message: 'Please enter your permanent Technician ID (e.g. Wepsun0001).',
+          onOk: () => techIdInputRef.current?.focus(),
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      const payload: any = {
         email: cleanIdentifier.includes('@') || isMasterCandidate ? cleanIdentifier : undefined,
-        phone: !cleanIdentifier.includes('@') && !isMasterCandidate ? cleanIdentifier : undefined,
+        phone: !cleanIdentifier.includes('@') && !isMasterCandidate && !isCandidateTechId ? cleanIdentifier : undefined,
         password: password,
+        technicianId: cleanTechId || (isCandidateTechId ? cleanIdentifier : undefined),
+        role: selectedRole === 'technician' ? 'technician' : 'client',
       };
 
       const targetRole: UserRole = selectedRole === 'client' ? 'client' : 'technician';
@@ -377,6 +381,27 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             waitTimeSeconds: (res as any)?.retryAfter || 60,
             onOk: () => emailInputRef.current?.focus(),
           });
+        } else if (errorCode === 'ACCOUNT_PENDING_APPROVAL') {
+          showSomethingWentWrong({
+            message: 'Your account is awaiting admin approval.',
+          });
+        } else if (errorCode === 'ACCOUNT_BLOCKED') {
+          showSomethingWentWrong({
+            message: 'Your account has been blocked. Please contact the administrator.',
+          });
+        } else if (errorCode === 'ACCOUNT_REJECTED') {
+          showSomethingWentWrong({
+            message: res?.message || 'Your technician application was not approved. Please contact the administrator.',
+          });
+        } else if (errorCode === 'ACCOUNT_SUSPENDED') {
+          showSomethingWentWrong({
+            message: 'Your account has been suspended. Please contact the administrator.',
+          });
+        } else if (errorCode === 'INVALID_TECHNICIAN_ID') {
+          showSomethingWentWrong({
+            message: res?.message || 'Invalid Technician ID.',
+            onTryAgain: () => techIdInputRef.current?.focus(),
+          });
         } else if (errorCode === 'ACCOUNT_DEACTIVATED') {
           showSomethingWentWrong({
             message: 'This account has been deactivated. Please contact WEPSUN Support.',
@@ -408,225 +433,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     }
   };
 
-  // =========================================================================
-  // MASTER ID DUAL-FACTOR AUTHENTICATION (ADMIN ENTRY VIA TECHNICIAN TAB)
-  // =========================================================================
 
-  // Step 1: Initiate Master ID 2FA
-  const handleInitiateMaster2FA = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isInitiatingMaster) return;
-
-    const candidate = masterIdInput.trim();
-    if (!candidate) {
-      showMissingFields({
-        message: 'Please enter an authorized Master ID to continue.',
-        onOk: () => masterIdInputRef.current?.focus(),
-      });
-      return;
-    }
-
-    setIsInitiatingMaster(true);
-
-    try {
-      const res = await apiService.initiateMaster2FA({ masterId: candidate });
-      if (res && res.success && res.data) {
-        setMasterChallengeToken(res.data.challengeToken);
-        setMasterMaskedEmail(res.data.maskedEmail || 'registered admin email');
-        setMasterMaskedPhone(res.data.maskedPhone || 'registered mobile');
-        setMasterStep('otp_verify');
-        setMasterEmailOtp('');
-        setMasterSmsOtp('');
-        setMasterTimer(60);
-        setCanResendMasterOtp(false);
-        if (res.data.devOtp) {
-          setDevMasterOtp(res.data.devOtp);
-        }
-
-        showOtpSent({
-          maskedContact: `${res.data.maskedEmail} and ${res.data.maskedPhone}`,
-          onEnterOtp: () => masterEmailOtpRef.current?.focus(),
-        });
-      } else {
-        showMasterInvalid({
-          onTryAgain: () => {
-            setMasterIdInput('');
-            masterIdInputRef.current?.focus();
-          },
-        });
-      }
-    } catch (err: any) {
-      showMasterInvalid({
-        onTryAgain: () => {
-          masterIdInputRef.current?.focus();
-        },
-      });
-    } finally {
-      setIsInitiatingMaster(false);
-    }
-  };
-
-  // Step 2: Verify Master Dual-Factor OTPs & Launch Admin Dashboard
-  const handleVerifyMaster2FA = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isVerifyingMaster || !masterChallengeToken) return;
-
-    const cleanEmailOtp = masterEmailOtp.replace(/\D/g, '').trim();
-    const cleanSmsOtp = masterSmsOtp.replace(/\D/g, '').trim();
-
-    if (cleanEmailOtp.length !== 6) {
-      showMissingFields({
-        message: 'Please enter the complete 6-digit Email verification code.',
-        onOk: () => masterEmailOtpRef.current?.focus(),
-      });
-      return;
-    }
-
-    setIsVerifyingMaster(true);
-
-    try {
-      const res = await apiService.verifyMaster2FA({
-        challengeToken: masterChallengeToken,
-        emailOtp: cleanEmailOtp,
-        smsOtp: cleanSmsOtp || undefined,
-        rememberMe,
-      });
-
-      if (res && res.success && res.data) {
-        const authData = res.data as any;
-        const accessToken = authData.tokens?.accessToken || authData.accessToken;
-        const refreshToken = authData.tokens?.refreshToken || authData.refreshToken;
-        if (accessToken) {
-          setTokens(accessToken, refreshToken);
-        }
-
-        const rawMasterAvatar = authData.user.avatarUrl || authData.user.avatar || '';
-        const cachedMasterAvatar = typeof window !== 'undefined' ? localStorage.getItem('wepsun_user_avatar_' + authData.user.id) : null;
-        const resolvedMasterAvatar = (isValidCustomAvatar(rawMasterAvatar) ? rawMasterAvatar : null) ||
-          (isValidCustomAvatar(cachedMasterAvatar) ? cachedMasterAvatar : null) ||
-          '';
-
-        if (resolvedMasterAvatar && typeof window !== 'undefined') {
-          localStorage.setItem('wepsun_profile_saved_' + authData.user.id, 'true');
-          localStorage.setItem('wepsun_user_avatar_' + authData.user.id, resolvedMasterAvatar);
-        }
-
-        const masterUser: UserRecord = {
-          id: authData.user.id,
-          name: authData.user.name,
-          email: authData.user.email,
-          phone: authData.user.phone || '+91 98201 55432',
-          role: 'master_admin',
-          companyId: authData.user.companyId || 'comp-1',
-          branchId: authData.user.branchId,
-          avatar: resolvedMasterAvatar,
-          isActive: true,
-        };
-
-        // Set persistent Master Admin session tokens
-        const masterExpiry = Date.now() + 30 * 24 * 60 * 60 * 1000;
-        sessionStorage.setItem('wepsun_master_authenticated', 'true');
-        sessionStorage.setItem('wepsun_master_session_expiry', String(masterExpiry));
-        sessionStorage.setItem('wepsun_role', 'master_admin');
-        sessionStorage.setItem('wepsun_lift_saas_v2_role', 'master_admin');
-        sessionStorage.setItem('wepsun_userId', masterUser.id);
-        sessionStorage.setItem('wepsun_lift_saas_v2_userId', masterUser.id);
-
-        localStorage.setItem('wepsun_master_authenticated', 'true');
-        localStorage.setItem('wepsun_master_session_expiry', String(masterExpiry));
-        localStorage.setItem('wepsun_role', 'master_admin');
-        localStorage.setItem('wepsun_lift_saas_v2_role', 'master_admin');
-        localStorage.setItem('wepsun_userId', masterUser.id);
-        localStorage.setItem('wepsun_lift_saas_v2_userId', masterUser.id);
-        localStorage.setItem('wepsun_lift_saas_v2_currentUser', JSON.stringify(masterUser));
-        localStorage.removeItem('wepsun_explicit_logout');
-
-        loginAsUser(masterUser);
-
-        try {
-          confetti({
-            particleCount: 100,
-            spread: 80,
-            origin: { y: 0.6 },
-            colors: ['#0066FF', '#00C853', '#FFD600', '#6200EA'],
-          });
-        } catch {}
-
-        showMasterSuccess({
-          name: masterUser.name,
-          onContinue: () => {
-            window.location.hash = 'dashboard';
-            if (onClose) onClose();
-          },
-        });
-      } else {
-        showVerificationFailed({
-          onTryAgain: () => {
-            setMasterEmailOtp('');
-            setMasterSmsOtp('');
-            masterEmailOtpRef.current?.focus();
-          },
-          onResendCode: () => {
-            handleResendMaster2FA();
-          },
-        });
-      }
-    } catch (err: any) {
-      showVerificationFailed({
-        onTryAgain: () => masterEmailOtpRef.current?.focus(),
-        onResendCode: () => handleResendMaster2FA(),
-      });
-    } finally {
-      setIsVerifyingMaster(false);
-    }
-  };
-
-  // Master Resend OTP
-  const handleResendMaster2FA = async () => {
-    if (!canResendMasterOtp || !masterChallengeToken) return;
-
-    try {
-      const res = await apiService.resendMaster2FA({ challengeToken: masterChallengeToken });
-      if (res && res.success) {
-        setMasterTimer(60);
-        setCanResendMasterOtp(false);
-        setMasterEmailOtp('');
-        setMasterSmsOtp('');
-        if (res.data?.devOtp) {
-          setDevMasterOtp(res.data.devOtp);
-        }
-        showOtpSent({
-          maskedContact: `${masterMaskedEmail} and ${masterMaskedPhone}`,
-          onEnterOtp: () => masterEmailOtpRef.current?.focus(),
-        });
-      } else {
-        showSomethingWentWrong({
-          message: res?.message || 'Could not resend Master 2FA codes.',
-        });
-      }
-    } catch (err: any) {
-      showSomethingWentWrong({
-        message: err?.message || 'Failed to resend code.',
-      });
-    }
-  };
-
-  // Master 2FA Countdown Timer
-  useEffect(() => {
-    let interval: any;
-    if (masterStep === 'otp_verify' && masterTimer > 0) {
-      interval = setInterval(() => {
-        setMasterTimer((prev) => {
-          if (prev <= 1) {
-            setCanResendMasterOtp(true);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [masterStep, masterTimer]);
 
   // =========================================================================
   // CLIENT REGISTRATION & EMAIL OTP TIMERS
@@ -708,6 +515,58 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       showAgreementRequired({
         onOk: () => termsCheckboxRef.current?.focus(),
       });
+      return;
+    }
+
+    // Technician Application Workflow (Direct submission with pending approval)
+    if (selectedRole === 'technician') {
+      if (!techAddress.trim()) {
+        showMissingFields({
+          message: 'Please enter your complete address to register as a technician.',
+        });
+        return;
+      }
+      if (!techQualifications.trim()) {
+        showMissingFields({
+          message: 'Please enter your technical qualifications and experience details.',
+        });
+        return;
+      }
+
+      setRegIsSubmitting(true);
+      try {
+        const regRes = await apiService.registerTechnician({
+          name: nameClean,
+          email: emailClean,
+          phone: phoneClean,
+          address: techAddress.trim(),
+          qualifications: techQualifications.trim(),
+          experienceYears: Number(techExperienceYears) || 0,
+          documents: techDocuments.trim() || undefined,
+          password: regPassword,
+        });
+
+        if (regRes.success) {
+          setTechnicianPendingSuccess(true);
+          try {
+            confetti({
+              particleCount: 80,
+              spread: 70,
+              origin: { y: 0.6 },
+            });
+          } catch {}
+        } else {
+          showRegistrationFailed({
+            message: regRes.message || 'Failed to submit technician application. Please check your details.',
+          });
+        }
+      } catch (err: any) {
+        showRegistrationFailed({
+          message: err?.message || 'Error submitting application. Please try again later.',
+        });
+      } finally {
+        setRegIsSubmitting(false);
+      }
       return;
     }
 
@@ -1192,15 +1051,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           <span>← Back to Home</span>
         </button>
 
-        {onClose && (
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 sm:right-8 p-2 rounded-full bg-white/20 hover:bg-white/35 text-white backdrop-blur-md transition-all shadow-sm cursor-pointer touch-manipulation"
-            title="Close"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        )}
+
 
         {/* Brand Lockup (Geometric Blue W Logo + WEPSUN Typography) */}
         <div
@@ -1350,203 +1201,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 </div>
               )}
 
-              {/* TECHNICIAN TAB: Standard Technician vs Master Access Mode */}
-              {selectedRole === 'technician' && (
-                <div className="mb-4">
-                  {techMode === 'standard' ? (
-                    <div className="p-3 bg-blue-50/60 border border-blue-200/70 rounded-2xl flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <Shield className="w-4 h-4 text-[#0066FF]" />
-                        <span className="text-xs font-semibold text-slate-700">Authorized Master ID?</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setTechMode('master');
-                          setMasterStep('id_entry');
-                        }}
-                        className="text-xs font-bold text-[#0066FF] hover:underline cursor-pointer"
-                      >
-                        Enter Master ID →
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="p-3 bg-slate-900 text-white rounded-2xl flex items-center justify-between gap-2 shadow-md">
-                      <div className="flex items-center gap-2">
-                        <Key className="w-4 h-4 text-amber-400" />
-                        <span className="text-xs font-bold tracking-wide">Master Admin Portal</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setTechMode('standard');
-                          setMasterStep('id_entry');
-                        }}
-                        className="text-xs font-medium text-slate-300 hover:text-white hover:underline cursor-pointer"
-                      >
-                        ← Field Tech Login
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* TECHNICIAN TAB: MASTER ID 2FA FLOW */}
-              {selectedRole === 'technician' && techMode === 'master' ? (
-                <div>
-                  {/* Master Step 1: Enter Master ID */}
-                  {masterStep === 'id_entry' ? (
-                    <form onSubmit={handleInitiateMaster2FA} className="space-y-3.5">
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                          <Key className="w-4 h-4" />
-                        </div>
-                        <input
-                          ref={masterIdInputRef}
-                          type="password"
-                          value={masterIdInput}
-                          onChange={(e) => setMasterIdInput(e.target.value)}
-                          placeholder="Enter Authorized Master ID"
-                          required
-                          autoFocus
-                          className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
-                        />
-                      </div>
-
-                      <p className="text-[11px] text-slate-500 leading-tight">
-                        Submitting an authorized Master ID initiates 2-Factor OTP verification sent to pre-registered administrative contact points.
-                      </p>
-
-                      <button
-                        type="submit"
-                        disabled={isInitiatingMaster || !masterIdInput.trim()}
-                        className="w-full py-3.5 rounded-2xl bg-[#0066FF] hover:bg-[#0052cc] text-white font-bold text-sm shadow-lg shadow-blue-500/25 active:scale-98 transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
-                      >
-                        {isInitiatingMaster ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin text-white" />
-                            <span>Validating Master ID...</span>
-                          </>
-                        ) : (
-                          <>
-                            <span>Authorize & Send Dual-Factor OTP</span>
-                            <ArrowRight className="w-4 h-4" />
-                          </>
-                        )}
-                      </button>
-                    </form>
-                  ) : (
-                    /* Master Step 2: Dual-Factor (Email + SMS OTP) Verification Screen */
-                    <form onSubmit={handleVerifyMaster2FA} className="space-y-3.5 animate-in fade-in duration-200">
-                      <div className="p-3.5 bg-blue-50/90 border border-blue-200 rounded-2xl text-left">
-                        <div className="flex items-center gap-2 text-[#0066FF] font-bold text-xs mb-1">
-                          <ShieldCheck className="w-4 h-4" />
-                          <span>Master Dual-Factor Verification Required</span>
-                        </div>
-                        <p className="text-[11px] text-slate-600 leading-tight">
-                          Verification codes dispatched to:
-                        </p>
-                        <div className="mt-1.5 space-y-0.5 text-xs text-slate-800 font-semibold font-mono">
-                          <div className="flex items-center gap-1.5">
-                            <Mail className="w-3.5 h-3.5 text-slate-500" />
-                            <span>{masterMaskedEmail}</span>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <Smartphone className="w-3.5 h-3.5 text-slate-500" />
-                            <span>{masterMaskedPhone}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Email OTP Field */}
-                      <div>
-                        <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
-                          Email Verification OTP (6 Digits)
-                        </label>
-                        <div className="relative">
-                          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                            <Mail className="w-4 h-4" />
-                          </div>
-                          <input
-                            ref={masterEmailOtpRef}
-                            type="text"
-                            inputMode="numeric"
-                            maxLength={6}
-                            value={masterEmailOtp}
-                            onChange={(e) => {
-                              setMasterEmailOtp(e.target.value.replace(/\D/g, '').slice(0, 6));
-                            }}
-                            placeholder="Enter 6-digit Email code"
-                            required
-                            autoFocus
-                            className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs sm:text-sm font-mono font-bold tracking-widest text-slate-800 focus:bg-white focus:border-[#0066FF] outline-none"
-                          />
-                        </div>
-                      </div>
-
-                      {/* SMS OTP Field */}
-                      <div>
-                        <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
-                          SMS Mobile OTP (6 Digits)
-                        </label>
-                        <div className="relative">
-                          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                            <Smartphone className="w-4 h-4" />
-                          </div>
-                          <input
-                            ref={masterSmsOtpRef}
-                            type="text"
-                            inputMode="numeric"
-                            maxLength={6}
-                            value={masterSmsOtp}
-                            onChange={(e) => {
-                              setMasterSmsOtp(e.target.value.replace(/\D/g, '').slice(0, 6));
-                            }}
-                            placeholder="Enter 6-digit SMS code"
-                            className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs sm:text-sm font-mono font-bold tracking-widest text-slate-800 focus:bg-white focus:border-[#0066FF] outline-none"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Resend Cooldown */}
-                      <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
-                        <span>Didn't receive codes?</span>
-                        {canResendMasterOtp ? (
-                          <button
-                            type="button"
-                            onClick={handleResendMaster2FA}
-                            className="font-bold text-[#0066FF] hover:underline cursor-pointer"
-                          >
-                            Resend Codes
-                          </button>
-                        ) : (
-                          <span>Resend in <strong className="text-[#0066FF] font-mono">{masterTimer}s</strong></span>
-                        )}
-                      </div>
-
-                      <button
-                        type="submit"
-                        disabled={isVerifyingMaster || masterEmailOtp.length !== 6}
-                        className="w-full py-3.5 rounded-2xl bg-[#0066FF] hover:bg-[#0052cc] text-white font-bold text-sm shadow-lg shadow-blue-500/25 active:scale-98 transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
-                      >
-                        {isVerifyingMaster ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin text-white" />
-                            <span>Verifying Credentials...</span>
-                          </>
-                        ) : (
-                          <>
-                            <ShieldCheck className="w-4 h-4" />
-                            <span>Verify & Access Admin Dashboard</span>
-                          </>
-                        )}
-                      </button>
-                    </form>
-                  )}
-                </div>
-              ) : (
-                /* STANDARD SIGN IN FORM (CLIENTS & STANDARD TECHNICIANS) */
-                <form onSubmit={handleSignInSubmit} className="space-y-3.5">
+              {/* STANDARD SIGN IN FORM (CLIENTS & TECHNICIANS) */}
+              <form onSubmit={handleSignInSubmit} className="space-y-3.5">
                   {/* Email / Identifier Field */}
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -1557,11 +1213,29 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       type="text"
                       value={identifier}
                       onChange={(e) => setIdentifier(e.target.value)}
-                      placeholder={selectedRole === 'technician' ? 'Technician Email / Code' : 'Email Address'}
+                      placeholder={selectedRole === 'technician' ? 'Technician Email or Mobile' : 'Email Address'}
                       required
                       className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
                     />
                   </div>
+
+                  {/* Technician ID Field (Visible on Technician role login) */}
+                  {selectedRole === 'technician' && (
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                        <Wrench className="w-4 h-4 text-[#0066FF]" />
+                      </div>
+                      <input
+                        ref={techIdInputRef}
+                        type="text"
+                        value={technicianId}
+                        onChange={(e) => setTechnicianId(e.target.value.toUpperCase())}
+                        placeholder="Enter Technician ID"
+                        required
+                        className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-bold text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all uppercase tracking-wider"
+                      />
+                    </div>
+                  )}
 
                   {/* Password Field */}
                   <div className="relative">
@@ -1629,7 +1303,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     )}
                   </button>
                 </form>
-              )}
 
               {/* Continue with Google Option (ONLY on Client tab as per security requirements) */}
               {selectedRole === 'client' && (
@@ -1685,184 +1358,336 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 </div>
               )}
 
-              {/* STEP 1: Registration Details Form */}
-              {signUpStep === 'form' ? (
-                <div>
-                  <form onSubmit={handleSignUpSubmit} className="space-y-3">
-                    {/* Full Name */}
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                        <User className="w-4 h-4" />
-                      </div>
-                      <input
-                        ref={regFullNameRef}
-                        type="text"
-                        value={regFullName}
-                        onChange={(e) => setRegFullName(e.target.value)}
-                        placeholder="Full Name"
-                        required
-                        className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
-                      />
-                    </div>
-
-                    {/* Email Address */}
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                        <Mail className="w-4 h-4" />
-                      </div>
-                      <input
-                        ref={regEmailInputRef}
-                        type="email"
-                        value={regEmail}
-                        onChange={(e) => setRegEmail(e.target.value)}
-                        placeholder="Email Address"
-                        required
-                        className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
-                      />
-                    </div>
-
-                    {/* Mobile Number with Country Code */}
-                    <div className="flex gap-2">
-                      <div className="w-20 shrink-0">
-                        <select
-                          value={regCountryCode}
-                          onChange={(e) => setRegCountryCode(e.target.value)}
-                          className="w-full py-2.5 px-2 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-bold text-slate-700 focus:bg-white focus:border-[#0066FF] outline-none"
-                        >
-                          <option value="+91">🇮🇳 +91</option>
-                          <option value="+1">🇺🇸 +1</option>
-                          <option value="+44">🇬🇧 +44</option>
-                          <option value="+971">🇦🇪 +971</option>
-                          <option value="+65">🇸🇬 +65</option>
-                        </select>
-                      </div>
-                      <div className="relative flex-1">
-                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                          <Phone className="w-4 h-4" />
-                        </div>
-                        <input
-                          ref={regMobileInputRef}
-                          type="tel"
-                          value={regMobile}
-                          onChange={(e) => {
-                            setRegMobile(e.target.value.replace(/\D/g, '').slice(0, 10));
-                          }}
-                          placeholder="Mobile Number"
-                          className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Password */}
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                        <Lock className="w-4 h-4" />
-                      </div>
-                      <input
-                        ref={regPasswordInputRef}
-                        type={regShowPassword ? 'text' : 'password'}
-                        value={regPassword}
-                        onChange={(e) => setRegPassword(e.target.value)}
-                        placeholder="Password (minimum 8–12 characters)"
-                        required
-                        minLength={8}
-                        className="w-full pl-10 pr-10 py-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setRegShowPassword(!regShowPassword)}
-                        className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
-                      >
-                        {regShowPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-
-                    {/* Confirm Password */}
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                        <Lock className="w-4 h-4" />
-                      </div>
-                      <input
-                        ref={regConfirmPasswordInputRef}
-                        type={regShowConfirmPassword ? 'text' : 'password'}
-                        value={regConfirmPassword}
-                        onChange={(e) => setRegConfirmPassword(e.target.value)}
-                        placeholder="Confirm Password"
-                        required
-                        className="w-full pl-10 pr-10 py-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setRegShowConfirmPassword(!regShowConfirmPassword)}
-                        className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
-                      >
-                        {regShowConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-
-                    {/* Terms & Privacy Policy Checkbox */}
-                    <div className="pt-1">
-                      <label className="flex items-start gap-2 cursor-pointer select-none text-left">
-                        <input
-                          ref={termsCheckboxRef}
-                          type="checkbox"
-                          checked={regAgreeTerms}
-                          onChange={(e) => setRegAgreeTerms(e.target.checked)}
-                          required
-                          className="w-4 h-4 mt-0.5 rounded text-[#0066FF] focus:ring-[#0066FF] border-slate-300 shrink-0"
-                        />
-                        <span className="text-[11px] sm:text-xs text-slate-600 leading-snug">
-                          I agree to the <a href="#terms" className="text-[#0066FF] font-semibold hover:underline">Terms of Service</a> and <a href="#privacy" className="text-[#0066FF] font-semibold hover:underline">Privacy Policy</a>.
-                        </span>
-                      </label>
-                    </div>
-
-                    {/* Sign Up Submit Button */}
-                    <button
-                      type="submit"
-                      disabled={regIsSubmitting || isSendingOtp || !regAgreeTerms}
-                      className="w-full py-3.5 rounded-2xl bg-[#0066FF] hover:bg-[#0052cc] text-white font-bold text-sm shadow-lg shadow-blue-500/25 active:scale-98 transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer mt-1"
-                    >
-                      {isSendingOtp ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin text-white" />
-                          <span>Sending Verification OTP...</span>
-                        </>
-                      ) : (
-                        <>
-                          <span>Create Account & Verify Email</span>
-                          <ArrowRight className="w-4 h-4" />
-                        </>
-                      )}
-                    </button>
-                  </form>
-
-                  {/* OR Divider */}
-                  <div className="relative flex items-center justify-center my-3.5">
-                    <div className="border-t border-slate-200 w-full" />
-                    <span className="bg-white px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                      OR
-                    </span>
-                    <div className="border-t border-slate-200 w-full" />
+              {/* Technician Pending Approval Success Card */}
+              {technicianPendingSuccess ? (
+                <div className="text-center py-6 px-4 animate-in fade-in zoom-in-95 duration-200">
+                  <div className="w-16 h-16 rounded-3xl bg-amber-500/10 border-2 border-amber-500/20 text-amber-500 flex items-center justify-center mx-auto mb-4 shadow-inner">
+                    <ShieldCheck className="w-9 h-9" />
                   </div>
-
-                  {/* Continue with Google */}
+                  <span className="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-100 text-amber-800 mb-2">
+                    Pending Administrator Approval
+                  </span>
+                  <h3 className="text-lg sm:text-xl font-extrabold text-slate-800 mb-2">
+                    Your account is awaiting admin approval.
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-600 max-w-sm mx-auto mb-6 leading-relaxed">
+                    Thank you for applying to <strong>WEPSUN Engineering Solutions</strong>. Your application and technical credentials have been securely submitted to our administration.
+                  </p>
+                  <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 text-left text-xs text-slate-600 mb-6 space-y-2.5">
+                    <div className="flex items-center gap-2 font-semibold text-slate-800">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <span>Registration details & qualifications recorded</span>
+                    </div>
+                    <div className="flex items-center gap-2 font-semibold text-slate-800">
+                      <Mail className="w-4 h-4 text-blue-500 shrink-0" />
+                      <span>You will receive your permanent Technician ID via email upon approval</span>
+                    </div>
+                    <div className="flex items-center gap-2 font-semibold text-slate-800">
+                      <Lock className="w-4 h-4 text-slate-400 shrink-0" />
+                      <span>Technician job assignments and tools will unlock upon approval</span>
+                    </div>
+                  </div>
                   <button
                     type="button"
-                    onClick={handleGoogleAuth}
-                    disabled={isGoogleSubmitting}
-                    aria-label="Continue with Google"
-                    className="w-full py-2.5 px-4 rounded-2xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2.5 shadow-sm transition-all cursor-pointer active:scale-98 disabled:opacity-60 disabled:cursor-not-allowed"
+                    onClick={() => {
+                      setTechnicianPendingSuccess(false);
+                      setView('signin');
+                      setSelectedRole('technician');
+                      window.location.hash = 'login';
+                    }}
+                    className="w-full py-3.5 rounded-2xl bg-[#0066FF] hover:bg-[#0052cc] text-white font-bold text-sm shadow-lg shadow-blue-500/25 active:scale-98 transition-all cursor-pointer"
                   >
-                    {isGoogleSubmitting ? (
-                      <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin shrink-0" />
-                    ) : (
-                      <GoogleGIcon />
-                    )}
-                    <span>{isGoogleSubmitting ? 'Connecting with Google...' : 'Continue with Google'}</span>
+                    Return to Sign In
                   </button>
                 </div>
               ) : (
+                <>
+                  {/* Role Tabs for Registration */}
+                  <div className="mb-4">
+                    <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100/90 rounded-2xl">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedRole('client')}
+                        className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          selectedRole === 'client'
+                            ? 'bg-white text-[#0066FF] shadow-sm'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Client Sign Up
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedRole('technician')}
+                        className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          selectedRole === 'technician'
+                            ? 'bg-white text-[#0066FF] shadow-sm'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Technician Registration
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* STEP 1: Registration Details Form */}
+                  {signUpStep === 'form' ? (
+                    <div>
+                      <form onSubmit={handleSignUpSubmit} className="space-y-3">
+                        {/* Full Name */}
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                            <User className="w-4 h-4" />
+                          </div>
+                          <input
+                            ref={regFullNameRef}
+                            type="text"
+                            value={regFullName}
+                            onChange={(e) => setRegFullName(e.target.value)}
+                            placeholder="Full Name"
+                            required
+                            className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
+                          />
+                        </div>
+
+                        {/* Email Address */}
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                            <Mail className="w-4 h-4" />
+                          </div>
+                          <input
+                            ref={regEmailInputRef}
+                            type="email"
+                            value={regEmail}
+                            onChange={(e) => setRegEmail(e.target.value)}
+                            placeholder="Email Address"
+                            required
+                            className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
+                          />
+                        </div>
+
+                        {/* Mobile Number with Country Code */}
+                        <div className="flex gap-2">
+                          <div className="w-20 shrink-0">
+                            <select
+                              value={regCountryCode}
+                              onChange={(e) => setRegCountryCode(e.target.value)}
+                              className="w-full py-2.5 px-2 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-bold text-slate-700 focus:bg-white focus:border-[#0066FF] outline-none"
+                            >
+                              <option value="+91">🇮🇳 +91</option>
+                              <option value="+1">🇺🇸 +1</option>
+                              <option value="+44">🇬🇧 +44</option>
+                              <option value="+971">🇦🇪 +971</option>
+                              <option value="+65">🇸🇬 +65</option>
+                            </select>
+                          </div>
+                          <div className="relative flex-1">
+                            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                              <Phone className="w-4 h-4" />
+                            </div>
+                            <input
+                              ref={regMobileInputRef}
+                              type="tel"
+                              value={regMobile}
+                              onChange={(e) => {
+                                setRegMobile(e.target.value.replace(/\D/g, '').slice(0, 10));
+                              }}
+                              placeholder="Mobile Number"
+                              className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Extra Fields for Technicians: Address, Qualifications, Experience, Documents */}
+                        {selectedRole === 'technician' && (
+                          <>
+                            {/* Residential Address */}
+                            <div className="relative">
+                              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                <MapPin className="w-4 h-4" />
+                              </div>
+                              <input
+                                type="text"
+                                value={techAddress}
+                                onChange={(e) => setTechAddress(e.target.value)}
+                                placeholder="Residential Address / City"
+                                required
+                                className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
+                              />
+                            </div>
+
+                            {/* Qualifications */}
+                            <div className="relative">
+                              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                <GraduationCap className="w-4 h-4" />
+                              </div>
+                              <input
+                                type="text"
+                                value={techQualifications}
+                                onChange={(e) => setTechQualifications(e.target.value)}
+                                placeholder="Technical Qualifications (e.g. ITI, Diploma, BE/BTech)"
+                                required
+                                className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
+                              />
+                            </div>
+
+                            {/* Experience and Certificate / License info */}
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                  <Briefcase className="w-4 h-4" />
+                                </div>
+                                <select
+                                  value={techExperienceYears}
+                                  onChange={(e) => setTechExperienceYears(e.target.value)}
+                                  className="w-full pl-10 pr-2 py-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 focus:bg-white focus:border-[#0066FF] outline-none"
+                                >
+                                  <option value="1">1 Year Exp.</option>
+                                  <option value="2">2 Years Exp.</option>
+                                  <option value="3">3 Years Exp.</option>
+                                  <option value="5">5+ Years Exp.</option>
+                                  <option value="10">10+ Years Exp.</option>
+                                </select>
+                              </div>
+                              <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                  <FileText className="w-4 h-4" />
+                                </div>
+                                <input
+                                  type="text"
+                                  value={techDocuments}
+                                  onChange={(e) => setTechDocuments(e.target.value)}
+                                  placeholder="License / Certificate No."
+                                  className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
+                                />
+                              </div>
+                            </div>
+                          </>
+                        )}
+
+                        {/* Password */}
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                            <Lock className="w-4 h-4" />
+                          </div>
+                          <input
+                            ref={regPasswordInputRef}
+                            type={regShowPassword ? 'text' : 'password'}
+                            value={regPassword}
+                            onChange={(e) => setRegPassword(e.target.value)}
+                            placeholder="Password (minimum 8–12 characters)"
+                            required
+                            minLength={8}
+                            className="w-full pl-10 pr-10 py-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setRegShowPassword(!regShowPassword)}
+                            className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                          >
+                            {regShowPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+
+                        {/* Confirm Password */}
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                            <Lock className="w-4 h-4" />
+                          </div>
+                          <input
+                            ref={regConfirmPasswordInputRef}
+                            type={regShowConfirmPassword ? 'text' : 'password'}
+                            value={regConfirmPassword}
+                            onChange={(e) => setRegConfirmPassword(e.target.value)}
+                            placeholder="Confirm Password"
+                            required
+                            className="w-full pl-10 pr-10 py-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setRegShowConfirmPassword(!regShowConfirmPassword)}
+                            className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                          >
+                            {regShowConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+
+                        {/* Terms & Privacy Policy Checkbox */}
+                        <div className="pt-1">
+                          <label className="flex items-start gap-2 cursor-pointer select-none text-left">
+                            <input
+                              ref={termsCheckboxRef}
+                              type="checkbox"
+                              checked={regAgreeTerms}
+                              onChange={(e) => setRegAgreeTerms(e.target.checked)}
+                              required
+                              className="w-4 h-4 mt-0.5 rounded text-[#0066FF] focus:ring-[#0066FF] border-slate-300 shrink-0"
+                            />
+                            <span className="text-[11px] sm:text-xs text-slate-600 leading-snug">
+                              I agree to the <a href="#terms" className="text-[#0066FF] font-semibold hover:underline">Terms of Service</a> and <a href="#privacy" className="text-[#0066FF] font-semibold hover:underline">Privacy Policy</a>.
+                            </span>
+                          </label>
+                        </div>
+
+                        {/* Sign Up Submit Button */}
+                        <button
+                          type="submit"
+                          disabled={regIsSubmitting || isSendingOtp || !regAgreeTerms}
+                          className="w-full py-3.5 rounded-2xl bg-[#0066FF] hover:bg-[#0052cc] text-white font-bold text-sm shadow-lg shadow-blue-500/25 active:scale-98 transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer mt-1"
+                        >
+                          {regIsSubmitting ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin text-white" />
+                              <span>Submitting Application...</span>
+                            </>
+                          ) : isSendingOtp ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin text-white" />
+                              <span>Sending Verification OTP...</span>
+                            </>
+                          ) : selectedRole === 'technician' ? (
+                            <>
+                              <span>Submit Application (Requires Approval)</span>
+                              <ArrowRight className="w-4 h-4" />
+                            </>
+                          ) : (
+                            <>
+                              <span>Create Account & Verify Email</span>
+                              <ArrowRight className="w-4 h-4" />
+                            </>
+                          )}
+                        </button>
+                      </form>
+
+                      {/* OR Divider & Continue with Google (Client Only) */}
+                      {selectedRole === 'client' && (
+                        <>
+                          <div className="relative flex items-center justify-center my-3.5">
+                            <div className="border-t border-slate-200 w-full" />
+                            <span className="bg-white px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                              OR
+                            </span>
+                            <div className="border-t border-slate-200 w-full" />
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={handleGoogleAuth}
+                            disabled={isGoogleSubmitting}
+                            aria-label="Continue with Google"
+                            className="w-full py-2.5 px-4 rounded-2xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2.5 shadow-sm transition-all cursor-pointer active:scale-98 disabled:opacity-60 disabled:cursor-not-allowed"
+                          >
+                            {isGoogleSubmitting ? (
+                              <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin shrink-0" />
+                            ) : (
+                              <GoogleGIcon />
+                            )}
+                            <span>{isGoogleSubmitting ? 'Connecting with Google...' : 'Continue with Google'}</span>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  ) : (
                 /* STEP 2: Interactive 6-Digit Email OTP Verification Screen */
                 <div className="animate-in fade-in slide-in-from-right-3 duration-200">
                   <button
@@ -1983,28 +1808,32 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   </button>
                 </div>
               )}
+            </>
+          )}
 
-              {/* Switch to Sign In */}
-              <div className="mt-4 text-center">
-                <p className="text-xs text-slate-500">
-                  Already have an account?{' '}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setView('signin');
-                      setSignUpStep('form');
-                      window.location.hash = 'login';
-                    }}
-                    className="font-bold text-[#0066FF] hover:underline cursor-pointer"
-                  >
-                    Sign In
-                  </button>
-                </p>
-              </div>
+          {/* Switch to Sign In */}
+          {!technicianPendingSuccess && (
+            <div className="mt-4 text-center">
+              <p className="text-xs text-slate-500">
+                Already have an account?{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setView('signin');
+                    setSignUpStep('form');
+                    window.location.hash = 'login';
+                  }}
+                  className="font-bold text-[#0066FF] hover:underline cursor-pointer"
+                >
+                  Sign In
+                </button>
+              </p>
             </div>
           )}
         </div>
-      </div>
+      )}
+    </div>
+  </div>
 
       {/* Bottom Trust Badges */}
       <div className="relative z-10 w-full py-5 px-4 flex items-center justify-center">

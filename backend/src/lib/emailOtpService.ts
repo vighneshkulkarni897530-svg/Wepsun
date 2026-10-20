@@ -176,6 +176,239 @@ export function generateOtpEmailText(params: {
   return `${greeting}\n\nYour 6-digit verification code for ${purpose} is:\n\n${otp}\n\nThis code is valid for ${expiryMinutes} minutes. Do NOT share this code with anyone.\n\n— WEPSUN Engineering Solution Team`;
 }
 
+/**
+ * Generate WEPSUN branded HTML email for Technician Approval & Permanent ID Assignment
+ */
+export function generateTechnicianApprovalEmailHtml(params: {
+  name: string;
+  permanentId: string;
+  loginUrl?: string;
+}): string {
+  const { name, permanentId, loginUrl = 'https://wepsun.onrender.com/#login' } = params;
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Technician Account Approved</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b192c; margin: 0; padding: 24px; color: #1e293b; }
+    .container { max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+    .header { background: linear-gradient(135deg, #0b2545 0%, #0066FF 100%); padding: 36px 28px; text-align: center; color: #ffffff; }
+    .logo-text { font-size: 26px; font-weight: 900; letter-spacing: 1px; margin: 0; }
+    .logo-sub { font-size: 11px; font-weight: 700; letter-spacing: 3px; color: #93c5fd; margin-top: 4px; text-transform: uppercase; }
+    .badge { display: inline-block; background: rgba(34, 197, 94, 0.2); border: 1px solid #22c55e; color: #166534; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; padding: 4px 12px; border-radius: 999px; margin-top: 14px; }
+    .content { padding: 36px 32px; background: #ffffff; }
+    .greeting { font-size: 18px; font-weight: 700; color: #0f172a; margin-bottom: 12px; }
+    .lead { font-size: 14px; color: #475569; line-height: 1.6; margin-bottom: 24px; }
+    .id-card { background: #f0f7ff; border: 2px solid #0066FF; border-radius: 16px; padding: 24px; text-align: center; margin: 24px 0; }
+    .id-label { font-size: 11px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 1.5px; }
+    .id-value { font-family: 'Courier New', Courier, monospace; font-size: 32px; font-weight: 900; letter-spacing: 4px; color: #0066FF; margin: 10px 0 6px; }
+    .id-subtext { font-size: 12px; color: #0b2545; font-weight: 600; }
+    .instructions-card { background: #f8fafc; border-radius: 14px; padding: 20px; margin: 24px 0; border: 1px solid #e2e8f0; }
+    .instructions-title { font-size: 13px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+    .step-list { margin: 0; padding-left: 20px; font-size: 13px; color: #334155; line-height: 1.7; }
+    .btn-container { text-align: center; margin: 30px 0 10px; }
+    .btn { display: inline-block; background: #0066FF; color: #ffffff !important; font-weight: 700; font-size: 14px; padding: 14px 28px; border-radius: 12px; text-decoration: none; box-shadow: 0 4px 12px rgba(0, 102, 255, 0.3); }
+    .security-note { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 14px 18px; border-radius: 0 12px 12px 0; font-size: 12px; color: #78350f; line-height: 1.5; margin-top: 24px; }
+    .footer { background: #f1f5f9; padding: 20px 32px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo-text">WEPSUN</div>
+      <div class="logo-sub">ENGINEERING SOLUTION</div>
+      <div class="badge">Application Approved</div>
+    </div>
+    <div class="content">
+      <div class="greeting">Congratulations ${name},</div>
+      <div class="lead">
+        Your technician registration for WEPSUN Engineering Solutions has been reviewed and <strong>approved</strong> by our administrative team. Your account is now active and ready for field service operations.
+      </div>
+
+      <div class="id-card">
+        <div class="id-label">Permanent Technician ID</div>
+        <div class="id-value">${permanentId}</div>
+        <div class="id-subtext">This ID is permanently assigned to your profile and will never change.</div>
+      </div>
+
+      <div class="instructions-card">
+        <div class="instructions-title">Login Instructions</div>
+        <ol class="step-list">
+          <li>Open the official WEPSUN web application or Android mobile app.</li>
+          <li>Select the <strong>Technician</strong> role tab on the login screen.</li>
+          <li>Enter your registered <strong>Email Address</strong> or <strong>Mobile Number</strong>.</li>
+          <li>Enter your permanent <strong>Technician ID: ${permanentId}</strong>.</li>
+          <li>Enter your account password.</li>
+        </ol>
+      </div>
+
+      <div class="btn-container">
+        <a href="${loginUrl}" class="btn" target="_blank" rel="noopener noreferrer">Sign In to WEPSUN Portal</a>
+      </div>
+
+      <div class="security-note">
+        <strong>Security Reminder:</strong> Never share your password or security credentials with anyone. WEPSUN administrators will never ask for your password. Keep your Technician ID handy for job check-ins and customer service reports.
+      </div>
+    </div>
+    <div class="footer">
+      © ${new Date().getFullYear()} WEPSUN Engineering Solution Pvt. Ltd. All rights reserved.<br>
+      Automated Technician Management System
+    </div>
+  </div>
+</body>
+</html>`.trim();
+}
+
+export function generateTechnicianApprovalEmailText(params: {
+  name: string;
+  permanentId: string;
+  loginUrl?: string;
+}): string {
+  const { name, permanentId, loginUrl = 'https://wepsun.onrender.com/#login' } = params;
+  return `Hello ${name},\n\nCongratulations! Your technician account for WEPSUN Engineering Solutions has been approved.\n\nYour Permanent Technician ID is: ${permanentId}\n\nLogin Instructions:\n1. Open the WEPSUN app or visit: ${loginUrl}\n2. Select 'Technician' role\n3. Enter your Email or Mobile Number\n4. Enter your Technician ID: ${permanentId}\n5. Enter your account password\n\nSecurity Reminder: Never share your password with anyone. Your Technician ID is permanent and unique to you.\n\n— WEPSUN Engineering Solution Team`;
+}
+
+/**
+ * Generate WEPSUN branded HTML email for Technician Rejection
+ */
+export function generateTechnicianRejectionEmailHtml(params: {
+  name: string;
+  reason?: string;
+}): string {
+  const { name, reason } = params;
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Application Status Update</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b192c; margin: 0; padding: 24px; color: #1e293b; }
+    .container { max-width: 540px; margin: 0 auto; background: #ffffff; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+    .header { background: linear-gradient(135deg, #0b2545 0%, #dc2626 100%); padding: 36px 28px; text-align: center; color: #ffffff; }
+    .logo-text { font-size: 26px; font-weight: 900; letter-spacing: 1px; margin: 0; }
+    .logo-sub { font-size: 11px; font-weight: 700; letter-spacing: 3px; color: #fca5a5; margin-top: 4px; text-transform: uppercase; }
+    .content { padding: 36px 32px; background: #ffffff; }
+    .greeting { font-size: 18px; font-weight: 700; color: #0f172a; margin-bottom: 12px; }
+    .lead { font-size: 14px; color: #475569; line-height: 1.6; margin-bottom: 20px; }
+    .reason-card { background: #fef2f2; border-left: 4px solid #ef4444; border-radius: 0 12px 12px 0; padding: 16px 20px; margin: 20px 0; }
+    .reason-title { font-size: 11px; font-weight: 800; color: #991b1b; text-transform: uppercase; letter-spacing: 1px; }
+    .reason-text { font-size: 13px; color: #7f1d1d; margin-top: 6px; line-height: 1.5; }
+    .footer { background: #f1f5f9; padding: 20px 32px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo-text">WEPSUN</div>
+      <div class="logo-sub">ENGINEERING SOLUTION</div>
+    </div>
+    <div class="content">
+      <div class="greeting">Hello ${name},</div>
+      <div class="lead">
+        Thank you for your interest in joining the WEPSUN field engineering team. After careful review of your application and submitted documentation, we regret to inform you that your registration could not be approved at this time.
+      </div>
+
+      ${reason ? `
+      <div class="reason-card">
+        <div class="reason-title">Reason Provided by Administrator</div>
+        <div class="reason-text">${reason}</div>
+      </div>
+      ` : ''}
+
+      <div class="lead" style="font-size: 13px; color: #64748b; margin-top: 24px;">
+        If you have questions regarding this decision or wish to provide updated documentation, please contact our support team at <strong>service@wepsun.com</strong>.
+      </div>
+    </div>
+    <div class="footer">
+      © ${new Date().getFullYear()} WEPSUN Engineering Solution Pvt. Ltd. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>`.trim();
+}
+
+export function generateTechnicianRejectionEmailText(params: {
+  name: string;
+  reason?: string;
+}): string {
+  const { name, reason } = params;
+  return `Hello ${name},\n\nThank you for applying to WEPSUN Engineering Solution. Following review, your technician application could not be approved at this time.${reason ? `\n\nReason: ${reason}` : ''}\n\nFor questions, please contact service@wepsun.com.\n\n— WEPSUN Engineering Solution Team`;
+}
+
+/**
+ * Generate WEPSUN branded HTML email for Technician Account Block Notice
+ */
+export function generateTechnicianBlockedEmailHtml(params: {
+  name: string;
+  permanentId?: string;
+  reason?: string;
+}): string {
+  const { name, permanentId, reason } = params;
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Account Status Notice</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b192c; margin: 0; padding: 24px; color: #1e293b; }
+    .container { max-width: 540px; margin: 0 auto; background: #ffffff; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+    .header { background: linear-gradient(135deg, #0b2545 0%, #b91c1c 100%); padding: 36px 28px; text-align: center; color: #ffffff; }
+    .logo-text { font-size: 26px; font-weight: 900; letter-spacing: 1px; margin: 0; }
+    .logo-sub { font-size: 11px; font-weight: 700; letter-spacing: 3px; color: #fca5a5; margin-top: 4px; text-transform: uppercase; }
+    .content { padding: 36px 32px; background: #ffffff; }
+    .greeting { font-size: 18px; font-weight: 700; color: #0f172a; margin-bottom: 12px; }
+    .lead { font-size: 14px; color: #475569; line-height: 1.6; margin-bottom: 20px; }
+    .reason-card { background: #fff1f2; border-left: 4px solid #e11d48; border-radius: 0 12px 12px 0; padding: 16px 20px; margin: 20px 0; }
+    .reason-title { font-size: 11px; font-weight: 800; color: #9f1239; text-transform: uppercase; letter-spacing: 1px; }
+    .reason-text { font-size: 13px; color: #881337; margin-top: 6px; line-height: 1.5; }
+    .footer { background: #f1f5f9; padding: 20px 32px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo-text">WEPSUN</div>
+      <div class="logo-sub">ENGINEERING SOLUTION</div>
+    </div>
+    <div class="content">
+      <div class="greeting">Hello ${name},</div>
+      <div class="lead">
+        This is an official notice that your technician account ${permanentId ? `(ID: <strong>${permanentId}</strong>)` : ''} has been <strong>blocked</strong> by an administrator. Access to jobs, service reports, and system operations has been restricted.
+      </div>
+
+      ${reason ? `
+      <div class="reason-card">
+        <div class="reason-title">Reason for Restriction</div>
+        <div class="reason-text">${reason}</div>
+      </div>
+      ` : ''}
+
+      <div class="lead" style="font-size: 13px; color: #64748b; margin-top: 24px;">
+        If you believe this is in error or wish to request an account review, please contact your service manager or the WEPSUN administration desk immediately.
+      </div>
+    </div>
+    <div class="footer">
+      © ${new Date().getFullYear()} WEPSUN Engineering Solution Pvt. Ltd. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>`.trim();
+}
+
+export function generateTechnicianBlockedEmailText(params: {
+  name: string;
+  permanentId?: string;
+  reason?: string;
+}): string {
+  const { name, permanentId, reason } = params;
+  return `Hello ${name},\n\nYour WEPSUN technician account ${permanentId ? `(${permanentId})` : ''} has been blocked by an administrator.${reason ? `\n\nReason: ${reason}` : ''}\n\nPlease contact your service manager or administrator for assistance.\n\n— WEPSUN Engineering Solution Team`;
+}
+
 // --------------------------------------------------------------------------
 // PROVIDER IMPLEMENTATIONS
 // --------------------------------------------------------------------------

@@ -34,6 +34,7 @@ import {
   FileText,
   LogOut,
   User,
+  UserCheck,
 } from 'lucide-react';
 import { WepsunLogo } from '../common/WepsunLogo';
 import { useApp } from '../../context/AppContext';
@@ -46,6 +47,7 @@ export type NavTabId =
   | 'lifts'
   | 'complaints'
   | 'technicians'
+  | 'technician_records'
   | 'amc'
   | 'quotations'
   | 'inventory'
@@ -126,6 +128,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'lifts', label: 'Lifts', icon: <Layers className="w-[18px] h-[18px]" /> },
     { id: 'complaints', label: 'Complaints', icon: <AlertCircle className="w-[18px] h-[18px]" /> },
     { id: 'technicians', label: 'Technicians', icon: <Wrench className="w-[18px] h-[18px]" /> },
+    { id: 'technician_records', label: 'Technician Records', icon: <UserCheck className="w-[18px] h-[18px]" /> },
     { id: 'amc', label: 'AMC', icon: <FileCheck2 className="w-[18px] h-[18px]" /> },
     { id: 'quotations', label: 'Quotations', icon: <FileSpreadsheet className="w-[18px] h-[18px]" /> },
     { id: 'inventory', label: 'Inventory', icon: <Package className="w-[18px] h-[18px]" /> },
