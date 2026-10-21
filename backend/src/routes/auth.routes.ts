@@ -1164,7 +1164,7 @@ router.post('/login', authLimiter, async (req: AuthenticatedRequest, res: Respon
           email: mockUser.email,
           phone: mockUser.phone,
           passwordHash: pHash,
-          role: (role || mockUser.role || 'COMPANY_ADMIN').toUpperCase(),
+          role: (mockUser.role || role || 'COMPANY_ADMIN').toUpperCase(),
           companyId: mockUser.companyId || 'comp-1',
           branchId: mockUser.branchId || null,
           clientId: (mockUser as any).clientId || null,

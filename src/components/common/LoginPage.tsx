@@ -46,6 +46,7 @@ import {
 import elevatorGlassLobbyImg from '../../assets/elevator-glass-lobby.jpg';
 import constructionPlansSunsetImg from '../../assets/construction-plans-sunset.jpg';
 import { isValidCustomAvatar } from '../../utils/avatarUtils';
+import { cacheUserSession } from '../../services/sessionManager';
 
 interface LoginPageProps {
   isOpen?: boolean;
@@ -105,16 +106,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     return 'signin';
   });
 
-  // Selected Role for authentication: Client | Technician | Admin / Staff
-  const [selectedRole, setSelectedRole] = useState<'client' | 'technician' | 'admin'>(() => {
+  // Selected Role for authentication: Client | Technician
+  const [selectedRole, setSelectedRole] = useState<'client' | 'technician'>(() => {
     const hash = window.location.hash.toLowerCase();
     if (hash.includes('login-technician') || hash.includes('technician')) return 'technician';
-    if (hash.includes('admin') || hash.includes('master') || hash.includes('dashboard')) return 'admin';
-    if (hash.includes('login-client') || hash.includes('client')) return 'client';
     if (defaultRole === 'technician') return 'technician';
-    if (defaultRole === 'admin') return 'admin';
     if (currentRole === 'technician') return 'technician';
-    if (currentRole === 'company_admin' || currentRole === 'master_admin' || currentRole === 'super_admin') return 'admin';
     return 'client';
   });
 
@@ -202,8 +199,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     loadGoogleGisScript().catch(() => {});
   }, []);
 
-  // Role Tab Change: Client | Technician | Admin
-  const handleRoleChange = (role: 'client' | 'technician' | 'admin') => {
+  // Role Tab Change: Client | Technician
+  const handleRoleChange = (role: 'client' | 'technician') => {
     setSelectedRole(role);
   };
 
@@ -248,7 +245,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     }, 6000);
 
     try {
-      const isMasterCandidate = cleanIdentifier.toLowerCase().startsWith('wep-');
+      const isMasterCandidate =
+        cleanIdentifier.toLowerCase().startsWith('wep-') ||
+        cleanIdentifier.toLowerCase().includes('mst-') ||
+        cleanIdentifier.toLowerCase().startsWith('mst') ||
+        cleanIdentifier.toLowerCase().includes('admin');
       const cleanTechId = technicianId.trim();
       const isCandidateTechId =
         cleanIdentifier.toUpperCase().startsWith('WEPSUN') ||
@@ -262,10 +263,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         phone: !cleanIdentifier.includes('@') && !isMasterCandidate && !isCandidateTechId ? cleanIdentifier : undefined,
         password: password,
         technicianId: cleanTechId || (isCandidateTechId ? cleanIdentifier : undefined),
-        role: selectedRole === 'technician' ? 'technician' : selectedRole === 'admin' ? 'company_admin' : 'client',
+        role: selectedRole === 'technician' ? 'technician' : 'client',
       };
 
-      const targetRole: UserRole = selectedRole === 'client' ? 'client' : selectedRole === 'technician' ? 'technician' : 'company_admin';
+      const targetRole: UserRole = selectedRole === 'client' ? 'client' : 'technician';
 
       const res = await apiService.login(payload);
       if (res && res.success && res.data) {
@@ -276,7 +277,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           setTokens(accessToken, refreshToken);
         }
         if (authData.user) {
-          const rawRole = (authData.user.role || (selectedRole === 'admin' ? 'company_admin' : targetRole)).toLowerCase();
+          const rawRole = (authData.user.role || targetRole).toLowerCase();
           const adminRoles = ['master_admin', 'super_admin', 'company_admin', 'service_manager', 'accounts', 'sales'];
           const isAdmin = adminRoles.includes(rawRole);
           const userRole: UserRole = isAdmin ? (rawRole as UserRole) : rawRole === 'technician' ? 'technician' : 'client';
@@ -316,6 +317,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             isActive: true,
           };
 
+          cacheUserSession(finalUser, userRole, isAdmin);
           loginAsUser(finalUser);
 
           if (pendingQuoteService || (typeof window !== 'undefined' && sessionStorage.getItem('wepsun_pending_quote_service'))) {
@@ -1184,9 +1186,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           {/* ========================================================================= */}
           {view === 'signin' ? (
             <div>
-              {/* Role Selection Tabs — Three Options: Client | Technician | Admin / Staff */}
+              {/* Role Selection Tabs — Two Options: Client | Technician */}
               <div className="mb-4">
-                <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100/90 rounded-2xl">
+                <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100/90 rounded-2xl">
                   <button
                     type="button"
                     onClick={() => handleRoleChange('client')}
@@ -1208,17 +1210,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     }`}
                   >
                     Technician
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleRoleChange('admin')}
-                    className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      selectedRole === 'admin'
-                        ? 'bg-white text-[#0066FF] shadow-sm'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Admin / Staff
                   </button>
                 </div>
               </div>
@@ -1273,9 +1264,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       placeholder={
                         selectedRole === 'technician'
                           ? 'Technician Email, Mobile, or ID'
-                          : selectedRole === 'admin'
-                          ? 'Admin Email or Master ID'
-                          : 'Email Address or Mobile'
+                          : 'Email, Mobile, or Master ID'
                       }
                       required
                       className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
@@ -1476,7 +1465,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                             : 'text-slate-600 hover:text-slate-900'
                         }`}
                       >
-                        Client Sign Up
+                        Client
                       </button>
                       <button
                         type="button"
@@ -1487,7 +1476,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                             : 'text-slate-600 hover:text-slate-900'
                         }`}
                       >
-                        Technician Registration
+                        Technician
                       </button>
                     </div>
                   </div>

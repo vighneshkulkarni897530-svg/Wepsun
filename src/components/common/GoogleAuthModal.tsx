@@ -478,7 +478,7 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
             <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
               Select Your Portal / Role
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setSelectedRole('client')}
@@ -502,18 +502,6 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
               >
                 <Wrench className="w-3.5 h-3.5" />
                 <span>Technician</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedRole('company_admin')}
-                className={`py-2 px-2.5 rounded-xl border text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer ${
-                  selectedRole === 'company_admin'
-                    ? 'bg-blue-50 border-[#0066FF] text-[#0066FF] shadow-xs'
-                    : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <Shield className="w-3.5 h-3.5" />
-                <span>Admin</span>
               </button>
             </div>
           </div>

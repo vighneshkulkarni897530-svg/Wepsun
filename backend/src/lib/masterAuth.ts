@@ -47,7 +47,13 @@ setInterval(() => {
  * Computes deterministic SHA-256 hex digest for credential verification
  */
 export function computeMasterIdHash(id: string): string {
-  return crypto.createHash('sha256').update(id.trim().toLowerCase()).digest('hex');
+  let normalized = id.trim().toLowerCase();
+  if (normalized.startsWith('mst-')) {
+    normalized = 'wep-' + normalized;
+  } else if (normalized.startsWith('mst')) {
+    normalized = 'wep-mst-' + normalized.slice(3).replace(/^-/, '');
+  }
+  return crypto.createHash('sha256').update(normalized).digest('hex');
 }
 
 /**
@@ -80,9 +86,14 @@ export function validateMasterId(candidateId: string): MasterValidationResult {
     return { isValid: false, message: 'Please enter your Master ID.' };
   }
 
-  const normalized = candidateId.trim().toLowerCase();
+  let normalized = candidateId.trim().toLowerCase();
   if (normalized.length === 0) {
     return { isValid: false, message: 'Please enter your Master ID.' };
+  }
+  if (normalized.startsWith('mst-')) {
+    normalized = 'wep-' + normalized;
+  } else if (normalized.startsWith('mst')) {
+    normalized = 'wep-mst-' + normalized.slice(3).replace(/^-/, '');
   }
 
   const candidateHash = computeMasterIdHash(normalized);
