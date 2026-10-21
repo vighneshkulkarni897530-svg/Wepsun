@@ -70,7 +70,7 @@ export const CustomerFeedbackManager: React.FC = () => {
   const [newClientName, setNewClientName] = useState('');
   const [newBuildingName, setNewBuildingName] = useState(tenantBuildings[0]?.name || 'Skyline Towers');
   const [newLiftNumber, setNewLiftNumber] = useState(tenantLifts[0]?.liftNumber || 'WPS-PUN-000123');
-  const [newTechnicianName, setNewTechnicianName] = useState(tenantTechnicians[0]?.name || 'Rajesh Sharma');
+  const [newTechnicianName, setNewTechnicianName] = useState(tenantTechnicians[0]?.name || 'Assigned Field Engineer');
   const [newRating, setNewRating] = useState(5);
   const [newServiceType, setNewServiceType] = useState<CustomerFeedback['serviceType']>('Breakdown Resolution');
   const [newComments, setNewComments] = useState('');

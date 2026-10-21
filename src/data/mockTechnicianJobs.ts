@@ -23,8 +23,8 @@ export const INITIAL_TECHNICIAN_JOBS: TechnicianJob[] = [
     estimatedDuration: '1 hr 30 mins',
     assignedBy: 'Sanjay Deshmukh (Operations Manager)',
     assignedAt: '2026-09-22T08:15:00+05:30',
-    technicianId: 'tech-1',
-    technicianName: 'Rajesh Sharma',
+    technicianId: '',
+    technicianName: 'Field Service Engineer',
 
     checkInDate: '2026-09-22',
     checkInTime: '08:52 AM',
@@ -161,8 +161,8 @@ export const INITIAL_TECHNICIAN_JOBS: TechnicianJob[] = [
     estimatedDuration: '2 hours',
     assignedBy: 'Sanjay Deshmukh (Operations Manager)',
     assignedAt: '2026-09-22T08:00:00+05:30',
-    technicianId: 'tech-1',
-    technicianName: 'Rajesh Sharma',
+    technicianId: '',
+    technicianName: 'Field Service Engineer',
 
     complaintReported: 'Monthly Comprehensive PM Visit (Visit 12 of 12 for AMC Year 2025-26). Full 24-point machine room, car top, landing, and pit inspection.',
     faultCategory: 'Routine PM Inspection',
@@ -214,8 +214,8 @@ export const INITIAL_TECHNICIAN_JOBS: TechnicianJob[] = [
     estimatedDuration: '1 hour',
     assignedBy: 'Vikram Joshi (Service Operations Head)',
     assignedAt: '2026-09-22T08:30:00+05:30',
-    technicianId: 'tech-1',
-    technicianName: 'Rajesh Sharma',
+    technicianId: '',
+    technicianName: 'Field Service Engineer',
 
     complaintReported: 'URGENT: Stretcher lift leveling sensor misalignment causing 20mm jolt at 3rd floor OT landing.',
     faultCategory: 'Electronic & Leveling Sensors',
@@ -249,8 +249,8 @@ export const INITIAL_TECHNICIAN_JOBS: TechnicianJob[] = [
     estimatedDuration: '2 hours 30 mins',
     assignedBy: 'Sanjay Deshmukh (Operations Manager)',
     assignedAt: '2026-09-22T07:45:00+05:30',
-    technicianId: 'tech-1',
-    technicianName: 'Rajesh Sharma',
+    technicianId: '',
+    technicianName: 'Field Service Engineer',
 
     complaintReported: 'Counterweight guide shoe liner worn out producing scraping noise during high speed travel between floors 10 to 14.',
     faultCategory: 'Mechanical & Shaft Hardware',
@@ -283,8 +283,8 @@ export const INITIAL_TECHNICIAN_JOBS: TechnicianJob[] = [
     estimatedDuration: '3 hours',
     assignedBy: 'Vikram Joshi (Service Operations Head)',
     assignedAt: '2026-09-22T07:30:00+05:30',
-    technicianId: 'tech-1',
-    technicianName: 'Rajesh Sharma',
+    technicianId: '',
+    technicianName: 'Field Service Engineer',
 
     complaintReported: 'Installation and commissioning of new Smart ARD Auto Rescue Unit (15kVA) and battery bank.',
     faultCategory: 'Electrical & ARD Modernization',
@@ -295,7 +295,7 @@ export const INITIAL_TECHNICIAN_JOBS: TechnicianJob[] = [
     liftSafetyStatus: 'Out of Service',
   },
 
-  // Tech-2 (Amit Verma) Scoped Job
+  // Unassigned Field Job
   {
     id: 'job-006',
     jobId: 'JOB-2026-0399',
@@ -318,8 +318,8 @@ export const INITIAL_TECHNICIAN_JOBS: TechnicianJob[] = [
     estimatedDuration: '1 hour',
     assignedBy: 'Vikram Joshi (Service Operations Head)',
     assignedAt: '2026-09-22T08:00:00+05:30',
-    technicianId: 'tech-2',
-    technicianName: 'Amit Verma',
+    technicianId: '',
+    technicianName: 'Field Service Engineer',
 
     complaintReported: 'Hall Call buttons on 2nd and 3rd floors not illuminating when pressed.',
     faultCategory: 'Electrical & Landing Fixtures',
@@ -354,8 +354,8 @@ export const INITIAL_TECHNICIAN_JOBS: TechnicianJob[] = [
     estimatedDuration: '1 hour 15 mins',
     assignedBy: 'Sanjay Deshmukh (Operations Manager)',
     assignedAt: '2026-08-15T09:00:00+05:30',
-    technicianId: 'tech-1',
-    technicianName: 'Rajesh Sharma',
+    technicianId: '',
+    technicianName: 'Field Service Engineer',
 
     checkInDate: '2026-08-15',
     checkInTime: '10:25 AM',
@@ -416,7 +416,7 @@ export const INITIAL_TECHNICIAN_JOBS: TechnicianJob[] = [
     clientNameSigned: 'Arvind Mehta',
     clientDesignation: 'Society Chairman',
     clientSignature: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="60"><path d="M 10 30 Q 50 10 90 30 T 170 30" stroke="navy" stroke-width="2" fill="none"/></svg>',
-    technicianSignature: 'Rajesh Sharma (Verified Tech-042)',
+    technicianSignature: 'Field Service Engineer (Verified)',
     signatureDate: '2026-08-15 11:40 AM',
     workCompletionConfirmed: true,
     otpVerified: true,
@@ -429,7 +429,7 @@ export const INITIAL_TECHNICIAN_JOBS: TechnicianJob[] = [
 export const INITIAL_TECH_NOTIFICATIONS: TechNotificationItem[] = [
   {
     id: 'tnotif-1',
-    technicianId: 'tech-1',
+    technicianId: '',
     type: 'emergency_call',
     title: 'Emergency Breakdown Alert - CityCare Hospital',
     message: 'High-priority hospital bed elevator leveling issue assigned to you. ETA required < 30 mins.',
@@ -440,7 +440,7 @@ export const INITIAL_TECH_NOTIFICATIONS: TechNotificationItem[] = [
   },
   {
     id: 'tnotif-2',
-    technicianId: 'tech-1',
+    technicianId: '',
     type: 'job_assigned',
     title: 'New PM Visit Assigned: Greenwood Heights CHS',
     message: 'Monthly PM Visit 12 of 12 for Wing A Passenger Elevator scheduled today at 11:00 AM.',
@@ -451,7 +451,7 @@ export const INITIAL_TECH_NOTIFICATIONS: TechNotificationItem[] = [
   },
   {
     id: 'tnotif-3',
-    technicianId: 'tech-1',
+    technicianId: '',
     type: 'parts_issued',
     title: 'Van Stock Restock Approved',
     message: '2 sets of Door Lock Interlock switches (WEP-SW-LCK102) issued to your field kit from Main Store.',
@@ -461,7 +461,7 @@ export const INITIAL_TECH_NOTIFICATIONS: TechNotificationItem[] = [
   },
   {
     id: 'tnotif-4',
-    technicianId: 'tech-1',
+    technicianId: '',
     type: 'service_report_generated',
     title: 'Service Report #SR-WEP-2026-0380 Archived',
     message: 'Client sign-off confirmed. Copy emailed to Greenwood Heights management committee.',

@@ -58,52 +58,65 @@ export const LiveTechnicianRadar: React.FC = () => {
               <span className="text-white font-bold">Mumbai & Navi Mumbai Elevator Grid</span>
             </div>
             <span className="text-[11px] font-mono text-emerald-300 font-semibold">
-              ● 4 Units Online
+              ● {technicians.filter((t) => t.currentStatus !== 'off_duty').length || technicians.length} Units Online
             </span>
           </div>
 
           {/* Interactive Simulated Markers */}
           <div className="relative z-10 my-auto grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 py-4 sm:py-8">
-            {technicians.map((tech) => {
-              const isSelected = tech.id === selectedTech?.id;
-              return (
-                <div
-                  key={tech.id}
-                  onClick={() => setSelectedTechId(tech.id)}
-                  className={`p-3.5 rounded-2xl border backdrop-blur-md cursor-pointer transition-all ${
-                    isSelected
-                      ? 'bg-white/20 border-white shadow-lg scale-105'
-                      : 'bg-black/20 border-white/10 hover:border-white/30'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div className="relative">
-                      <img
-                        src={tech.avatar}
-                        alt={tech.name}
-                        className="w-9 h-9 rounded-xl object-cover ring-2 ring-white/50"
-                      />
-                      <span
-                        className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-[#123B5D] ${
-                          tech.currentStatus === 'available'
-                            ? 'bg-emerald-400'
-                            : tech.currentStatus === 'on_job'
-                            ? 'bg-amber-400'
-                            : 'bg-sky-400'
-                        }`}
-                      />
-                    </div>
+            {technicians.length === 0 ? (
+              <div className="col-span-full py-12 text-center text-sky-200">
+                <Compass className="w-10 h-10 mx-auto mb-2 text-sky-300/60 animate-pulse" />
+                <p className="text-sm font-semibold">No Field Units Currently Active</p>
+                <p className="text-xs text-sky-300/70 mt-1">
+                  Approved field engineers will appear on the telemetry radar once on-duty.
+                </p>
+              </div>
+            ) : (
+              technicians.map((tech) => {
+                const isSelected = tech.id === selectedTech?.id;
+                return (
+                  <div
+                    key={tech.id}
+                    onClick={() => setSelectedTechId(tech.id)}
+                    className={`p-3.5 rounded-2xl border backdrop-blur-md cursor-pointer transition-all ${
+                      isSelected
+                        ? 'bg-white/20 border-white shadow-lg scale-105'
+                        : 'bg-black/20 border-white/10 hover:border-white/30'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="relative">
+                        <img
+                          src={
+                            tech.avatar ||
+                            `https://ui-avatars.com/api/?name=${encodeURIComponent(tech.name)}&background=1976D2&color=fff`
+                          }
+                          alt={tech.name}
+                          className="w-9 h-9 rounded-xl object-cover ring-2 ring-white/50"
+                        />
+                        <span
+                          className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-[#123B5D] ${
+                            tech.currentStatus === 'available'
+                              ? 'bg-emerald-400'
+                              : tech.currentStatus === 'on_job'
+                              ? 'bg-amber-400'
+                              : 'bg-sky-400'
+                          }`}
+                        />
+                      </div>
 
-                    <div className="min-w-0 flex-1 text-xs">
-                      <div className="font-bold text-white truncate">{tech.name}</div>
-                      <div className="text-[10px] text-sky-200 font-mono truncate">
-                        {tech.currentLocationName}
+                      <div className="min-w-0 flex-1 text-xs">
+                        <div className="font-bold text-white truncate">{tech.name}</div>
+                        <div className="text-[10px] text-sky-200 font-mono truncate">
+                          {tech.currentLocationName || tech.zone || 'Field Service Zone'}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
 
           <div className="relative z-10 flex items-center justify-between text-[10px] font-mono text-sky-200/70">
@@ -113,12 +126,15 @@ export const LiveTechnicianRadar: React.FC = () => {
         </div>
 
         {/* Selected Engineer Telemetry Panel */}
-        {selectedTech && (
+        {selectedTech ? (
           <div className="lg:col-span-1 bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col justify-between gap-4">
             <div className="space-y-4">
               <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
                 <img
-                  src={selectedTech.avatar}
+                  src={
+                    selectedTech.avatar ||
+                    `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedTech.name)}&background=1976D2&color=fff`
+                  }
                   alt={selectedTech.name}
                   className="w-14 h-14 rounded-2xl object-cover ring-2 ring-blue-100"
                 />
@@ -176,6 +192,16 @@ export const LiveTechnicianRadar: React.FC = () => {
               <PhoneCall className="w-4 h-4" />
               Direct Call ({selectedTech.phone})
             </a>
+          </div>
+        ) : (
+          <div className="lg:col-span-1 bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col justify-center items-center text-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-[#1976D2] flex items-center justify-center">
+              <UserCheck className="w-6 h-6" />
+            </div>
+            <h3 className="text-sm font-bold text-slate-800">No Technician Selected</h3>
+            <p className="text-xs text-slate-500 max-w-xs">
+              Select an active field unit from the radar grid or approve newly registered technicians under Technician Records.
+            </p>
           </div>
         )}
       </div>

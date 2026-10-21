@@ -147,14 +147,37 @@ export const TechnicianRecordsView: React.FC = () => {
         sortOrder,
       });
 
-      if (res && res.success && res.data) {
-        setRecords(res.data.technicians || []);
-        if (res.data.pagination) {
-          setTotalCount(res.data.pagination.total);
-          setTotalPages(res.data.pagination.totalPages || 1);
+      if (res && res.success) {
+        const rawData = res.data;
+        let techList: TechnicianRecordItem[] = [];
+        if (Array.isArray(rawData)) {
+          techList = rawData;
+        } else if (rawData && Array.isArray((rawData as any).technicians)) {
+          techList = (rawData as any).technicians;
+        } else if (Array.isArray((res as any).technicians)) {
+          techList = (res as any).technicians;
         }
-        if (res.data.counts) {
-          setStatusCounts(res.data.counts);
+        setRecords(techList);
+
+        const pagination = rawData?.pagination || (res as any).pagination;
+        if (pagination) {
+          setTotalCount(pagination.total ?? techList.length);
+          setTotalPages(pagination.totalPages ?? 1);
+        } else {
+          setTotalCount(techList.length);
+          setTotalPages(1);
+        }
+
+        const counts = rawData?.counts || (res as any).counts || (res as any).summary;
+        if (counts) {
+          setStatusCounts({
+            ALL: counts.ALL ?? counts.total ?? 0,
+            PENDING_APPROVAL: counts.PENDING_APPROVAL ?? counts.pending ?? 0,
+            APPROVED: counts.APPROVED ?? counts.approved ?? 0,
+            REJECTED: counts.REJECTED ?? counts.rejected ?? 0,
+            BLOCKED: counts.BLOCKED ?? counts.blocked ?? 0,
+            SUSPENDED: counts.SUSPENDED ?? counts.suspended ?? 0,
+          });
         }
       } else {
         setError(res?.message || 'Failed to load technician records from server.');

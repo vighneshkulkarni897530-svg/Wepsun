@@ -266,7 +266,15 @@ interface AppContextType {
   hideLoadingModal: () => void;
 }
 
-const AppContext = createContext<AppContextType | undefined>(undefined);
+// Singleton-safe React Context to prevent Fast Refresh / HMR reference desync in development
+const GLOBAL_APP_CONTEXT_KEY = '__WEPSUN_APP_CONTEXT__';
+export const AppContext =
+  (typeof window !== 'undefined' && ((window as unknown) as Record<string, unknown>)[GLOBAL_APP_CONTEXT_KEY] as React.Context<AppContextType | undefined>) ||
+  createContext<AppContextType | undefined>(undefined);
+
+if (typeof window !== 'undefined') {
+  ((window as unknown) as Record<string, unknown>)[GLOBAL_APP_CONTEXT_KEY] = AppContext;
+}
 
 const STORAGE_PREFIX = 'wepsun_lift_saas_v2_';
 
@@ -283,7 +291,7 @@ function safeStorageParse<T>(key: string, fallback: T): T {
   }
 }
 
-export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export function AppProvider({ children }: { children: React.ReactNode }) {
   // Multi-Tenancy & Active Company/Branch
   const [companies] = useState<Company[]>(INITIAL_COMPANIES);
   const [activeCompanyId, setActiveCompanyIdState] = useState<string>(() => {
@@ -349,10 +357,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return localStorage.getItem(STORAGE_PREFIX + 'clientId') || '';
   });
   const [activeTechnicianId, setActiveTechnicianId] = useState<string>(() => {
-    return localStorage.getItem(STORAGE_PREFIX + 'technicianId') || '';
+    const saved = localStorage.getItem(STORAGE_PREFIX + 'technicianId') || '';
+    if (['tech-1', 'tech-2', 'tech-rohan', 'tech-3', 'tech-4'].includes(saved)) {
+      localStorage.removeItem(STORAGE_PREFIX + 'technicianId');
+      return '';
+    }
+    return saved;
   });
   const [users, setUsers] = useState<User[]>(() => {
-    return safeStorageParse(STORAGE_PREFIX + 'users', INITIAL_USERS);
+    const raw = safeStorageParse<User[]>(STORAGE_PREFIX + 'users', INITIAL_USERS);
+    const demoUserIds = new Set(['usr-tech-1', 'usr-tech-2', 'usr-tech-rohan', 'usr-inactive-1']);
+    const filtered = (raw || []).filter(
+      (u) => !demoUserIds.has(u.id) && !u.email?.toLowerCase().includes('tech1@wepsun.com') && !u.email?.toLowerCase().includes('inactive@wepsun.com')
+    );
+    if (filtered.length !== raw.length) {
+      try {
+        localStorage.setItem(STORAGE_PREFIX + 'users', JSON.stringify(filtered));
+      } catch {}
+    }
+    return filtered;
   });
   const [demoAccounts] = useState<DemoAccount[]>(DEMO_ACCOUNTS);
 
@@ -371,7 +394,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [technicians, setTechnicians] = useState<Technician[]>(() => {
-    return safeStorageParse(STORAGE_PREFIX + 'technicians', INITIAL_TECHNICIANS);
+    const raw = safeStorageParse<Technician[]>(STORAGE_PREFIX + 'technicians', INITIAL_TECHNICIANS);
+    const demoTechIds = new Set(['tech-1', 'tech-2', 'tech-3', 'tech-4', 'tech-rohan', 'tech-rajesh', 'tech-amit']);
+    const filtered = (raw || []).filter(
+      (t) => !demoTechIds.has(t.id) && !t.email?.toLowerCase().includes('rajesh.sharma') && !t.email?.toLowerCase().includes('amit.patel')
+    );
+    if (filtered.length !== raw.length) {
+      try {
+        localStorage.setItem(STORAGE_PREFIX + 'technicians', JSON.stringify(filtered));
+      } catch {}
+    }
+    return filtered;
   });
 
   const [complaints, setComplaints] = useState<Complaint[]>(() => {
@@ -2936,13 +2969,15 @@ function mapServerServiceReport(sr: any): ServiceReport {
       liftNumber: recordData.liftNumber || targetLift?.liftNumber || '',
       buildingName: recordData.buildingName || targetLift?.buildingName || '',
       clientName: recordData.clientName || targetLift?.clientName || '',
-      technicianId: recordData.technicianId || activeTechnicianId,
-      technicianName: recordData.technicianName || 'Rajesh Sharma',
+      technicianId: recordData.technicianId || activeTechnicianId || currentUser?.technicianId || '',
+      technicianName: recordData.technicianName || currentUser?.name || 'Assigned Field Engineer',
       date: new Date().toISOString().split('T')[0],
       items: recordData.items || [],
       overallStatus: recordData.overallStatus || 'passed',
       remarks: recordData.remarks || 'Monthly preventive maintenance visit completed.',
-      technicianSignature: recordData.technicianSignature || 'Rajesh Sharma (Verified Tech)',
+      technicianSignature:
+        recordData.technicianSignature ||
+        `${recordData.technicianName || currentUser?.name || 'Field Engineer'} (Verified Tech)`,
       clientSignature: recordData.clientSignature,
       nextPmDate: nextPmDate.toISOString().split('T')[0],
     };

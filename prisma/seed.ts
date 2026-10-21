@@ -180,87 +180,12 @@ export async function seedDatabase() {
   });
 
   // 5. TECHNICIANS
-  console.log('👷 Seeding Field Technicians...');
-  const tech1 = await prisma.technician.upsert({
-    where: { employeeCode: 'TECH-001' },
-    update: {
-      permanentId: 'Wepsun0001',
-      accountStatus: 'APPROVED' as any,
-      approvedAt: new Date('2026-01-01'),
-      approvedBy: 'Sunil Mehta',
-      qualifications: 'Diploma in Electrical & Lift Engineering',
-      experienceYears: 6.5,
-      address: 'Andheri West, Mumbai',
-    },
-    create: {
-      id: 'tech-1',
-      companyId: wepsun.id,
-      branchId: brMum.id,
-      name: 'Rajesh Sharma',
-      employeeCode: 'TECH-001',
-      permanentId: 'Wepsun0001',
-      accountStatus: 'APPROVED' as any,
-      phone: '+91 98203 11223',
-      email: 'rajesh.sharma@wepsun.com',
-      zone: 'Pune West (Baner, Hinjewadi, Aundh)',
-      currentStatus: 'available',
-      currentLocationName: 'Baner Main Road, Pune',
-      latitude: 18.559,
-      longitude: 73.78,
-      totalResolved: 142,
-      avgResolutionMinutes: 38,
-      customerRating: 4.9,
-      totalRatingsCount: 118,
-      qualifications: 'Diploma in Electrical & Lift Engineering',
-      experienceYears: 6.5,
-      address: 'Andheri West, Mumbai',
-      approvedAt: new Date('2026-01-01'),
-      approvedBy: 'Sunil Mehta',
-    },
-  });
-
-  const tech2 = await prisma.technician.upsert({
-    where: { employeeCode: 'TECH-002' },
-    update: {
-      permanentId: 'Wepsun0002',
-      accountStatus: 'APPROVED' as any,
-      approvedAt: new Date('2026-01-05'),
-      approvedBy: 'Sunil Mehta',
-      qualifications: 'ITI Wireman & Mechanical Maintenance',
-      experienceYears: 4.0,
-      address: 'Vashi Sector 17, Navi Mumbai',
-    },
-    create: {
-      id: 'tech-2',
-      companyId: wepsun.id,
-      branchId: brThn.id,
-      name: 'Amit Patel',
-      employeeCode: 'TECH-002',
-      permanentId: 'Wepsun0002',
-      accountStatus: 'APPROVED' as any,
-      phone: '+91 98204 44556',
-      email: 'amit.patel@wepsun.com',
-      zone: 'Pune East (Kharadi, Viman Nagar, Hadapsar)',
-      currentStatus: 'available',
-      currentLocationName: 'Kharadi IT SEZ, Pune',
-      latitude: 18.551,
-      longitude: 73.935,
-      totalResolved: 98,
-      avgResolutionMinutes: 44,
-      customerRating: 4.8,
-      totalRatingsCount: 82,
-      qualifications: 'ITI Wireman & Mechanical Maintenance',
-      experienceYears: 4.0,
-      address: 'Vashi Sector 17, Navi Mumbai',
-      approvedAt: new Date('2026-01-05'),
-      approvedBy: 'Sunil Mehta',
-    },
-  });
+  // Field technicians register via onboarding application and are approved dynamically by admin.
+  console.log('👷 Field technicians will onboard via live registration and admin approval workflow.');
 
   // 6. USERS (RBAC)
   console.log('🔐 Seeding Multi-Tenant RBAC User Accounts with Hashed Passwords...');
   const adminPasswordHash = bcrypt.hashSync('admin123', 10);
-  const techPasswordHash = bcrypt.hashSync('tech123', 10);
   const clientPasswordHash = bcrypt.hashSync('client123', 10);
   const superPasswordHash = bcrypt.hashSync('super123', 10);
   const defaultPasswordHash = adminPasswordHash;
@@ -326,26 +251,7 @@ export async function seedDatabase() {
     },
   });
 
-  // 4. Technician
-  await prisma.user.upsert({
-    where: { email: 'tech1@wepsun.com' },
-    update: { passwordHash: techPasswordHash, role: 'TECHNICIAN', technicianId: tech1.id, isActive: true },
-    create: {
-      id: 'usr-tech-1',
-      companyId: wepsun.id,
-      branchId: brMum.id,
-      name: 'Rajesh Sharma (Lead Tech)',
-      email: 'tech1@wepsun.com',
-      passwordHash: techPasswordHash,
-      phone: '+91 98203 11223',
-      role: 'TECHNICIAN',
-      technicianId: tech1.id,
-      isActive: true,
-      avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-    },
-  });
-
-  // 5. Client
+  // 4. Client
   await prisma.user.upsert({
     where: { email: 'greenwood@wepsun.com' },
     update: { passwordHash: clientPasswordHash, role: 'CLIENT', clientId: client1.id, isActive: true },
@@ -364,7 +270,7 @@ export async function seedDatabase() {
     },
   });
 
-  // 6. Accounts Executive
+  // 5. Accounts Executive
   await prisma.user.upsert({
     where: { email: 'accounts@wepsun.com' },
     update: { passwordHash: defaultPasswordHash, role: 'ACCOUNTS', isActive: true },
@@ -382,7 +288,7 @@ export async function seedDatabase() {
     },
   });
 
-  // 7. Sales Executive
+  // 6. Sales Executive
   await prisma.user.upsert({
     where: { email: 'sales@wepsun.com' },
     update: { passwordHash: defaultPasswordHash, role: 'SALES', isActive: true },
@@ -397,24 +303,6 @@ export async function seedDatabase() {
       role: 'SALES',
       isActive: true,
       avatarUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80',
-    },
-  });
-
-  // 8. Inactive User for Testing Blocking
-  await prisma.user.upsert({
-    where: { email: 'inactive@wepsun.com' },
-    update: { passwordHash: defaultPasswordHash, role: 'TECHNICIAN', isActive: false },
-    create: {
-      id: 'usr-inactive-1',
-      companyId: wepsun.id,
-      branchId: brMum.id,
-      name: 'Ex-Employee User',
-      email: 'inactive@wepsun.com',
-      passwordHash: defaultPasswordHash,
-      phone: '+91 98000 11111',
-      role: 'TECHNICIAN',
-      isActive: false,
-      avatarUrl: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=150&auto=format&fit=crop&q=80',
     },
   });
 
@@ -624,18 +512,11 @@ export async function seedDatabase() {
       description: 'Outer landing door latch stuck at 4th floor landing. Passengers safely evacuated.',
       priority: 'CRITICAL',
       isEmergency: true,
-      status: 'RESOLVED',
-      reportedAt: new Date(Date.now() - 4 * 3600000),
-      assignedTechnicianId: tech1.id,
-      assignedAt: new Date(Date.now() - 3.8 * 3600000),
-      technicianEta: '18 Mins (Baner Rapid Unit)',
-      checkInTime: new Date(Date.now() - 3.5 * 3600000),
-      checkOutTime: new Date(Date.now() - 2.5 * 3600000),
-      diagnosisRemarks: 'Intermittent door safety interlock contact oxidation.',
-      actionTaken: 'Burnished contacts and replaced auxiliary microswitch.',
-      clientRating: 5,
-      clientFeedback: 'Fast response and very polite technician!',
-      closedAt: new Date(Date.now() - 2.5 * 3600000),
+      status: 'NEW',
+      reportedAt: new Date(Date.now() - 1 * 3600000),
+      assignedTechnicianId: null,
+      technicianEta: null,
+      diagnosisRemarks: 'Awaiting field engineer assignment.',
     },
   });
 
@@ -649,59 +530,15 @@ export async function seedDatabase() {
         description: 'Customer raised SOS ticket via QR Code portal',
         actorName: 'Sanjay Deshmukh (Secretary)',
         actorRole: 'CLIENT',
-        timestamp: new Date(Date.now() - 4 * 3600000),
-      },
-      {
-        complaintId: comp1.id,
-        status: 'ASSIGNED',
-        title: 'Assigned to Senior Technician',
-        description: 'Auto-dispatched to Rajesh Sharma based on GPS proximity (2.1 km away)',
-        actorName: 'Dispatch System',
-        actorRole: 'SYSTEM',
-        timestamp: new Date(Date.now() - 3.8 * 3600000),
-      },
-      {
-        complaintId: comp1.id,
-        status: 'RESOLVED',
-        title: 'Service Completed & Signed Off',
-        description: 'Repaired, tested, and client digital OTP verified',
-        actorName: 'Rajesh Sharma',
-        actorRole: 'TECHNICIAN',
-        timestamp: new Date(Date.now() - 2.5 * 3600000),
+        timestamp: new Date(Date.now() - 1 * 3600000),
       },
     ],
     skipDuplicates: true,
   });
 
   // 11. SERVICE REPORTS
-  console.log('📑 Seeding Service Reports...');
-  await prisma.serviceReport.upsert({
-    where: { reportNumber: 'WPS-SR-000182' },
-    update: {},
-    create: {
-      id: 'rep-1',
-      companyId: wepsun.id,
-      branchId: brMum.id,
-      reportNumber: 'WPS-SR-000182',
-      ticketId: comp1.id,
-      liftId: lift1.id,
-      technicianId: tech1.id,
-      serviceStartTime: '10:15 AM',
-      serviceEndTime: '11:15 AM',
-      serviceType: 'BREAKDOWN_REPAIR',
-      initialDiagnosis: 'Intermittent door safety interlock trip at 4th floor',
-      rootCause: 'Door lock contact oxidation due to moisture',
-      workPerformed: 'Burnished contacts and tested safety loop 10x cycles',
-      technicianRecommendations: 'Check floor door alignment during next monthly PM',
-      liftOperatingStatusAfterWork: 'Fully Operational & Safe for Passengers',
-      technicianSignature: 'signed_by_rajesh_sharma',
-      clientSignature: 'signed_by_sanjay_deshmukh',
-      clientOtpVerified: true,
-      clientRating: 5,
-      clientFeedback: 'Excellent prompt service',
-      pdfUrl: 'https://app.wepsun.com/reports/WPS-SR-000182.pdf',
-    },
-  });
+  // Service reports are created dynamically when on-duty field technicians complete jobs.
+  console.log('📑 Service reports will be logged dynamically by registered field technicians.');
 
   // 12. INVENTORY & MOVEMENT LEDGER
   console.log('📦 Seeding Inventory & Immutable Stock Ledger...');
@@ -771,10 +608,10 @@ export async function seedDatabase() {
         quantity: -5,
         previousStock: 50,
         newStock: 45,
-        referenceId: 'KIT-RAJESH-001',
-        technicianId: tech1.id,
+        referenceId: 'KIT-SERVICE-001',
+        technicianId: null,
         performedBy: 'Vikram Joshi (Service Manager)',
-        notes: 'Issued to Rajesh Sharma field toolkit',
+        notes: 'Transferred to central emergency field van toolkit',
       },
     ],
     skipDuplicates: true,
@@ -835,7 +672,7 @@ export async function seedDatabase() {
       workOrderNumber: 'WO-2026-0045',
       quotationId: quote1.id,
       liftId: lift1.id,
-      technicianId: tech1.id,
+      technicianId: null,
       title: 'Quotation Execution: ARD Battery & Cam Spring Replacement',
       description: 'Scheduled site visit for battery bank overhaul and door retractor installation',
       priority: 'HIGH',
@@ -895,7 +732,7 @@ export async function seedDatabase() {
         clientPhone: '+91 98220 11223',
         buildingName: 'Greenwood Heights CHS',
         liftNumber: 'WPS-PUN-000123',
-        technicianName: 'Rajesh Sharma',
+        technicianName: 'Assigned Field Engineer',
         ticketNumber: 'TKT-2026-0416',
         serviceType: 'Breakdown Resolution',
         overallRating: 5,
@@ -904,7 +741,7 @@ export async function seedDatabase() {
         rideSmoothness: 5,
         communication: 5,
         tags: ['Fast Arrival', 'Clean Work', 'Polite Technician', 'Digital Report'],
-        comments: 'Emergency door jam breakdown was attended in just 22 minutes! Rajesh replaced the lock microswitch and completed safety run cycles with utmost professionalism.',
+        comments: 'Emergency door jam breakdown was attended promptly! Replaced the lock microswitch and completed safety run cycles with utmost professionalism.',
         adminReply: 'Thank you Sanjay ji! Our 24x7 Pune West rapid response unit is committed to 30-min SLA for all passenger elevators.',
         adminReplyBy: 'Vikram Joshi (Service Manager)',
         adminReplyAt: new Date(),
@@ -916,7 +753,7 @@ export async function seedDatabase() {
         clientPhone: '+91 98450 33445',
         buildingName: 'TechPark Infinity',
         liftNumber: 'WPS-PUN-000124',
-        technicianName: 'Amit Patel',
+        technicianName: 'Field Service Engineer',
         ticketNumber: 'PM-2026-0088',
         serviceType: 'Routine PM Visit',
         overallRating: 5,
@@ -938,8 +775,8 @@ export async function seedDatabase() {
     data: [
       {
         companyId: wepsun.id,
-        title: '🚨 Emergency Breakdown Attended',
-        message: 'Greenwood Heights Lift WPS-PUN-000123 repaired by Rajesh Sharma (38 mins resolution time).',
+        title: '🚨 Emergency Breakdown Logged',
+        message: 'Greenwood Heights Lift WPS-PUN-000123 reported. Awaiting technician assignment.',
         type: 'BREAKDOWN',
         isRead: false,
       },
@@ -964,15 +801,6 @@ export async function seedDatabase() {
         performedBy: 'Sunil Mehta',
         userRole: 'COMPANY_ADMIN',
         details: 'Managing Director Sunil Mehta logged in from Mumbai HQ',
-      },
-      {
-        companyId: wepsun.id,
-        entityType: 'ServiceReport',
-        entityId: 'rep-1',
-        action: 'CREATE',
-        performedBy: 'Rajesh Sharma',
-        userRole: 'TECHNICIAN',
-        details: 'Service report WPS-SR-000182 digitally verified with customer signature and OTP',
       },
     ],
     skipDuplicates: true,

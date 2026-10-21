@@ -409,17 +409,41 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response): P
       list = mockList.slice((page - 1) * limit, page * limit);
     }
 
+    const countsPayload = {
+      ALL: summary.total,
+      APPROVED: summary.approved,
+      PENDING_APPROVAL: summary.pending,
+      BLOCKED: summary.blocked,
+      REJECTED: summary.rejected,
+      SUSPENDED: summary.suspended,
+      total: summary.total,
+      approved: summary.approved,
+      pending: summary.pending,
+      blocked: summary.blocked,
+      rejected: summary.rejected,
+      suspended: summary.suspended,
+    };
+
+    const paginationPayload = {
+      total: totalCount,
+      page,
+      limit,
+      totalPages: Math.ceil(totalCount / limit) || 1,
+    };
+
     res.json({
       success: true,
       count: list.length,
-      data: list,
-      summary,
-      pagination: {
-        total: totalCount,
-        page,
-        limit,
-        totalPages: Math.ceil(totalCount / limit) || 1,
+      data: {
+        technicians: list,
+        pagination: paginationPayload,
+        counts: countsPayload,
       },
+      // Root-level fields for backwards & test suite compatibility
+      technicians: list,
+      summary,
+      counts: countsPayload,
+      pagination: paginationPayload,
     });
   } catch (err: any) {
     res.status(500).json({

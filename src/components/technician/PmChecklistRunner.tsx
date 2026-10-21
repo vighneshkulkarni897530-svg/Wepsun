@@ -97,12 +97,12 @@ export const PmChecklistRunner: React.FC<PmChecklistRunnerProps> = ({ lift, onCo
         liftNumber: currentLift.liftNumber,
         buildingName: currentLift.buildingName,
         clientName: currentLift.clientName,
-        technicianId: currentUser.technicianId || 'tech-1',
-        technicianName: currentUser.name,
+        technicianId: currentUser.technicianId || currentUser.id || '',
+        technicianName: currentUser.name || 'Assigned Field Engineer',
         items,
         overallStatus,
         remarks: overallRemarks || 'All PM check points inspected and recorded as per WEPSUN standards.',
-        technicianSignature: technicianSignature || 'Rajesh Sharma [e-Sign Verified]',
+        technicianSignature: technicianSignature || `${currentUser.name || 'Field Engineer'} [e-Sign Verified]`,
       });
 
       setIsSubmitting(false);

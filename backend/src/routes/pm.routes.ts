@@ -45,7 +45,7 @@ router.get('/schedules', requireAuth, async (req: AuthenticatedRequest, res: Res
           dueDate: nextPm.toISOString(),
           status: isDue ? 'SCHEDULED' : 'COMPLETED',
           frequency: lift.amcContract?.pmFrequency || 'Monthly (12 Visits/Year)',
-          assignedTechnicianName: 'Rajesh Sharma',
+          assignedTechnicianName: 'Certified Field Engineer',
           zones: ['Machine Room', 'Car Top', 'Landing Doors', 'Pit'],
         };
       });
@@ -61,7 +61,7 @@ router.get('/schedules', requireAuth, async (req: AuthenticatedRequest, res: Res
         dueDate: new Date(Date.now() + index * 86400000 * 3).toISOString(),
         status: index % 2 === 0 ? 'SCHEDULED' : 'COMPLETED',
         frequency: 'Monthly (12 Visits/Year)',
-        assignedTechnicianName: 'Rajesh Sharma',
+        assignedTechnicianName: 'Certified Field Engineer',
         zones: ['Machine Room', 'Car Top', 'Landing Doors', 'Pit'],
       }));
     }

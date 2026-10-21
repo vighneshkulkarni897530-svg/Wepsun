@@ -17,7 +17,7 @@ export const ClientFeedbackModal: React.FC<ClientFeedbackModalProps> = ({
   ticketId = 'CMP-2026-0416',
   liftNumber = 'WPS-PUN-000123',
   buildingName = 'Greenwood Heights CHS',
-  technicianName = 'Rajesh Sharma',
+  technicianName = 'Assigned Field Engineer',
 }) => {
   const { submitCustomerFeedback, currentUser } = useApp();
   

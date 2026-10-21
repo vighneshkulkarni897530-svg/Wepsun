@@ -41,7 +41,7 @@ export const PublicFeedbackPage: React.FC<PublicFeedbackPageProps> = ({
   const [clientPhone, setClientPhone] = useState('');
   const [buildingName, setBuildingName] = useState(initialBuildingName || tenantBuildings[0]?.name || 'Greenwood Heights CHS');
   const [liftNumber, setLiftNumber] = useState(initialLiftNumber || tenantLifts[0]?.liftNumber || 'WPS-PUN-000123');
-  const [technicianName, setTechnicianName] = useState(initialTechName || tenantTechnicians[0]?.name || 'Rajesh Sharma');
+  const [technicianName, setTechnicianName] = useState(initialTechName || tenantTechnicians[0]?.name || 'Assigned Field Engineer');
   const [ticketNumber, setTicketNumber] = useState(initialTicketNumber || '');
   const [serviceType, setServiceType] = useState<'Breakdown Resolution' | 'Routine PM Visit' | 'Annual Safety Inspection' | 'Parts Replacement' | 'Modernization'>('Breakdown Resolution');
 

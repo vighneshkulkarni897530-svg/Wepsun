@@ -775,7 +775,7 @@ export const InventoryManager: React.FC = () => {
                       <td className="p-3.5 font-bold text-slate-900">
                         <div className="flex items-center gap-1.5">
                           <User className="w-3.5 h-3.5 text-[#1976D2]" />
-                          <span>{mov.technicianName || 'Rajesh Sharma'}</span>
+                          <span>{mov.technicianName || 'Field Technician'}</span>
                         </div>
                       </td>
 

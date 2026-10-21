@@ -84,6 +84,7 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
 }) => {
   const {
     activeTechnicianId,
+    currentUser,
     technicians,
     lifts,
     inventory,
@@ -168,20 +169,34 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
 
   // Current logged in technician profile
   const currentTech = useMemo(() => {
-    return technicians.find((t) => t.id === activeTechnicianId) || technicians[0] || {
-      id: 'tech-1',
-      name: 'Rajesh Sharma',
-      phone: '+91 98203 11223',
-      email: 'rajesh.sharma@wepsun.com',
-      branchName: 'Pune Service Hub',
+    const matched = technicians.find(
+      (t) => t.id === activeTechnicianId || t.email === currentUser?.email || (t as any).userId === currentUser?.id
+    );
+    if (matched) return matched;
+    if (currentUser && (currentUser.role === 'technician' || currentUser.technicianId)) {
+      return {
+        id: currentUser.technicianId || currentUser.id,
+        name: currentUser.name || 'Technician',
+        phone: currentUser.phone || '',
+        email: currentUser.email || '',
+        branchName: 'Service Hub',
+      };
+    }
+    return technicians[0] || {
+      id: activeTechnicianId || 'tech-field',
+      name: currentUser?.name || 'Field Technician',
+      phone: currentUser?.phone || '',
+      email: currentUser?.email || '',
+      branchName: 'Service Hub',
     };
-  }, [technicians, activeTechnicianId]);
+  }, [technicians, activeTechnicianId, currentUser]);
 
   // Strict RBAC: Filter jobs strictly scoped to the logged-in technician
   const assignedJobs = useMemo(() => {
-    const filtered = techJobs.filter((j) => j.technicianId === activeTechnicianId || (!j.technicianId && activeTechnicianId === 'tech-1'));
+    const activeId = activeTechnicianId || currentUser?.technicianId;
+    const filtered = techJobs.filter((j) => (activeId && j.technicianId === activeId) || !j.technicianId);
     return filtered.length > 0 ? filtered : techJobs;
-  }, [techJobs, activeTechnicianId]);
+  }, [techJobs, activeTechnicianId, currentUser]);
 
   // Selected active job for detail views
   const [selectedJobId, setSelectedJobId] = useState<string>(() => {

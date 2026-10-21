@@ -178,7 +178,9 @@ export const ClientPmView: React.FC = () => {
 
             <div className="p-3.5 rounded-2xl bg-[#F5F8FA] border border-slate-200">
               <span className="text-[10px] text-slate-400 uppercase font-mono block">Assigned Tech</span>
-              <span className="font-bold text-slate-900 text-sm mt-0.5 block truncate">Rajesh Sharma</span>
+              <span className="font-bold text-slate-900 text-sm mt-0.5 block truncate">
+                {clientScopedPmRecords[0]?.technicianName || 'Certified Field Engineer'}
+              </span>
               <span className="text-[10px] text-blue-600 font-mono">Sr. Field Engineer</span>
             </div>
           </div>

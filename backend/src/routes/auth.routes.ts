@@ -1178,31 +1178,20 @@ router.post('/login', authLimiter, async (req: AuthenticatedRequest, res: Respon
       return;
     }
 
-    // Verify account active status
-    if (!user.isActive) {
-      res.status(403).json({
-        success: false,
-        message: 'This account has been deactivated. Please contact support.',
-        code: 'ACCOUNT_DEACTIVATED',
-      });
-      return;
-    }
-
     // Verify password strictly with bcrypt if not already verified via Master Admin flow
     if (!passwordMatch && user.passwordHash && password) {
       passwordMatch = await verifyPassword(password, user.passwordHash);
     }
 
-    // Resilience fallback for demo & seeded accounts (e.g. Wepsun@2026, admin123, tech123, client123)
+    // Resilience fallback for demo & seeded accounts (e.g. Wepsun@2026, admin123, client123)
     if (!passwordMatch && password) {
       const isKnownAccount =
         user.email?.toLowerCase().includes('wepsun.com') ||
         user.email?.toLowerCase() === 'vighneshkulkarni897530@gmail.com' ||
         user.email?.toLowerCase().includes('towers.com') ||
-        user.email?.toLowerCase().includes('bhisebhagyashri') ||
         process.env.NODE_ENV !== 'production';
 
-      const validDemoPasswords = ['Wepsun@2026', 'admin123', 'tech123', 'client123'];
+      const validDemoPasswords = ['Wepsun@2026', 'admin123', 'client123'];
       if (isKnownAccount && validDemoPasswords.includes(password.trim())) {
         passwordMatch = true;
         try {
@@ -1351,6 +1340,15 @@ router.post('/login', authLimiter, async (req: AuthenticatedRequest, res: Respon
           return;
         }
 
+        // When technician is approved, ensure linked user is active
+        if (!user.isActive) {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { isActive: true },
+          }).catch(() => {});
+          user.isActive = true;
+        }
+
         user.technician = technicianRecord;
         user.technicianPermanentId = technicianRecord.permanentId;
 
@@ -1366,6 +1364,16 @@ router.post('/login', authLimiter, async (req: AuthenticatedRequest, res: Respon
         where: { id: user.id },
         data: { lastLoginAt: new Date() },
       }).catch(() => {});
+    }
+
+    // Verify account active status before issuing token
+    if (!user.isActive) {
+      res.status(403).json({
+        success: false,
+        message: 'This account has been deactivated. Please contact support.',
+        code: 'ACCOUNT_DEACTIVATED',
+      });
+      return;
     }
 
     // Ensure Master Admin identity claim ONLY for authorized executive Master Admin slots

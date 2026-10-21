@@ -22,7 +22,18 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({
   allowedRoles,
   fallbackHash = 'home',
 }) => {
-  const { isAuthenticated, isAuthLoading, currentRole, showToast } = useApp();
+  let appState: Partial<ReturnType<typeof useApp>> = {};
+  try {
+    appState = useApp();
+  } catch (err) {
+    console.warn('[AuthGuard] AppContext initializing or HMR sync in progress:', err);
+  }
+
+  const {
+    isAuthenticated = false,
+    isAuthLoading = false,
+    currentRole = 'client',
+  } = appState;
 
   useEffect(() => {
     if (!isAuthLoading && !isAuthenticated) {

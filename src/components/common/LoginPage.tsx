@@ -251,14 +251,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         cleanIdentifier.toUpperCase().startsWith('WES-TECH-') ||
         cleanIdentifier.toUpperCase().startsWith('TECH-');
 
-      if (selectedRole === 'technician' && !cleanTechId && !isCandidateTechId) {
-        showMissingFields({
-          message: 'Please enter your permanent Technician ID (e.g. Wepsun0001).',
-          onOk: () => techIdInputRef.current?.focus(),
-        });
-        setIsSubmitting(false);
-        return;
-      }
+
 
       const payload: any = {
         email: cleanIdentifier.includes('@') || isMasterCandidate ? cleanIdentifier : undefined,
@@ -520,6 +513,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
     // Technician Application Workflow (Direct submission with pending approval)
     if (selectedRole === 'technician') {
+      const mobileDigits = regMobile.replace(/\D/g, '');
+      if (mobileDigits.length !== 10) {
+        showMissingFields({
+          message: 'Please enter a valid 10-digit mobile number for technician registration.',
+          onOk: () => regMobileInputRef.current?.focus(),
+        });
+        return;
+      }
       if (!techAddress.trim()) {
         showMissingFields({
           message: 'Please enter your complete address to register as a technician.',
@@ -1230,8 +1231,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                         type="text"
                         value={technicianId}
                         onChange={(e) => setTechnicianId(e.target.value.toUpperCase())}
-                        placeholder="Enter Technician ID"
-                        required
+                        placeholder="Permanent Technician ID (Optional or e.g. Wepsun0001)"
                         className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-bold text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all uppercase tracking-wider"
                       />
                     </div>
@@ -1492,7 +1492,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                               onChange={(e) => {
                                 setRegMobile(e.target.value.replace(/\D/g, '').slice(0, 10));
                               }}
-                              placeholder="Mobile Number"
+                              placeholder={selectedRole === 'technician' ? 'Mobile Number (10 digits, required)' : 'Mobile Number'}
+                              required={selectedRole === 'technician'}
                               className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
                             />
                           </div>
