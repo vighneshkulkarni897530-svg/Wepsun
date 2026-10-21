@@ -217,10 +217,12 @@ export function clearStoredTokens(): void {
  */
 export function cacheUserSession(user: User, role: UserRole = user.role || 'client', isMasterAdmin = false): void {
   if (typeof window === 'undefined') return;
+  const adminRoles: UserRole[] = ['master_admin', 'super_admin', 'company_admin', 'service_manager', 'accounts', 'sales'];
+  const isAdmin = isMasterAdmin || adminRoles.includes(role) || (user.role && adminRoles.includes(user.role as UserRole));
   const sessionData = {
     user,
     role,
-    isMasterAdmin,
+    isMasterAdmin: Boolean(isAdmin),
     cachedAt: Date.now(),
   };
   localStorage.setItem(USER_SESSION_KEY, JSON.stringify(sessionData));
@@ -240,10 +242,10 @@ export function cacheUserSession(user: User, role: UserRole = user.role || 'clie
   nativePrefSet(USER_SESSION_KEY, JSON.stringify(sessionData));
   nativePrefSet(ROLE_KEY, role);
 
-  if (isMasterAdmin) {
+  if (isAdmin) {
     localStorage.setItem(MASTER_AUTH_KEY, 'true');
     sessionStorage.setItem(MASTER_AUTH_KEY, 'true');
-    // Set 30-day max lifetime for Master Admin session unless explicitly logged out
+    // Set 30-day max lifetime for Admin session unless explicitly logged out
     const expiry = Date.now() + 30 * 24 * 60 * 60 * 1000;
     localStorage.setItem(MASTER_EXPIRY_KEY, String(expiry));
     sessionStorage.setItem(MASTER_EXPIRY_KEY, String(expiry));
@@ -272,10 +274,11 @@ export function getCachedUserSession(): { user: User | null; role: UserRole; isM
         const u = JSON.parse(uRaw);
         if (u && u.id) {
           const r = (localStorage.getItem(STORAGE_PREFIX + 'role') || u.role || 'client') as UserRole;
+          const adminRolesLower = ['master_admin', 'super_admin', 'company_admin', 'service_manager', 'accounts', 'sales'];
           return {
             user: u,
             role: r,
-            isMasterAdmin: r === 'master_admin' && isMasterAdminSessionValid(),
+            isMasterAdmin: adminRolesLower.includes(String(r).toLowerCase()) && isMasterAdminSessionValid(),
           };
         }
       }
@@ -283,10 +286,12 @@ export function getCachedUserSession(): { user: User | null; role: UserRole; isM
     }
     const parsed = JSON.parse(raw);
     if (parsed && parsed.user) {
+      const adminRolesLower = ['master_admin', 'super_admin', 'company_admin', 'service_manager', 'accounts', 'sales'];
+      const r = (parsed.role || parsed.user.role || 'client') as UserRole;
       return {
         user: parsed.user,
-        role: parsed.role || 'client',
-        isMasterAdmin: Boolean(parsed.isMasterAdmin),
+        role: r,
+        isMasterAdmin: Boolean(parsed.isMasterAdmin) || (adminRolesLower.includes(String(r).toLowerCase()) && isMasterAdminSessionValid()),
       };
     }
   } catch {
@@ -296,41 +301,13 @@ export function getCachedUserSession(): { user: User | null; role: UserRole; isM
 }
 
 /**
- * Check if the active session is genuinely authorized for Master Admin / Company Admin
+ * Check if the active session is genuinely authorized for Master Admin / Company Admin / Operations
  */
 export function isMasterAdminSessionValid(): boolean {
   if (typeof window === 'undefined') return false;
 
   const isExplicitLogout = localStorage.getItem(EXPLICIT_LOGOUT_KEY) === 'true';
   if (isExplicitLogout) return false;
-
-  // A valid token must exist and contain an authorized administrative claim
-  const token = getStoredAccessToken() || getStoredRefreshToken();
-  if (!token) {
-    return false;
-  }
-
-  const payload = decodeJwtPayload(token);
-  if (!payload) {
-    return false;
-  }
-
-  const roleStr = String(payload.role || '').toUpperCase();
-  // ONLY Master Admin accounts with verified Master ID session are permitted to access the Admin Dashboard
-  const isMasterAdminRole = roleStr === 'MASTER_ADMIN';
-  if (!isMasterAdminRole) {
-    return false;
-  }
-
-  // Strictly verify the token identity belongs to one of the authorized Executive Master Admin slots
-  const userEmail = String(payload.email || '').toLowerCase().trim();
-  const authorizedMasterEmails = [
-    'jaiswalsumit2812@gmail.com',
-    'gauravsaini0004@gmail.com'
-  ];
-  if (userEmail && !authorizedMasterEmails.includes(userEmail)) {
-    return false;
-  }
 
   // Check admin session expiry
   const expiryRaw = localStorage.getItem(MASTER_EXPIRY_KEY) || sessionStorage.getItem(MASTER_EXPIRY_KEY);
@@ -343,16 +320,63 @@ export function isMasterAdminSessionValid(): boolean {
     }
   }
 
-  const flag =
-    localStorage.getItem(MASTER_AUTH_KEY) === 'true' ||
-    sessionStorage.getItem(MASTER_AUTH_KEY) === 'true';
-  if (!flag) {
-    localStorage.setItem(MASTER_AUTH_KEY, 'true');
-    sessionStorage.setItem(MASTER_AUTH_KEY, 'true');
+  // 1. A valid token must exist and contain an authorized administrative claim
+  const token = getStoredAccessToken() || getStoredRefreshToken();
+  if (token) {
+    const payload = decodeJwtPayload(token);
+    if (payload) {
+      const roleStr = String(payload.role || '').toUpperCase();
+      const authorizedAdminRoles = [
+        'MASTER_ADMIN',
+        'SUPER_ADMIN',
+        'COMPANY_ADMIN',
+        'SERVICE_MANAGER',
+        'ACCOUNTS',
+        'SALES'
+      ];
+      if (authorizedAdminRoles.includes(roleStr)) {
+        const flag =
+          localStorage.getItem(MASTER_AUTH_KEY) === 'true' ||
+          sessionStorage.getItem(MASTER_AUTH_KEY) === 'true';
+        if (!flag) {
+          localStorage.setItem(MASTER_AUTH_KEY, 'true');
+          sessionStorage.setItem(MASTER_AUTH_KEY, 'true');
+        }
+        return true;
+      }
+    }
   }
 
-  return true;
+  // 2. Fallback to cached session validation for offline resilience
+  const cachedRaw = localStorage.getItem(USER_SESSION_KEY) || sessionStorage.getItem(USER_SESSION_KEY);
+  if (cachedRaw) {
+    try {
+      const parsed = JSON.parse(cachedRaw);
+      const r = String(parsed?.role || parsed?.user?.role || '').toLowerCase();
+      const authorizedAdminRolesLower = [
+        'master_admin',
+        'super_admin',
+        'company_admin',
+        'service_manager',
+        'accounts',
+        'sales'
+      ];
+      if (authorizedAdminRolesLower.includes(r) || parsed?.isMasterAdmin) {
+        const flag =
+          localStorage.getItem(MASTER_AUTH_KEY) === 'true' ||
+          sessionStorage.getItem(MASTER_AUTH_KEY) === 'true';
+        if (flag) {
+          return true;
+        }
+      }
+    } catch {}
+  }
+
+  return false;
 }
+
+// Alias export for administrative session validation
+export const isAdminSessionValid = isMasterAdminSessionValid;
 
 /**
  * Clear master admin flags
@@ -556,11 +580,14 @@ export async function restoreAuthenticatedSession(): Promise<RestoredSessionResu
         if (tokenToDecode) {
           const claims = decodeJwtPayload(tokenToDecode);
           if (claims && claims.sub) {
+            const rawClaimRole = (claims.role || '').toLowerCase();
+            const adminRolesLower = ['master_admin', 'super_admin', 'company_admin', 'service_manager', 'accounts', 'sales'];
+            const isClaimAdmin = adminRolesLower.includes(rawClaimRole);
             const fallbackRole: UserRole =
-              claims.role?.toLowerCase() === 'technician'
+              rawClaimRole === 'technician'
                 ? 'technician'
-                : claims.role?.toLowerCase() === 'master_admin' && isMasterAdminSessionValid()
-                ? 'master_admin'
+                : isClaimAdmin && isMasterAdminSessionValid()
+                ? (rawClaimRole as UserRole)
                 : 'client';
 
             const offlineUser: User = {
@@ -575,14 +602,15 @@ export async function restoreAuthenticatedSession(): Promise<RestoredSessionResu
               isActive: true,
             };
 
-            cacheUserSession(offlineUser, fallbackRole, fallbackRole === 'master_admin');
+            const isMasterAdminFlag = isClaimAdmin && isMasterAdminSessionValid();
+            cacheUserSession(offlineUser, fallbackRole, isMasterAdminFlag);
 
             return {
               status: 'offline',
               user: offlineUser,
               role: fallbackRole,
               accessToken: accessToken || refreshToken,
-              isMasterAdmin: fallbackRole === 'master_admin',
+              isMasterAdmin: isMasterAdminFlag,
               message: 'Operating in resilient offline cached session mode.',
             };
           }
@@ -611,11 +639,14 @@ export async function restoreAuthenticatedSession(): Promise<RestoredSessionResu
       const serverUser = res.data.user;
       const rawRole = (serverUser.role || 'client').toLowerCase();
       let userRole: UserRole = 'client';
+      const adminRolesLower = ['master_admin', 'super_admin', 'company_admin', 'service_manager', 'accounts', 'sales'];
 
       if (rawRole === 'technician') {
         userRole = 'technician';
-      } else if (rawRole === 'master_admin' || rawRole === 'company_admin' || rawRole === 'super_admin') {
-        userRole = 'master_admin';
+      } else if (rawRole === 'client') {
+        userRole = 'client';
+      } else if (adminRolesLower.includes(rawRole)) {
+        userRole = rawRole as UserRole;
       } else {
         userRole = 'client';
       }
@@ -645,7 +676,7 @@ export async function restoreAuthenticatedSession(): Promise<RestoredSessionResu
         isActive: serverUser.isActive ?? true,
       };
 
-      const isMasterAdmin = userRole === 'master_admin';
+      const isMasterAdmin = adminRolesLower.includes(userRole);
 
       if (isMasterAdmin) {
         localStorage.setItem(MASTER_AUTH_KEY, 'true');
@@ -679,12 +710,18 @@ export async function restoreAuthenticatedSession(): Promise<RestoredSessionResu
           if (retryRes && retryRes.success && retryRes.data?.user) {
             const serverUser = retryRes.data.user;
             const rawRole = (serverUser.role || 'client').toLowerCase();
-            const userRole: UserRole =
-              rawRole === 'technician'
-                ? 'technician'
-                : rawRole === 'master_admin' || rawRole === 'company_admin' || rawRole === 'super_admin'
-                ? 'master_admin'
-                : 'client';
+            let userRole: UserRole = 'client';
+            const adminRolesLower = ['master_admin', 'super_admin', 'company_admin', 'service_manager', 'accounts', 'sales'];
+
+            if (rawRole === 'technician') {
+              userRole = 'technician';
+            } else if (rawRole === 'client') {
+              userRole = 'client';
+            } else if (adminRolesLower.includes(rawRole)) {
+              userRole = rawRole as UserRole;
+            } else {
+              userRole = 'client';
+            }
 
             const retryRawAvatar = serverUser.avatarUrl || serverUser.avatar || '';
             const retryCachedAvatar = typeof window !== 'undefined' ? localStorage.getItem('wepsun_user_avatar_' + serverUser.id) : null;
@@ -710,7 +747,7 @@ export async function restoreAuthenticatedSession(): Promise<RestoredSessionResu
               avatar: retryResolvedAvatar,
               isActive: true,
             };
-            const isMasterAdmin = userRole === 'master_admin';
+            const isMasterAdmin = adminRolesLower.includes(userRole);
             if (isMasterAdmin) {
               localStorage.setItem(MASTER_AUTH_KEY, 'true');
               sessionStorage.setItem(MASTER_AUTH_KEY, 'true');
@@ -783,12 +820,13 @@ export async function restoreAuthenticatedSession(): Promise<RestoredSessionResu
     const claims = decodeJwtPayload(tokenToDecode);
     if (claims && claims.sub) {
       const claimRole = (claims.role || '').toLowerCase();
-      const isClaimAdmin = claimRole === 'master_admin';
+      const adminRolesLower = ['master_admin', 'super_admin', 'company_admin', 'service_manager', 'accounts', 'sales'];
+      const isClaimAdmin = adminRolesLower.includes(claimRole);
       const fallbackRole: UserRole =
         claimRole === 'technician'
           ? 'technician'
           : isClaimAdmin && isMasterAdminSessionValid()
-          ? 'master_admin'
+          ? (claimRole as UserRole)
           : 'client';
 
       const offlineUser: User = {
@@ -803,14 +841,15 @@ export async function restoreAuthenticatedSession(): Promise<RestoredSessionResu
         isActive: true,
       };
 
-      cacheUserSession(offlineUser, fallbackRole, fallbackRole === 'master_admin');
+      const isMasterAdminFlag = isClaimAdmin && isMasterAdminSessionValid();
+      cacheUserSession(offlineUser, fallbackRole, isMasterAdminFlag);
 
       return {
         status: 'offline',
         user: offlineUser,
         role: fallbackRole,
         accessToken: accessToken || refreshToken,
-        isMasterAdmin: fallbackRole === 'master_admin',
+        isMasterAdmin: isMasterAdminFlag,
         message: 'Operating in offline mode with cached authorization.',
       };
     }

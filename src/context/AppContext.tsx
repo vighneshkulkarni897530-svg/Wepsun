@@ -317,9 +317,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Current Role & Mock User (Defaults to Client unless valid Master Admin session exists)
   const [currentRole, setCurrentRoleState] = useState<UserRole>(() => {
+    const adminRoles: UserRole[] = ['company_admin', 'master_admin', 'super_admin', 'service_manager', 'accounts', 'sales'];
     const cached = getCachedUserSession();
     if (cached && cached.role) {
-      if (cached.role === 'company_admin' || cached.role === 'master_admin' || cached.role === 'super_admin') {
+      if (adminRoles.includes(cached.role)) {
         if (isMasterAdminSessionValid()) {
           return cached.role;
         }
@@ -329,7 +330,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
 
     const savedRole = localStorage.getItem(STORAGE_PREFIX + 'role') as UserRole;
-    if (savedRole === 'company_admin' || savedRole === 'master_admin' || savedRole === 'super_admin') {
+    if (savedRole && adminRoles.includes(savedRole)) {
       if (isMasterAdminSessionValid()) {
         return savedRole;
       }
@@ -341,13 +342,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [activeUserId, setActiveUserId] = useState<string>(() => {
     const cached = getCachedUserSession();
     if (cached && cached.user?.id) {
-      if ((cached.user.id.includes('admin') || cached.user.id.includes('master')) && !isMasterAdminSessionValid()) {
+      const uRole = cached.user.role || cached.role;
+      const adminRoles: UserRole[] = ['company_admin', 'master_admin', 'super_admin', 'service_manager', 'accounts', 'sales'];
+      if (adminRoles.includes(uRole) && !isMasterAdminSessionValid()) {
         return 'usr-client-priya';
       }
       return cached.user.id;
     }
     const savedUserId = localStorage.getItem(STORAGE_PREFIX + 'userId');
-    if (savedUserId && (savedUserId.includes('admin') || savedUserId.includes('master')) && !isMasterAdminSessionValid()) {
+    const savedRole = localStorage.getItem(STORAGE_PREFIX + 'role') as UserRole;
+    const adminRoles: UserRole[] = ['company_admin', 'master_admin', 'super_admin', 'service_manager', 'accounts', 'sales'];
+    if (savedUserId && savedRole && adminRoles.includes(savedRole) && !isMasterAdminSessionValid()) {
       return 'usr-client-priya';
     }
     return savedUserId || 'usr-client-priya';
@@ -882,10 +887,11 @@ function mapServerServiceReport(sr: any): ServiceReport {
       return u;
     };
 
+    const adminRoles: UserRole[] = ['company_admin', 'master_admin', 'super_admin', 'service_manager', 'accounts', 'sales'];
     const cached = getCachedUserSession();
     if (cached && cached.user) {
-      const userRole = cached.user.role || cached.role;
-      if ((userRole === 'company_admin' || userRole === 'master_admin' || userRole === 'super_admin') && !isMasterAdminSessionValid()) {
+      const userRole = (cached.user.role || cached.role || 'client') as UserRole;
+      if (adminRoles.includes(userRole) && !isMasterAdminSessionValid()) {
         return resolveUserAvatar(INITIAL_USERS.find((u) => u.role === 'client') || INITIAL_USERS[2]);
       }
       return resolveUserAvatar(cached.user);
@@ -893,7 +899,7 @@ function mapServerServiceReport(sr: any): ServiceReport {
 
     const saved = safeStorageParse<User | null>(STORAGE_PREFIX + 'currentUser', null);
     if (saved) {
-      if ((saved.role === 'company_admin' || saved.role === 'master_admin' || saved.role === 'super_admin') && !isMasterAdminSessionValid()) {
+      if (adminRoles.includes(saved.role as UserRole) && !isMasterAdminSessionValid()) {
         return resolveUserAvatar(INITIAL_USERS.find((u) => u.role === 'client') || INITIAL_USERS[2]);
       }
       return resolveUserAvatar(saved);
@@ -903,7 +909,7 @@ function mapServerServiceReport(sr: any): ServiceReport {
       const storedUsers = safeStorageParse<User[]>(STORAGE_PREFIX + 'users', INITIAL_USERS);
       const found = storedUsers.find((u) => u.id === savedUserId) || INITIAL_USERS.find((u) => u.id === savedUserId);
       if (found) {
-        if ((found.role === 'company_admin' || found.role === 'master_admin' || found.role === 'super_admin') && !isMasterAdminSessionValid()) {
+        if (adminRoles.includes(found.role as UserRole) && !isMasterAdminSessionValid()) {
           return resolveUserAvatar(INITIAL_USERS.find((u) => u.role === 'client') || INITIAL_USERS[2]);
         }
         return resolveUserAvatar(found);

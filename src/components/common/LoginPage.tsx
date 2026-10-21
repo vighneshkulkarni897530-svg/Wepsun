@@ -50,7 +50,7 @@ import { isValidCustomAvatar } from '../../utils/avatarUtils';
 interface LoginPageProps {
   isOpen?: boolean;
   onClose?: () => void;
-  defaultRole?: 'technician' | 'client';
+  defaultRole?: 'technician' | 'client' | 'admin';
   initialView?: 'signin' | 'signup';
   isModal?: boolean;
 }
@@ -70,6 +70,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   } = useApp();
 
   const {
+    showPopup,
     showAccountNotFound,
     showIncorrectPassword,
     showSignInSuccess,
@@ -104,13 +105,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     return 'signin';
   });
 
-  // Selected Role for authentication: Exactly TWO visible tabs (Client | Technician)
-  const [selectedRole, setSelectedRole] = useState<'client' | 'technician'>(() => {
+  // Selected Role for authentication: Client | Technician | Admin / Staff
+  const [selectedRole, setSelectedRole] = useState<'client' | 'technician' | 'admin'>(() => {
     const hash = window.location.hash.toLowerCase();
     if (hash.includes('login-technician') || hash.includes('technician')) return 'technician';
+    if (hash.includes('admin') || hash.includes('master') || hash.includes('dashboard')) return 'admin';
     if (hash.includes('login-client') || hash.includes('client')) return 'client';
     if (defaultRole === 'technician') return 'technician';
+    if (defaultRole === 'admin') return 'admin';
     if (currentRole === 'technician') return 'technician';
+    if (currentRole === 'company_admin' || currentRole === 'master_admin' || currentRole === 'super_admin') return 'admin';
     return 'client';
   });
 
@@ -198,8 +202,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     loadGoogleGisScript().catch(() => {});
   }, []);
 
-  // Role Tab Change: Exactly Client or Technician
-  const handleRoleChange = (role: 'client' | 'technician') => {
+  // Role Tab Change: Client | Technician | Admin
+  const handleRoleChange = (role: 'client' | 'technician' | 'admin') => {
     setSelectedRole(role);
   };
 
@@ -258,10 +262,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         phone: !cleanIdentifier.includes('@') && !isMasterCandidate && !isCandidateTechId ? cleanIdentifier : undefined,
         password: password,
         technicianId: cleanTechId || (isCandidateTechId ? cleanIdentifier : undefined),
-        role: selectedRole === 'technician' ? 'technician' : 'client',
+        role: selectedRole === 'technician' ? 'technician' : selectedRole === 'admin' ? 'company_admin' : 'client',
       };
 
-      const targetRole: UserRole = selectedRole === 'client' ? 'client' : 'technician';
+      const targetRole: UserRole = selectedRole === 'client' ? 'client' : selectedRole === 'technician' ? 'technician' : 'company_admin';
 
       const res = await apiService.login(payload);
       if (res && res.success && res.data) {
@@ -272,17 +276,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           setTokens(accessToken, refreshToken);
         }
         if (authData.user) {
-          const userRole = (authData.user.role || targetRole).toLowerCase() as UserRole;
-          const isMasterAdmin = userRole === 'master_admin';
+          const rawRole = (authData.user.role || (selectedRole === 'admin' ? 'company_admin' : targetRole)).toLowerCase();
+          const adminRoles = ['master_admin', 'super_admin', 'company_admin', 'service_manager', 'accounts', 'sales'];
+          const isAdmin = adminRoles.includes(rawRole);
+          const userRole: UserRole = isAdmin ? (rawRole as UserRole) : rawRole === 'technician' ? 'technician' : 'client';
 
-          if (isMasterAdmin) {
+          if (isAdmin) {
             localStorage.setItem('wepsun_master_authenticated', 'true');
             sessionStorage.setItem('wepsun_master_authenticated', 'true');
             const expiry = Date.now() + 30 * 24 * 60 * 60 * 1000;
             localStorage.setItem('wepsun_master_session_expiry', String(expiry));
             sessionStorage.setItem('wepsun_master_session_expiry', String(expiry));
-            localStorage.setItem('wepsun_role', 'master_admin');
-            sessionStorage.setItem('wepsun_role', 'master_admin');
+            localStorage.setItem('wepsun_role', userRole);
+            sessionStorage.setItem('wepsun_role', userRole);
           }
 
           const rawAvatar = authData.user.avatarUrl || authData.user.avatar || '';
@@ -375,25 +381,62 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             onOk: () => emailInputRef.current?.focus(),
           });
         } else if (errorCode === 'ACCOUNT_PENDING_APPROVAL') {
-          showSomethingWentWrong({
-            message: 'Your account is awaiting admin approval.',
+          showPopup({
+            type: 'warning',
+            title: 'Account Awaiting Admin Approval',
+            message: res?.message || 'Your technician application is currently under review by the administration. You will receive your permanent technician ID once approved.',
+            primaryAction: {
+              label: 'Understood',
+              variant: 'primary',
+              onClick: () => closePopup(),
+            },
           });
         } else if (errorCode === 'ACCOUNT_BLOCKED') {
-          showSomethingWentWrong({
-            message: 'Your account has been blocked. Please contact the administrator.',
+          showPopup({
+            type: 'error',
+            title: 'Account Blocked',
+            message: res?.message || 'Your account has been blocked by the administrator. Please contact WEPSUN Support.',
+            primaryAction: {
+              label: 'Close',
+              variant: 'secondary',
+              onClick: () => closePopup(),
+            },
           });
         } else if (errorCode === 'ACCOUNT_REJECTED') {
-          showSomethingWentWrong({
-            message: res?.message || 'Your technician application was not approved. Please contact the administrator.',
+          showPopup({
+            type: 'error',
+            title: 'Application Not Approved',
+            message: res?.message || 'Your technician application was not approved. Please contact the administrator for details.',
+            primaryAction: {
+              label: 'Close',
+              variant: 'secondary',
+              onClick: () => closePopup(),
+            },
           });
         } else if (errorCode === 'ACCOUNT_SUSPENDED') {
-          showSomethingWentWrong({
-            message: 'Your account has been suspended. Please contact the administrator.',
+          showPopup({
+            type: 'warning',
+            title: 'Account Suspended',
+            message: res?.message || 'Your account has been temporarily suspended. Please contact the administrator.',
+            primaryAction: {
+              label: 'Close',
+              variant: 'secondary',
+              onClick: () => closePopup(),
+            },
           });
         } else if (errorCode === 'INVALID_TECHNICIAN_ID') {
-          showSomethingWentWrong({
-            message: res?.message || 'Invalid Technician ID.',
-            onTryAgain: () => techIdInputRef.current?.focus(),
+          showPopup({
+            type: 'login_error',
+            title: 'Invalid Technician ID',
+            message: res?.message || 'The Technician ID entered does not match our records. Please verify your Permanent ID or Employee Code.',
+            primaryAction: {
+              label: 'Try Again',
+              variant: 'primary',
+              onClick: () => {
+                closePopup();
+                techIdInputRef.current?.focus();
+              },
+            },
           });
         } else if (errorCode === 'ACCOUNT_DEACTIVATED') {
           showSomethingWentWrong({
@@ -409,7 +452,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         } else {
           showSomethingWentWrong({
             message: res?.message || "We couldn't complete your request right now. Please try again later.",
-            onTryAgain: () => emailInputRef.current?.focus(),
+            onTryAgain: () => {
+              emailInputRef.current?.focus();
+            },
           });
         }
       }
@@ -1139,9 +1184,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           {/* ========================================================================= */}
           {view === 'signin' ? (
             <div>
-              {/* Role Selection Tabs — Exactly TWO Options: Client | Technician */}
+              {/* Role Selection Tabs — Three Options: Client | Technician | Admin / Staff */}
               <div className="mb-4">
-                <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100/90 rounded-2xl">
+                <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100/90 rounded-2xl">
                   <button
                     type="button"
                     onClick={() => handleRoleChange('client')}
@@ -1163,6 +1208,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     }`}
                   >
                     Technician
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleRoleChange('admin')}
+                    className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      selectedRole === 'admin'
+                        ? 'bg-white text-[#0066FF] shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Admin / Staff
                   </button>
                 </div>
               </div>
@@ -1202,7 +1258,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 </div>
               )}
 
-              {/* STANDARD SIGN IN FORM (CLIENTS & TECHNICIANS) */}
+              {/* STANDARD SIGN IN FORM */}
               <form onSubmit={handleSignInSubmit} className="space-y-3.5">
                   {/* Email / Identifier Field */}
                   <div className="relative">
@@ -1214,7 +1270,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       type="text"
                       value={identifier}
                       onChange={(e) => setIdentifier(e.target.value)}
-                      placeholder={selectedRole === 'technician' ? 'Technician Email or Mobile' : 'Email Address'}
+                      placeholder={
+                        selectedRole === 'technician'
+                          ? 'Technician Email, Mobile, or ID'
+                          : selectedRole === 'admin'
+                          ? 'Admin Email or Master ID'
+                          : 'Email Address or Mobile'
+                      }
                       required
                       className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200/90 bg-slate-50/50 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 outline-none transition-all"
                     />
