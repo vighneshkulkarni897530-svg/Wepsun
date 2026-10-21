@@ -18,6 +18,9 @@ import {
   generateTechnicianRejectionEmailText,
   generateTechnicianBlockedEmailHtml,
   generateTechnicianBlockedEmailText,
+  verifyEmailOtp,
+  verifyAndConsumeEmailVerification,
+  verifyEmailVerificationToken,
 } from '../lib/emailOtpService.js';
 
 const router = Router();
@@ -90,6 +93,8 @@ router.post('/register', authLimiter, async (req: AuthenticatedRequest, res: Res
       companyId: reqCompanyId,
       branchId: reqBranchId,
       zone,
+      verificationToken,
+      otp,
     } = req.body;
 
     const cleanName = (name || '').trim();
@@ -111,6 +116,28 @@ router.post('/register', authLimiter, async (req: AuthenticatedRequest, res: Res
         success: false,
         message: 'A valid email address is required.',
         code: 'INVALID_EMAIL',
+      });
+      return;
+    }
+
+    // Enforce email OTP verification before creating/submitting technician application
+    let isEmailVerified = false;
+    if (verificationToken) {
+      const check = verifyAndConsumeEmailVerification(cleanEmail, verificationToken);
+      isEmailVerified = check.valid;
+    } else if (otp) {
+      const verifyRes = verifyEmailOtp({ email: cleanEmail, otp, type: 'signup' });
+      isEmailVerified = verifyRes.success;
+    } else {
+      const check = verifyAndConsumeEmailVerification(cleanEmail);
+      isEmailVerified = check.valid;
+    }
+
+    if (!isEmailVerified) {
+      res.status(403).json({
+        success: false,
+        message: 'Email verification is required. Please verify your email before submitting your application.',
+        code: 'EMAIL_NOT_VERIFIED',
       });
       return;
     }

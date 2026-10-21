@@ -10,15 +10,26 @@ dotenv.config();
 
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
+import jwt from 'jsonwebtoken';
+
+const JWT_VERIFY_SECRET = process.env.JWT_SECRET || process.env.JWT_ACCESS_SECRET || 'wepsun-production-secure-access-jwt-secret-key-32-chars';
 
 export interface OtpRecord {
   email: string;
-  otp: string;
+  otp?: string;
+  otpHash?: string;
   type: 'signup' | 'forgot_password';
   expiresAt: number;
   attempts: number;
   lastSentAt: number;
   userData?: any;
+}
+
+export interface VerifiedEmailRecord {
+  email: string;
+  token: string;
+  verifiedAt: number;
+  expiresAt: number;
 }
 
 export interface EmailDispatchResult {
@@ -46,23 +57,32 @@ export interface EmailServiceHealth {
 // In-memory thread-safe OTP store (scoped by email + type)
 export const otpStore = new Map<string, OtpRecord>();
 
+// Verified Email Store for single-page and multi-step registration proof
+export const verifiedEmailStore = new Map<string, VerifiedEmailRecord>();
+
 // Security Policy Constants
 export const OTP_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
-export const RESEND_COOLDOWN_MS = 60 * 1000;  // 60 seconds
+export const RESEND_COOLDOWN_MS = 30 * 1000;  // 30 seconds
 export const MAX_ATTEMPTS = 5;                // Max 5 failed attempts before invalidation
+export const VERIFICATION_TOKEN_EXPIRY_MS = 30 * 60 * 1000; // 30 minutes to complete registration
 
 export function getStoreKey(email: string, type: 'signup' | 'forgot_password'): string {
   return `${type}:${email.toLowerCase().trim()}`;
 }
 
 /**
- * Periodically purge expired OTPs to prevent memory leaks
+ * Periodically purge expired OTPs and verification tokens to prevent memory leaks
  */
 setInterval(() => {
   const now = Date.now();
   for (const [key, record] of otpStore.entries()) {
     if (now > record.expiresAt) {
       otpStore.delete(key);
+    }
+  }
+  for (const [email, record] of verifiedEmailStore.entries()) {
+    if (now > record.expiresAt) {
+      verifiedEmailStore.delete(email);
     }
   }
 }, 5 * 60 * 1000);
@@ -747,10 +767,12 @@ export async function sendEmailOtp(params: {
   type: 'signup' | 'forgot_password';
   userData?: any;
   otp?: string;
+  force?: boolean;
 }): Promise<{
   success: boolean;
   message: string;
   expiresIn?: number;
+  retryAfterSeconds?: number;
   code?: string;
   provider?: string;
   devOtp?: string;
@@ -759,16 +781,17 @@ export async function sendEmailOtp(params: {
   const cleanEmail = params.email.toLowerCase().trim();
   const key = getStoreKey(cleanEmail, params.type);
   const now = Date.now();
-
-  // 1. Rate Limiting: 60-second cooldown enforcement (relaxed in development)
   const isDev = process.env.NODE_ENV !== 'production';
+
+  // 1. Rate Limiting: 30-second cooldown enforcement between OTP requests
   const existing = otpStore.get(key);
-  if (existing && !isDev && now - existing.lastSentAt < RESEND_COOLDOWN_MS) {
+  if (existing && !params.force && (now - existing.lastSentAt < RESEND_COOLDOWN_MS)) {
     const waitSeconds = Math.ceil((RESEND_COOLDOWN_MS - (now - existing.lastSentAt)) / 1000);
     return {
       success: false,
       message: `Please wait ${waitSeconds} seconds before requesting a new verification code.`,
       code: 'RATE_LIMITED',
+      retryAfterSeconds: waitSeconds,
       expiresIn: Math.max(0, Math.ceil((existing.expiresAt - now) / 1000)),
     };
   }
@@ -797,9 +820,11 @@ export async function sendEmailOtp(params: {
   });
 
   // Always store OTP record before or on dispatch so it can be verified
+  const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
   otpStore.set(key, {
     email: cleanEmail,
-    otp,
+    otp: isDev ? otp : undefined,
+    otpHash,
     type: params.type,
     expiresAt,
     attempts: 0,
@@ -841,6 +866,100 @@ export async function sendEmailOtp(params: {
 }
 
 /**
+ * Generate cryptographically signed email verification token bound to the exact email
+ */
+export function generateEmailVerificationToken(email: string): string {
+  const cleanEmail = email.toLowerCase().trim();
+  const token = jwt.sign(
+    {
+      email: cleanEmail,
+      purpose: 'email_verification',
+      timestamp: Date.now(),
+    },
+    JWT_VERIFY_SECRET,
+    { expiresIn: '30m' }
+  );
+
+  verifiedEmailStore.set(cleanEmail, {
+    email: cleanEmail,
+    token,
+    verifiedAt: Date.now(),
+    expiresAt: Date.now() + VERIFICATION_TOKEN_EXPIRY_MS,
+  });
+
+  return token;
+}
+
+/**
+ * Verify whether an email verification token or active server-side verified record is valid
+ */
+export function verifyEmailVerificationToken(email: string, token?: string): { valid: boolean; reason?: string } {
+  const cleanEmail = email.toLowerCase().trim();
+  if (!cleanEmail) {
+    return { valid: false, reason: 'Email is required.' };
+  }
+
+  // 1. Check server-side verified store first (must exist and not be expired or consumed)
+  const record = verifiedEmailStore.get(cleanEmail);
+  if (!record || Date.now() > record.expiresAt) {
+    return { valid: false, reason: 'Email has not been verified or verification has expired/been consumed.' };
+  }
+
+  // 2. If token provided, verify cryptographic signature and match
+  if (token && typeof token === 'string') {
+    try {
+      const decoded = jwt.verify(token, JWT_VERIFY_SECRET) as any;
+      if (decoded.purpose !== 'email_verification') {
+        return { valid: false, reason: 'Invalid token purpose.' };
+      }
+      if (decoded.email.toLowerCase().trim() !== cleanEmail) {
+        return { valid: false, reason: 'Token was issued for a different email address.' };
+      }
+      if (record.token && record.token !== token) {
+        return { valid: false, reason: 'Token does not match active verification session.' };
+      }
+      return { valid: true };
+    } catch (err: any) {
+      return { valid: false, reason: err.message || 'Token verification failed.' };
+    }
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Verify and single-use consume the email verification record to prevent replay attacks
+ */
+export function verifyAndConsumeEmailVerification(email: string, token?: string): { valid: boolean; reason?: string } {
+  const cleanEmail = email.toLowerCase().trim();
+  const check = verifyEmailVerificationToken(cleanEmail, token);
+  if (!check.valid) {
+    return check;
+  }
+  // Single-use: purge from server-side store so it cannot be reused
+  verifiedEmailStore.delete(cleanEmail);
+  return { valid: true };
+}
+
+/**
+ * Invalidate verified email state (e.g. when user changes email field)
+ */
+export function invalidateEmailVerification(email: string): void {
+  const cleanEmail = email.toLowerCase().trim();
+  verifiedEmailStore.delete(cleanEmail);
+  otpStore.delete(getStoreKey(cleanEmail, 'signup'));
+}
+
+/**
+ * Inspection helper strictly for test suites in non-production environments
+ */
+export function peekActiveEmailOtpForTesting(email: string, type: 'signup' | 'forgot_password' = 'signup'): string | undefined {
+  const cleanEmail = email.toLowerCase().trim();
+  const record = otpStore.get(getStoreKey(cleanEmail, type));
+  return record?.otp;
+}
+
+/**
  * Verify OTP entered by the user
  * Enforces single-use consumption, 10-min expiration & max 5 failed attempts
  */
@@ -854,6 +973,7 @@ export function verifyEmailOtp(params: {
   userData?: any;
   code?: string;
   remainingAttempts?: number;
+  verificationToken?: string;
 } {
   const cleanEmail = params.email ? params.email.toLowerCase().trim() : '';
   const cleanOtp = params.otp ? String(params.otp).replace(/\s+/g, '').trim() : '';
@@ -865,9 +985,11 @@ export function verifyEmailOtp(params: {
 
   if (!record) {
     if (isDev && (cleanOtp === '123456' || cleanOtp === '7419')) {
+      const devToken = params.type === 'signup' ? generateEmailVerificationToken(cleanEmail) : undefined;
       return {
         success: true,
         message: 'Dev test code accepted.',
+        verificationToken: devToken,
       };
     }
     return {
@@ -897,8 +1019,23 @@ export function verifyEmailOtp(params: {
     };
   }
 
-  // Cryptographic string comparison
-  const isValidOtp = record.otp === cleanOtp;
+  // Cryptographic constant-time comparison
+  const submittedHash = crypto.createHash('sha256').update(cleanOtp).digest('hex');
+  let isValidOtp = false;
+
+  if (record.otpHash) {
+    try {
+      isValidOtp = crypto.timingSafeEqual(
+        Buffer.from(record.otpHash, 'hex'),
+        Buffer.from(submittedHash, 'hex')
+      );
+    } catch {
+      isValidOtp = false;
+    }
+  } else if (record.otp) {
+    isValidOtp = record.otp === cleanOtp;
+  }
+
   if (!isValidOtp) {
     record.attempts += 1;
     const remaining = Math.max(0, MAX_ATTEMPTS - record.attempts);
@@ -923,10 +1060,15 @@ export function verifyEmailOtp(params: {
   const savedUserData = record.userData;
   otpStore.delete(key);
 
+  const verificationToken = params.type === 'signup'
+    ? generateEmailVerificationToken(cleanEmail)
+    : undefined;
+
   return {
     success: true,
     message: 'Verification code confirmed successfully.',
     userData: savedUserData,
+    verificationToken,
   };
 }
 

@@ -63,9 +63,18 @@ export interface SendOtpResponse {
   firebaseEmailSent?: boolean;
 }
 
+export interface InlineVerifyOtpResponse {
+  success: boolean;
+  message?: string;
+  verificationToken?: string;
+  code?: string;
+  remainingAttempts?: number;
+}
+
 export interface VerifyOtpPayload {
   email: string;
-  otp: string;
+  otp?: string;
+  verificationToken?: string;
   fullName: string;
   phone?: string;
   role: UserRole;
@@ -90,14 +99,16 @@ export interface VerifyOtpResponse {
  */
 export async function sendSignupEmailOtp(
   email: string,
-  fullName: string
+  fullName?: string,
+  role?: string
 ): Promise<SendOtpResponse> {
   const cleanEmail = email.trim().toLowerCase();
   try {
     const res = await apiService.sendOtp({
       email: cleanEmail,
-      name: fullName.trim(),
+      name: fullName ? fullName.trim() : '',
       type: 'signup',
+      role,
     });
 
     if (res.success) {
@@ -124,18 +135,69 @@ export async function sendSignupEmailOtp(
 }
 
 /**
+ * Inline Email OTP Verification directly on the Sign Up page
+ */
+export async function verifyInlineEmailOtp(
+  email: string,
+  otp: string
+): Promise<InlineVerifyOtpResponse> {
+  const cleanEmail = email.trim().toLowerCase();
+  const cleanOtp = otp.trim();
+
+  try {
+    const res = await apiService.verifyEmailOtp({
+      email: cleanEmail,
+      otp: cleanOtp,
+    });
+
+    if (res.success) {
+      return {
+        success: true,
+        message: res.message || 'Email verified successfully!',
+        verificationToken: (res as any).verificationToken || (res.data as any)?.verificationToken,
+      };
+    } else {
+      return {
+        success: false,
+        message: res.message || res.error || 'Invalid verification code. Please try again.',
+        code: res.code,
+        remainingAttempts: (res as any).remainingAttempts,
+      };
+    }
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err.message || 'Unable to connect to verification service. Please try again.',
+      code: 'VERIFICATION_ERROR',
+    };
+  }
+}
+
+/**
+ * Invalidate verified email state when user modifies email field
+ */
+export async function invalidateEmailState(email: string): Promise<void> {
+  const cleanEmail = email.trim().toLowerCase();
+  if (!cleanEmail) return;
+  try {
+    await apiService.invalidateEmailVerification(cleanEmail);
+  } catch {}
+}
+
+/**
  * 2. Verify Email OTP & Complete Registration
  */
 export async function verifySignupEmailOtp(
   payload: VerifyOtpPayload
 ): Promise<VerifyOtpResponse> {
   const cleanEmail = payload.email.trim().toLowerCase();
-  const cleanOtp = payload.otp.trim();
+  const cleanOtp = (payload.otp || '').trim();
 
   try {
     const res = await apiService.verifySignupOtp({
       email: cleanEmail,
-      otp: cleanOtp,
+      otp: cleanOtp || undefined,
+      verificationToken: payload.verificationToken,
       name: payload.fullName.trim(),
       phone: payload.phone?.trim() || '',
       role: payload.role.toUpperCase(),

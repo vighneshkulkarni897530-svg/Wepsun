@@ -22,7 +22,14 @@ import { requireAuth, requireRole, AuthenticatedRequest } from '../middleware/au
 import { authLimiter } from '../middleware/rateLimiter.js';
 import { verifyGoogleIdToken, verifyGoogleAccessToken } from '../lib/googleAuth.js';
 import { validateMasterId, getMasterAdminUser, initiateMaster2FA, verifyMaster2FA, resendMaster2FA, validateMasterCredentials, getMasterAuthorizedEmails } from '../lib/masterAuth.js';
-import { sendEmailOtp, verifyEmailOtp, getEmailServiceHealth } from '../lib/emailOtpService.js';
+import {
+  sendEmailOtp,
+  verifyEmailOtp,
+  getEmailServiceHealth,
+  verifyEmailVerificationToken,
+  verifyAndConsumeEmailVerification,
+  invalidateEmailVerification,
+} from '../lib/emailOtpService.js';
 
 const router = Router();
 
@@ -2118,12 +2125,13 @@ router.post('/send-otp', authLimiter, async (req: AuthenticatedRequest, res: Res
   }
 
   try {
-    // If sign-up, verify if active account already exists
+    // If sign-up, verify if active account or technician application already exists
     if (type === 'signup') {
       let existingUser: any = null;
       try {
         existingUser = await prisma.user.findFirst({
           where: { email: { equals: cleanEmail, mode: 'insensitive' as const } },
+          include: { technician: true },
         });
       } catch {
         existingUser = null;
@@ -2134,6 +2142,14 @@ router.post('/send-otp', authLimiter, async (req: AuthenticatedRequest, res: Res
       }
 
       if (existingUser) {
+        if (existingUser.role === 'TECHNICIAN' && existingUser.technician?.accountStatus === 'PENDING_APPROVAL') {
+          res.status(400).json({
+            success: false,
+            message: 'Your technician application is currently awaiting admin approval.',
+            code: 'ACCOUNT_PENDING_APPROVAL',
+          });
+          return;
+        }
         res.status(409).json({
           success: false,
           message: 'An account with this email address already exists. Please sign in instead.',
@@ -2141,6 +2157,29 @@ router.post('/send-otp', authLimiter, async (req: AuthenticatedRequest, res: Res
         });
         return;
       }
+
+      // Also check technician table directly
+      try {
+        const existingTech = await prisma.technician.findFirst({
+          where: { email: { equals: cleanEmail, mode: 'insensitive' as const } },
+        });
+        if (existingTech) {
+          if (existingTech.accountStatus === 'PENDING_APPROVAL') {
+            res.status(400).json({
+              success: false,
+              message: 'Your technician application is currently awaiting admin approval.',
+              code: 'ACCOUNT_PENDING_APPROVAL',
+            });
+            return;
+          }
+          res.status(409).json({
+            success: false,
+            message: 'An account with this email address already exists. Please sign in instead.',
+            code: 'USER_ALREADY_EXISTS',
+          });
+          return;
+        }
+      } catch {}
     } else if (type === 'forgot_password') {
       // If forgot password, check if account exists
       let existingUser: any = null;
@@ -2175,7 +2214,10 @@ router.post('/send-otp', authLimiter, async (req: AuthenticatedRequest, res: Res
 
     if (!otpResult.success) {
       const statusCode = otpResult.code === 'RATE_LIMITED' ? 429 : 503;
-      res.status(statusCode).json(otpResult);
+      res.status(statusCode).json({
+        ...otpResult,
+        code: otpResult.code === 'RATE_LIMITED' ? 'COOLDOWN_ACTIVE' : otpResult.code,
+      });
       return;
     }
 
@@ -2189,24 +2231,29 @@ router.post('/send-otp', authLimiter, async (req: AuthenticatedRequest, res: Res
   }
 });
 
-// POST /api/auth/verify-otp — Verify sign-up OTP and complete registration
-router.post('/verify-otp', authLimiter, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  const { email, otp, name, fullName, phone, role = 'CLIENT', password, companyId = 'comp-1' } = req.body;
+// POST /api/auth/verify-email-otp — Verify email OTP inline on Sign Up page and return cryptographic verification token
+router.post('/verify-email-otp', authLimiter, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  const { email, otp } = req.body;
   const cleanEmail = String(email || '').toLowerCase().trim();
   const cleanOtp = String(otp || '').trim();
-  const displayName = String(name || fullName || '').trim();
 
   if (!cleanEmail || !cleanOtp) {
     res.status(400).json({
       success: false,
-      message: 'Email and 6-digit verification code are required.',
+      message: 'Email address and 6-digit verification code are required.',
       code: 'MISSING_FIELDS',
     });
     return;
   }
 
-  const userAgent = req.headers['user-agent'];
-  const ipAddress = req.ip || req.socket.remoteAddress;
+  if (!cleanEmail.includes('@') || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+    res.status(400).json({
+      success: false,
+      message: 'A valid email address is required.',
+      code: 'INVALID_EMAIL',
+    });
+    return;
+  }
 
   try {
     const verifyResult = verifyEmailOtp({
@@ -2220,6 +2267,94 @@ router.post('/verify-otp', authLimiter, async (req: AuthenticatedRequest, res: R
       return;
     }
 
+    res.json({
+      success: true,
+      verified: true,
+      message: 'Email verified successfully!',
+      data: {
+        verified: true,
+        email: cleanEmail,
+        verificationToken: verifyResult.verificationToken,
+      },
+      verificationToken: verifyResult.verificationToken,
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to verify verification code. Please try again.',
+      code: 'VERIFICATION_ERROR',
+    });
+  }
+});
+
+// POST /api/auth/invalidate-email — Explicitly invalidate email verification state when email changes
+router.post('/invalidate-email', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  const { email } = req.body;
+  const cleanEmail = String(email || '').toLowerCase().trim();
+  if (cleanEmail) {
+    invalidateEmailVerification(cleanEmail);
+  }
+  res.json({ success: true, message: 'Email verification state reset.' });
+});
+
+// POST /api/auth/verify-otp or POST /api/auth/register — Complete registration with verification proof
+const handleAccountRegistration = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  const { email, otp, verificationToken, name, fullName, phone, role = 'CLIENT', password, companyId = 'comp-1' } = req.body;
+  const cleanEmail = String(email || '').toLowerCase().trim();
+  const cleanOtp = String(otp || '').trim();
+  const displayName = String(name || fullName || '').trim();
+
+  if (!cleanEmail) {
+    res.status(400).json({
+      success: false,
+      message: 'Email address is required.',
+      code: 'MISSING_FIELDS',
+    });
+    return;
+  }
+
+  // Enforce server-side verification check
+  let isVerified = false;
+  if (verificationToken) {
+    const check = verifyAndConsumeEmailVerification(cleanEmail, verificationToken);
+    if (!check.valid) {
+      res.status(403).json({
+        success: false,
+        message: 'Email verification is required before creating an account. Please verify your email first.',
+        code: 'EMAIL_NOT_VERIFIED',
+      });
+      return;
+    }
+    isVerified = true;
+  } else if (cleanOtp) {
+    const verifyResult = verifyEmailOtp({
+      email: cleanEmail,
+      otp: cleanOtp,
+      type: 'signup',
+    });
+    if (!verifyResult.success) {
+      res.status(400).json(verifyResult);
+      return;
+    }
+    isVerified = true;
+  } else {
+    // Check active memory store
+    const check = verifyAndConsumeEmailVerification(cleanEmail);
+    if (!check.valid) {
+      res.status(403).json({
+        success: false,
+        message: 'Email verification is required before creating an account. Please verify your email first.',
+        code: 'EMAIL_NOT_VERIFIED',
+      });
+      return;
+    }
+    isVerified = true;
+  }
+
+  const userAgent = req.headers['user-agent'];
+  const ipAddress = req.ip || req.socket.remoteAddress;
+
+  try {
     // OTP Verified! Check if account already exists or create new account in Database
     let user: any = null;
     try {
@@ -2393,7 +2528,10 @@ router.post('/verify-otp', authLimiter, async (req: AuthenticatedRequest, res: R
       code: 'SERVER_ERROR',
     });
   }
-});
+};
+
+router.post('/verify-otp', authLimiter, handleAccountRegistration);
+router.post('/register', authLimiter, handleAccountRegistration);
 
 // POST /api/auth/forgot-password-otp — Dispatch 6-digit OTP for password recovery
 router.post('/forgot-password-otp', authLimiter, async (req: AuthenticatedRequest, res: Response): Promise<void> => {

@@ -269,19 +269,24 @@ export async function apiFetch<T = any>(
 
   try {
     try {
-      // If target is local dev proxy (/api), only wait 3.5s so we failover immediately if local backend isn't up
-      const initialTimeout = targetBase === '/api' ? 3500 : cloudTimeout;
+      // For auth routes (like sending email OTP), SMTP delivery takes 5-15s.
+      // We must not abort at 3.5s because aborting causes a duplicate failover call to cloud, sending 2 OTPs!
+      const initialTimeout = targetBase === '/api' && !isAuthRoute ? 3500 : cloudTimeout;
       response = await executeFetch(targetBase, initialTimeout);
 
       // If local dev server returned 502/503/504 gateway error (backend not running locally),
-      // transparently retry against the live production cloud backend
-      if (!response.ok && (response.status === 502 || response.status === 503 || response.status === 504 || (response.status === 500 && isAuthRoute)) && targetBase !== DEFAULT_CLOUD_API_URL) {
+      // transparently retry against the live production cloud backend (for non-email-sending endpoints)
+      if (!response.ok && (response.status === 502 || response.status === 503 || response.status === 504) && targetBase !== DEFAULT_CLOUD_API_URL) {
         console.warn(`[apiFetch] ${targetBase} returned HTTP ${response.status}, failing over to ${DEFAULT_CLOUD_API_URL}`);
         targetBase = DEFAULT_CLOUD_API_URL;
         response = await executeFetch(targetBase, cloudTimeout);
       }
     } catch (initialErr: any) {
-      // If primary endpoint failed (e.g. ECONNREFUSED or aborted on localhost), failover directly to cloud
+      // Prevent duplicate email dispatch on client abort
+      if (initialErr?.name === 'AbortError' && endpoint.includes('send-otp')) {
+        throw new Error('Email verification request timed out. Please check your connection and try again.');
+      }
+      // If primary endpoint failed (e.g. ECONNREFUSED on localhost), failover directly to cloud
       if (targetBase !== DEFAULT_CLOUD_API_URL) {
         console.warn(`[apiFetch] ${targetBase} unreachable (${initialErr.message}), failing over to ${DEFAULT_CLOUD_API_URL}`);
         targetBase = DEFAULT_CLOUD_API_URL;
@@ -393,12 +398,26 @@ export const apiService = {
   resetPassword: (payload: { token: string; newPassword: string }) =>
     apiFetch('/auth/reset-password', { method: 'POST', body: JSON.stringify(payload), skipAuth: true }),
 
-  // Firebase Email OTP Authentication
-  sendOtp: (payload: { email: string; name?: string; type: 'signup' | 'forgot_password' }) =>
+  // Firebase & Email OTP Authentication
+  sendOtp: (payload: { email: string; name?: string; type: 'signup' | 'forgot_password'; role?: string; phone?: string }) =>
     apiFetch('/auth/send-otp', { method: 'POST', body: JSON.stringify(payload), skipAuth: true }),
+  verifyEmailOtp: (payload: { email: string; otp: string }) =>
+    apiFetch('/auth/verify-email-otp', { method: 'POST', body: JSON.stringify(payload), skipAuth: true }),
+  invalidateEmailVerification: (email: string) =>
+    apiFetch('/auth/invalidate-email', { method: 'POST', body: JSON.stringify({ email }), skipAuth: true }),
+  registerClient: (payload: {
+    name: string;
+    email: string;
+    phone?: string;
+    password: string;
+    verificationToken?: string;
+    companyId?: string;
+  }) =>
+    apiFetch('/auth/register', { method: 'POST', body: JSON.stringify(payload), skipAuth: true }),
   verifySignupOtp: (payload: {
     email: string;
-    otp: string;
+    otp?: string;
+    verificationToken?: string;
     name: string;
     phone?: string;
     role: string;
@@ -517,6 +536,7 @@ export const apiService = {
     documents?: string;
     password?: string;
     companyId?: string;
+    verificationToken?: string;
   }, options?: ApiRequestOptions) =>
     apiFetch('/technicians/register', { method: 'POST', body: JSON.stringify(payload), skipAuth: true, ...options }),
 
