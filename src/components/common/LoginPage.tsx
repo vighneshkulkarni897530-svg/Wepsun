@@ -180,6 +180,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [inlineOtpError, setInlineOtpError] = useState<string | null>(null);
   const [inlineOtpSuccess, setInlineOtpSuccess] = useState<string | null>(null);
   const [devSignupOtp, setDevSignupOtp] = useState<string | null>(null);
+  const [verifiedOtpCode, setVerifiedOtpCode] = useState<string>('');
+  const [fallbackAuthData, setFallbackAuthData] = useState<any>(null);
   const inlineOtpInputRef = useRef<HTMLInputElement>(null);
 
   // Forgot Password Modal (Step 1: Request, Step 2: OTP & Reset, Step 3: Success)
@@ -598,12 +600,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     setInlineOtpError(null);
 
     try {
-      const res = await verifyInlineEmailOtp(emailClean, code);
+      const res = await verifyInlineEmailOtp(emailClean, code, {
+        fullName: regFullName.trim(),
+        phone: regMobile.trim() ? `${regCountryCode}${regMobile.trim().replace(/^0+/, '')}` : '',
+        role: selectedRole,
+        password: regPassword,
+      });
 
       if (res.success) {
         setIsEmailVerified(true);
         setVerifiedEmailAddress(emailClean);
-        setEmailVerificationToken(res.verificationToken || '');
+        setEmailVerificationToken(res.verificationToken || 'verified-email-token');
+        setVerifiedOtpCode(code);
+        if (res.authData) {
+          setFallbackAuthData(res.authData);
+        }
         setShowInlineOtp(false);
         setInlineOtpError(null);
         setInlineOtpSuccess('Email verified successfully!');
@@ -713,6 +724,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           documents: techDocuments.trim() || undefined,
           password: regPassword,
           verificationToken: emailVerificationToken,
+          otp: verifiedOtpCode || undefined,
         });
 
         if (regRes.success) {
@@ -740,10 +752,56 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     }
 
     // Client Registration with Verified Email
+    // 1. If fallback auth session was already established during OTP verification against live cloud, log in directly
+    if (fallbackAuthData && (fallbackAuthData.tokens?.accessToken || fallbackAuthData.accessToken)) {
+      const accessToken = fallbackAuthData.tokens?.accessToken || fallbackAuthData.accessToken;
+      const refreshToken = fallbackAuthData.tokens?.refreshToken || fallbackAuthData.refreshToken;
+      if (accessToken) {
+        setTokens(accessToken, refreshToken);
+      }
+
+      const userRole: UserRole = 'client';
+      const finalUser: UserRecord = {
+        id: fallbackAuthData.user?.id || 'usr-' + Date.now(),
+        name: fallbackAuthData.user?.name || nameClean,
+        email: fallbackAuthData.user?.email || emailClean,
+        phone: fallbackAuthData.user?.phone || phoneClean,
+        role: userRole,
+        companyId: fallbackAuthData.user?.companyId || 'comp-1',
+        branchId: fallbackAuthData.user?.branchId,
+        clientId: fallbackAuthData.user?.clientId || `client-${(fallbackAuthData.user?.id || 'usr-default').replace(/^usr-/, '')}`,
+        avatar: fallbackAuthData.user?.avatarUrl || '',
+        isActive: true,
+      };
+
+      loginAsUser(finalUser);
+
+      if (pendingQuoteService || (typeof window !== 'undefined' && sessionStorage.getItem('wepsun_pending_quote_service'))) {
+        sessionStorage.setItem('wepsun_open_quote_after_login', 'true');
+      }
+
+      try {
+        confetti({
+          particleCount: 80,
+          spread: 70,
+          origin: { y: 0.6 },
+        });
+      } catch {}
+
+      showAccountCreatedSuccess({
+        onContinue: () => {
+          window.location.hash = 'home';
+          if (onClose) onClose();
+        },
+      });
+      return;
+    }
+
     setRegIsSubmitting(true);
     try {
       const res = await apiService.verifySignupOtp({
         email: emailClean,
+        otp: verifiedOtpCode || undefined,
         verificationToken: emailVerificationToken,
         name: nameClean,
         phone: phoneClean,
@@ -1571,6 +1629,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                                 setIsEmailVerified(false);
                                 setVerifiedEmailAddress('');
                                 setEmailVerificationToken('');
+                                setVerifiedOtpCode('');
+                                setFallbackAuthData(null);
                                 setShowInlineOtp(false);
                                 setInlineOtpValue('');
                                 setInlineOtpError(null);
@@ -1634,6 +1694,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                                 setIsEmailVerified(false);
                                 setVerifiedEmailAddress('');
                                 setEmailVerificationToken('');
+                                setVerifiedOtpCode('');
+                                setFallbackAuthData(null);
                                 setShowInlineOtp(false);
                                 setInlineOtpValue('');
                                 setInlineOtpError(null);

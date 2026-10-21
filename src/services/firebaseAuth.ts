@@ -69,6 +69,7 @@ export interface InlineVerifyOtpResponse {
   verificationToken?: string;
   code?: string;
   remainingAttempts?: number;
+  authData?: any;
 }
 
 export interface VerifyOtpPayload {
@@ -139,7 +140,14 @@ export async function sendSignupEmailOtp(
  */
 export async function verifyInlineEmailOtp(
   email: string,
-  otp: string
+  otp: string,
+  metadata?: {
+    fullName?: string;
+    phone?: string;
+    role?: string;
+    password?: string;
+    companyId?: string;
+  }
 ): Promise<InlineVerifyOtpResponse> {
   const cleanEmail = email.trim().toLowerCase();
   const cleanOtp = otp.trim();
@@ -148,6 +156,11 @@ export async function verifyInlineEmailOtp(
     const res = await apiService.verifyEmailOtp({
       email: cleanEmail,
       otp: cleanOtp,
+      fullName: metadata?.fullName,
+      phone: metadata?.phone,
+      role: metadata?.role,
+      password: metadata?.password,
+      companyId: metadata?.companyId,
     });
 
     if (res.success) {
@@ -155,6 +168,7 @@ export async function verifyInlineEmailOtp(
         success: true,
         message: res.message || 'Email verified successfully!',
         verificationToken: (res as any).verificationToken || (res.data as any)?.verificationToken,
+        authData: (res as any).authData || ((res as any).data?.tokens ? (res as any).data : undefined),
       };
     } else {
       return {
