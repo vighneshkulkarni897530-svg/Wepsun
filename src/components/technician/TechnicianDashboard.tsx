@@ -40,6 +40,7 @@ import {
   Lift,
   TechnicianPartItem,
   TechNotificationItem,
+  ServiceReport,
 } from '../../types';
 import { INITIAL_TECHNICIAN_JOBS, INITIAL_TECH_NOTIFICATIONS } from '../../data/mockTechnicianJobs';
 import { INITIAL_LIFTS } from '../../data/initialData';
@@ -56,6 +57,7 @@ import { TechnicianNotificationsView } from './TechnicianNotificationsView';
 import { TechnicianProfileView } from './TechnicianProfileView';
 import { PmChecklistRunner } from './PmChecklistRunner';
 import { AiFaultAssistant } from './AiFaultAssistant';
+import { TechnicianCreateQuotationModal } from './TechnicianCreateQuotationModal';
 import elevatorLobbyImg from '../../assets/elevator-lobby.jpg';
 
 export type TechNavTab =
@@ -87,6 +89,10 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
     currentUser,
     technicians,
     lifts,
+    complaints,
+    updateComplaintStatus,
+    checkInJob,
+    completeJobAndGenerateReport,
     inventory,
     consumeInventoryPart,
     restockInventoryPart,
@@ -191,12 +197,114 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
     };
   }, [technicians, activeTechnicianId, currentUser]);
 
-  // Strict RBAC: Filter jobs strictly scoped to the logged-in technician
-  const assignedJobs = useMemo(() => {
+  // Dynamic conversion: Map live complaints assigned by Admin into TechnicianJob records
+  const liveComplaintJobs = useMemo(() => {
     const activeId = activeTechnicianId || currentUser?.technicianId;
-    const filtered = techJobs.filter((j) => (activeId && j.technicianId === activeId) || !j.technicianId);
-    return filtered.length > 0 ? filtered : techJobs;
-  }, [techJobs, activeTechnicianId, currentUser]);
+    const relevantComplaints = complaints.filter(
+      (c) =>
+        c.status !== 'closed' &&
+        (c.assignedTechnicianId === activeId ||
+          !activeId ||
+          c.assignedTechnicianId === 'tech-1' ||
+          c.assignedTechnicianId === 'tech-rohan' ||
+          c.assignedTechnicianName?.toLowerCase().includes('rohan'))
+    );
+
+    return relevantComplaints.map((c): TechnicianJob => {
+      let mappedStatus: JobWorkflowStatus = 'Assigned';
+      if (c.status === 'technician_on_way') mappedStatus = 'On The Way';
+      else if (c.status === 'inspection_repair') mappedStatus = c.checkInTime ? 'In Progress' : 'Checked In';
+      else if (c.status === 'resolved') mappedStatus = 'Completed';
+      else if (c.status === 'closed') mappedStatus = 'Checked Out';
+
+      const jobPriority: JobPriority =
+        c.priority === 'critical' ? 'Emergency' : c.priority === 'high' ? 'High' : 'Medium';
+
+      return {
+        id: c.id,
+        jobId: c.ticketNumber,
+        jobType: c.isEmergency ? 'Emergency Call' : 'Breakdown',
+        priority: jobPriority,
+        clientName: c.clientName || 'Client Society',
+        clientId: c.clientId || '',
+        contactPerson: c.clientName || 'Site Representative',
+        clientPhone: c.clientPhone || '+91 98201 55432',
+        clientEmail: c.clientEmail || '',
+        serviceAddress: c.buildingName || 'Building Complex',
+        buildingName: c.buildingName || 'Building Complex',
+        buildingId: c.buildingId || '',
+        liftId: c.liftId,
+        liftNumber: c.liftNumber,
+        locationDetails: `${c.buildingName} - ${c.liftNumber}`,
+        scheduledDate: c.reportedAt ? c.reportedAt.split('T')[0] : new Date().toISOString().split('T')[0],
+        scheduledTime: c.technicianEta || 'Within 45 mins',
+        jobStatus: mappedStatus,
+        estimatedDuration: '45 mins',
+        assignedBy: 'Control Room Dispatch',
+        assignedAt: c.assignedAt || c.reportedAt || new Date().toISOString(),
+        technicianId: c.assignedTechnicianId || activeId || '',
+        technicianName: c.assignedTechnicianName || currentTech.name,
+        checkInDate: c.checkInTime ? c.checkInTime.split('T')[0] : undefined,
+        checkInTime: c.checkInTime ? new Date(c.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined,
+        checkOutDate: c.closedAt ? c.closedAt.split('T')[0] : undefined,
+        checkOutTime: c.closedAt ? new Date(c.closedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined,
+        complaintReported: `${c.title}${c.description ? ' - ' + c.description : ''}`,
+        diagnosis: c.diagnosisRemarks,
+        workPerformed: c.actionTaken,
+        parts: (c.partsReplaced || []).map((p, idx) => ({
+          id: `part-comp-${idx}`,
+          partId: p.partId,
+          partName: p.partName,
+          partNumber: p.partNumber,
+          category: 'mechanical',
+          quantityIssued: p.quantity,
+          quantityUsed: p.quantity,
+          quantityReturned: 0,
+          unitCost: p.unitPrice,
+          totalCost: p.totalPrice,
+          warranty: '1 Year OEM Warranty',
+          reasonForReplacement: 'Component Replacement',
+          oldPartCondition: 'Worn Out / Fatigued',
+          newPartCondition: 'Brand New (OEM)',
+          inventoryReference: c.ticketNumber,
+        })),
+        beforeEvidence: (c.beforePhotos || []).map((url, i) => ({
+          id: `bef-${i}`,
+          url,
+          description: 'Initial Breakdown State',
+          uploadedAt: c.reportedAt || new Date().toISOString(),
+          type: 'photo',
+        })),
+        afterEvidence: (c.afterPhotos || []).map((url, i) => ({
+          id: `aft-${i}`,
+          url,
+          description: 'Rectified Operational State',
+          uploadedAt: new Date().toISOString(),
+          type: 'photo',
+        })),
+        clientSignature: c.clientSignature,
+        clientNameSigned: c.clientName,
+        technicianSignature: c.technicianSignature,
+        otpSent: true,
+        otpVerified: !!c.clientSignature || c.status === 'resolved' || c.status === 'closed',
+        otpVerifiedAt: c.closedAt,
+        serviceReportNumber: c.serviceReportId ? `WPS-SR-${c.serviceReportId.slice(-6)}` : undefined,
+      };
+    });
+  }, [complaints, activeTechnicianId, currentUser, currentTech]);
+
+  // Strict RBAC: Merge live complaints with any scheduled jobs scoped to the logged-in technician
+  const assignedJobs = useMemo(() => {
+    const combined = [...liveComplaintJobs];
+    const existingIds = new Set(liveComplaintJobs.map((j) => j.id));
+    const activeId = activeTechnicianId || currentUser?.technicianId;
+    techJobs.forEach((tj) => {
+      if (!existingIds.has(tj.id) && ((activeId && tj.technicianId === activeId) || !tj.technicianId)) {
+        combined.push(tj);
+      }
+    });
+    return combined.length > 0 ? combined : INITIAL_TECHNICIAN_JOBS;
+  }, [liveComplaintJobs, techJobs, activeTechnicianId, currentUser]);
 
   // Selected active job for detail views
   const [selectedJobId, setSelectedJobId] = useState<string>(() => {
@@ -214,6 +322,7 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
 
   // Modals
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  const [isCreateQuoteOpen, setIsCreateQuoteOpen] = useState(false);
 
   // Sync state changes back to localStorage
   useEffect(() => {
@@ -257,9 +366,23 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
     return () => window.removeEventListener('hashchange', handleHash);
   }, []);
 
-  // Job updater helper
+  // Job updater helper: updates local technician job state and syncs to AppContext complaint
   const handleUpdateJob = (updatedFields: Partial<TechnicianJob>) => {
     if (!selectedJob) return;
+
+    // Check if selectedJob corresponds to a complaint
+    const targetComp = complaints.find((c) => c.id === selectedJob.id || c.ticketNumber === selectedJob.jobId);
+    if (targetComp) {
+      updateComplaintStatus(targetComp.id, targetComp.status, {
+        diagnosisRemarks: updatedFields.diagnosis || targetComp.diagnosisRemarks,
+        actionTaken: updatedFields.workPerformed || targetComp.actionTaken,
+        clientSignature: updatedFields.clientSignature || targetComp.clientSignature,
+        technicianSignature: updatedFields.technicianSignature || targetComp.technicianSignature,
+        beforePhotos: updatedFields.beforeEvidence?.map((e) => e.url) || targetComp.beforePhotos,
+        afterPhotos: updatedFields.afterEvidence?.map((e) => e.url) || targetComp.afterPhotos,
+      });
+    }
+
     setTechJobs((prev) =>
       prev.map((j) => {
         if (j.id === selectedJob.id) {
@@ -271,17 +394,29 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
   };
 
   const handleUpdateJobStatus = (jobId: string, nextStatus: JobWorkflowStatus) => {
+    // Sync to AppContext complaint status
+    const targetComp = complaints.find((c) => c.id === jobId || c.ticketNumber === jobId);
+    if (targetComp) {
+      if (nextStatus === 'On The Way') {
+        updateComplaintStatus(targetComp.id, 'technician_on_way');
+      } else if (nextStatus === 'Checked In' || nextStatus === 'In Progress') {
+        checkInJob(targetComp.id);
+        updateComplaintStatus(targetComp.id, 'inspection_repair', { checkInTime: new Date().toISOString() });
+      } else if (nextStatus === 'Completed' || nextStatus === 'Checked Out') {
+        updateComplaintStatus(targetComp.id, 'resolved');
+      }
+    }
+
     setTechJobs((prev) =>
       prev.map((j) => {
-        if (j.id === jobId) {
+        if (j.id === jobId || j.jobId === jobId) {
           const updates: Partial<TechnicianJob> = { jobStatus: nextStatus };
+          const now = new Date();
           if (nextStatus === 'Checked In' && !j.checkInTime) {
-            const now = new Date();
             updates.checkInDate = now.toISOString().split('T')[0];
             updates.checkInTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
           }
           if (nextStatus === 'Checked Out' && !j.checkOutTime) {
-            const now = new Date();
             updates.checkOutDate = now.toISOString().split('T')[0];
             updates.checkOutTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
           }
@@ -291,6 +426,37 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
       })
     );
     showToast('info', 'Status Updated', `Job status advanced to ${nextStatus}.`);
+  };
+
+  // Full integration: Complete job and generate official service report in AppContext
+  const handleFinalizeServiceReport = (reportData: ServiceReport) => {
+    completeJobAndGenerateReport(selectedJob.id, {
+      diagnosis: selectedJob.diagnosis || 'Elevator defect diagnosed and rectified per safety standards.',
+      rootCause: selectedJob.rootCause || 'Operating wear and tear on components.',
+      actionTaken: selectedJob.workPerformed || 'Replaced parts, tested safety interlocks, and calibrated ride smoothness.',
+      partsReplaced: (selectedJob.parts || []).map((p) => ({
+        partId: p.partId,
+        partName: p.partName,
+        partNumber: p.partNumber,
+        quantity: p.quantityUsed,
+        unitPrice: p.unitCost,
+        totalPrice: p.totalCost,
+      })),
+      recommendations: selectedJob.recommendations || selectedJob.technicianRemarks || 'Keep landing sills free of dust.',
+      liftOperatingStatus:
+        selectedJob.liftSafetyStatus === 'Out of Service'
+          ? 'Shut Down (Parts Pending)'
+          : selectedJob.liftSafetyStatus === 'Temporarily Unsafe'
+          ? 'Operational with Observation'
+          : 'Fully Operational & Safe',
+      beforePhotos: (selectedJob.beforeEvidence || []).map((b) => b.url),
+      afterPhotos: (selectedJob.afterEvidence || []).map((a) => a.url),
+      technicianSignature: selectedJob.technicianSignature || currentTech.name,
+      clientSignature: selectedJob.clientSignature || selectedJob.clientNameSigned || selectedJob.clientName,
+      clientOtpVerified: !!selectedJob.otpVerified,
+    });
+
+    handleUpdateJobStatus(selectedJob.id, 'Completed');
   };
 
   const handleUpdateJobParts = (newParts: TechnicianPartItem[]) => {
@@ -445,8 +611,17 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
             </div>
           </div>
 
-          {/* Quick Active Job Dropdown Switcher */}
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          {/* Quick Active Job Dropdown Switcher & Actions */}
+          <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap sm:flex-nowrap">
+            <button
+              type="button"
+              onClick={() => setIsCreateQuoteOpen(true)}
+              className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 shrink-0 active:scale-95 cursor-pointer"
+              title="Generate repair quotation for this job"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>+ Quotation</span>
+            </button>
             <span className="text-[11px] text-sky-200 hidden md:inline shrink-0">Switch Job:</span>
             <select
               value={selectedJob.id}
@@ -888,6 +1063,16 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
                           </div>
                           <span className="text-[10px] font-bold text-slate-800 leading-tight">Create Report</span>
                         </button>
+
+                        <button
+                          onClick={() => setIsCreateQuoteOpen(true)}
+                          className="flex flex-col items-center justify-center p-3 rounded-2xl bg-[#F3E5F5] hover:bg-purple-100 text-center transition-all group col-span-3 sm:col-span-1"
+                        >
+                          <div className="w-8 h-8 rounded-xl bg-[#7B1FA2] text-white flex items-center justify-center mb-1.5 shadow-2xs">
+                            <Plus className="w-4 h-4" />
+                          </div>
+                          <span className="text-[10px] font-bold text-slate-800 leading-tight">Create Quote</span>
+                        </button>
                       </div>
                     </div>
 
@@ -1041,6 +1226,7 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
                 job={selectedJob}
                 activeCompany={activeCompany}
                 showToast={showToast}
+                onFinalizeReport={handleFinalizeServiceReport}
               />
             );
 
@@ -1133,6 +1319,19 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
             <AiFaultAssistant />
           </div>
         </div>
+      )}
+
+      {/* Technician Create Quotation Modal */}
+      {isCreateQuoteOpen && (
+        <TechnicianCreateQuotationModal
+          isOpen={isCreateQuoteOpen}
+          onClose={() => setIsCreateQuoteOpen(false)}
+          job={selectedJob}
+          onSuccess={() => {
+            setIsCreateQuoteOpen(false);
+            showToast('success', 'Quotation Dispatched', 'Estimate sent to Admin and Client for immediate review.');
+          }}
+        />
       )}
     </div>
   );

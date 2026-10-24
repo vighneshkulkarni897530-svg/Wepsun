@@ -336,6 +336,7 @@ export interface Quotation {
   complaintId?: string;
   liftId: string;
   liftNumber: string;
+  buildingId?: string;
   buildingName: string;
   clientId: string;
   clientName: string;
@@ -352,6 +353,7 @@ export interface Quotation {
   status: QuotationStatus;
   clarificationNotes?: string;
   clientFeedback?: string;
+  notes?: string;
   createdAt: string;
   validUntil: string;
   convertedToWorkOrderId?: string;

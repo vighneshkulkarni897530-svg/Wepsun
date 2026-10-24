@@ -25,68 +25,82 @@ interface ServiceReportViewProps {
   job: TechnicianJob;
   activeCompany?: Partial<Company>;
   showToast: (type: 'success' | 'info' | 'warning' | 'error', title: string, message: string) => void;
+  onFinalizeReport?: (reportData: ServiceReport) => void;
 }
 
 export const ServiceReportView: React.FC<ServiceReportViewProps> = ({
   job,
   activeCompany,
   showToast,
+  onFinalizeReport,
 }) => {
+  const [isFinalized, setIsFinalized] = React.useState(!!job?.serviceReportNumber);
   const reportNumber = job?.serviceReportNumber || (job?.jobId ? `SR-WEP-2026-${job.jobId.slice(-4)}` : 'SR-WEP-2026-0001');
-  const completionDate = job?.checkOutDate || job?.scheduledDate || '2026-09-22';
+  const completionDate = job?.checkOutDate || job?.scheduledDate || new Date().toISOString().split('T')[0];
   const startTime = job?.checkInTime || '08:52 AM';
-  const endTime = job?.checkOutTime || '09:50 AM';
+  const endTime = job?.checkOutTime || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const duration = job?.totalDurationMinutes ? `${job.totalDurationMinutes} mins` : '1 hr 15 mins';
 
-  const handleDownloadPdf = () => {
-    const reportData: ServiceReport = {
-      id: `sr-${Date.now()}`,
-      companyId: 'comp-1',
-      branchId: 'br-thn-1',
-      reportNumber,
-      ticketId: job?.id || 'job-001',
-      ticketNumber: job?.jobId || 'JOB-001',
-      liftId: job?.liftId || 'lift-1',
-      liftNumber: job?.liftNumber || 'WPS-PUN-000101',
-      liftBrand: 'WEPSUN MRL Traction',
-      liftModel: 'WEP-MAX 3000 Eco',
-      buildingName: job?.buildingName || 'Greenwood Heights CHS',
-      buildingAddress: job?.serviceAddress || 'Sector 19, Vashi, Navi Mumbai',
-      clientName: job?.clientName || 'Greenwood Heights Society',
-      clientContact: job?.clientPhone || '+91 98220 11223',
-      technicianId: job?.technicianId || '',
-      technicianName: job?.technicianName || 'Assigned Field Engineer',
-      technicianPhone: job?.clientPhone || '+91 98203 11223',
-      serviceDate: completionDate,
-      serviceStartTime: startTime,
-      serviceEndTime: endTime,
-      serviceType: (job?.jobType as any) || 'Breakdown',
-      initialDiagnosis: job?.diagnosis || job?.complaintReported || 'Periodic inspection and defect resolution',
-      rootCause: job?.rootCause || 'Normal component wear and tear',
-      workPerformed: job?.workPerformed || 'Testing and calibration completed',
-      partsReplaced: (job?.parts || []).map((p) => ({
-        partId: p.partId,
-        partName: p.partName,
-        partNumber: p.partNumber,
-        quantity: p.quantityUsed,
-        unitPrice: p.unitCost,
-        totalPrice: p.totalCost,
-      })),
-      technicianRecommendations: job?.recommendations || job?.technicianRemarks || 'Keep landing sills clean',
-      liftOperatingStatusAfterWork:
-        job?.liftSafetyStatus === 'Out of Service'
-          ? 'Shut Down (Parts Pending)'
-          : job?.liftSafetyStatus === 'Temporarily Unsafe'
-          ? 'Operational with Observation'
-          : 'Fully Operational & Safe',
-      beforePhotos: (job?.beforeEvidence || []).map((b) => b.url),
-      afterPhotos: (job?.afterEvidence || []).map((a) => a.url),
-      technicianSignature: job?.technicianSignature || job?.technicianName || 'Assigned Field Engineer (Verified)',
-      clientSignature: job?.clientNameSigned || job?.clientName || 'Client Representative',
-      clientOtpVerified: !!job?.otpVerified,
-      createdAt: new Date().toISOString(),
-    };
+  const buildReportData = (): ServiceReport => ({
+    id: `sr-${Date.now()}`,
+    companyId: 'comp-1',
+    branchId: 'br-thn-1',
+    reportNumber,
+    ticketId: job?.id || 'job-001',
+    ticketNumber: job?.jobId || 'JOB-001',
+    liftId: job?.liftId || 'lift-1',
+    liftNumber: job?.liftNumber || 'WPS-PUN-000101',
+    liftBrand: 'WEPSUN MRL Traction',
+    liftModel: 'WEP-MAX 3000 Eco',
+    buildingName: job?.buildingName || 'Greenwood Heights CHS',
+    buildingAddress: job?.serviceAddress || 'Sector 19, Vashi, Navi Mumbai',
+    clientName: job?.clientName || 'Greenwood Heights Society',
+    clientContact: job?.clientPhone || '+91 98220 11223',
+    technicianId: job?.technicianId || '',
+    technicianName: job?.technicianName || 'Assigned Field Engineer',
+    technicianPhone: job?.clientPhone || '+91 98203 11223',
+    serviceDate: completionDate,
+    serviceStartTime: startTime,
+    serviceEndTime: endTime,
+    serviceType: (job?.jobType as any) || 'Breakdown',
+    initialDiagnosis: job?.diagnosis || job?.complaintReported || 'Periodic inspection and defect resolution',
+    rootCause: job?.rootCause || 'Normal component wear and tear',
+    workPerformed: job?.workPerformed || 'Testing and calibration completed',
+    partsReplaced: (job?.parts || []).map((p) => ({
+      partId: p.partId,
+      partName: p.partName,
+      partNumber: p.partNumber,
+      quantity: p.quantityUsed,
+      unitPrice: p.unitCost,
+      totalPrice: p.totalCost,
+    })),
+    technicianRecommendations: job?.recommendations || job?.technicianRemarks || 'Keep landing sills clean',
+    liftOperatingStatusAfterWork:
+      job?.liftSafetyStatus === 'Out of Service'
+        ? 'Shut Down (Parts Pending)'
+        : job?.liftSafetyStatus === 'Temporarily Unsafe'
+        ? 'Operational with Observation'
+        : 'Fully Operational & Safe',
+    beforePhotos: (job?.beforeEvidence || []).map((b) => b.url),
+    afterPhotos: (job?.afterEvidence || []).map((a) => a.url),
+    technicianSignature: job?.technicianSignature || job?.technicianName || 'Assigned Field Engineer (Verified)',
+    clientSignature: job?.clientNameSigned || job?.clientName || 'Client Representative',
+    clientOtpVerified: !!job?.otpVerified,
+    createdAt: new Date().toISOString(),
+  });
 
+  const handleFinalizeReport = () => {
+    const reportData = buildReportData();
+    if (onFinalizeReport) {
+      onFinalizeReport(reportData);
+    }
+    setIsFinalized(true);
+    downloadServiceReportPdf(reportData, activeCompany);
+    showToast('success', 'Service Report Submitted', `Report ${reportNumber} sealed in shared system. Ticket moved to Resolved.`);
+  };
+
+  const handleDownloadPdf = () => {
+    const reportData = buildReportData();
     downloadServiceReportPdf(reportData, activeCompany);
     showToast('success', 'PDF Generated & Downloaded', `Service Report ${reportNumber} saved as official PDF document.`);
   };
@@ -133,8 +147,21 @@ export const ServiceReportView: React.FC<ServiceReportViewProps> = ({
           {/* Action Buttons */}
           <div className="flex items-center gap-2 flex-wrap">
             <button
+              onClick={handleFinalizeReport}
+              disabled={isFinalized}
+              className={`px-4 py-2 rounded-xl font-black text-xs shadow-sm transition-all flex items-center gap-1.5 ${
+                isFinalized
+                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 cursor-default'
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer active:scale-95'
+              }`}
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              <span>{isFinalized ? 'Report Sealed & Filed' : 'Seal & Submit to System'}</span>
+            </button>
+
+            <button
               onClick={handleDownloadPdf}
-              className="px-4 py-2 rounded-xl bg-[#1976D2] hover:bg-blue-700 text-white font-black text-xs shadow-sm transition-all flex items-center gap-1.5"
+              className="px-4 py-2 rounded-xl bg-[#1976D2] hover:bg-blue-700 text-white font-black text-xs shadow-sm transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
             >
               <Download className="w-4 h-4" />
               <span>Download PDF</span>
@@ -142,7 +169,7 @@ export const ServiceReportView: React.FC<ServiceReportViewProps> = ({
 
             <button
               onClick={handleShareWhatsApp}
-              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm transition-all flex items-center gap-1.5"
+              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
             >
               <Share2 className="w-4 h-4" />
               <span>Share WhatsApp</span>

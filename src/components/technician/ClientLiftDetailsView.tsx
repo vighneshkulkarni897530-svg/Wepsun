@@ -23,8 +23,10 @@ import {
   ArrowRight,
   Hash,
   Award,
+  QrCode,
 } from 'lucide-react';
 import { TechnicianJob, Lift } from '../../types';
+import { LiftDigitalPassportModal } from '../common/LiftDigitalPassportModal';
 
 interface ClientLiftDetailsViewProps {
   job: TechnicianJob;
@@ -40,6 +42,7 @@ export const ClientLiftDetailsView: React.FC<ClientLiftDetailsViewProps> = ({
   showToast,
 }) => {
   const [isCalling, setIsCalling] = useState<string | null>(null);
+  const [isPassportOpen, setIsPassportOpen] = useState(false);
 
   const handleCall = (name: string, phone: string) => {
     setIsCalling(name);
@@ -315,16 +318,28 @@ export const ClientLiftDetailsView: React.FC<ClientLiftDetailsViewProps> = ({
             </div>
 
             {/* Action Bar */}
-            <div className="pt-2 flex items-center justify-between">
-              <button
-                onClick={() => onNavigateToTab('service_history')}
-                className="text-xs font-bold text-[#1976D2] hover:underline flex items-center gap-1"
-              >
-                <span>View Lift Service History</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
+            <div className="pt-2 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsPassportOpen(true)}
+                  className="px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#1976D2] font-bold text-xs flex items-center gap-1.5 border border-blue-200 transition-colors"
+                >
+                  <QrCode className="w-3.5 h-3.5" />
+                  <span>Lift Passport & QR</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onNavigateToTab('service_history')}
+                  className="text-xs font-bold text-[#1976D2] hover:underline flex items-center gap-1"
+                >
+                  <span>View History</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
 
               <button
+                type="button"
                 onClick={() => onNavigateToTab('diagnosis')}
                 className="px-3.5 py-2 rounded-xl bg-[#123B5D] hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs"
               >
@@ -335,6 +350,15 @@ export const ClientLiftDetailsView: React.FC<ClientLiftDetailsViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Lift Digital Passport Modal */}
+      {isPassportOpen && lift && (
+        <LiftDigitalPassportModal
+          lift={lift}
+          isOpen={isPassportOpen}
+          onClose={() => setIsPassportOpen(false)}
+        />
+      )}
     </div>
   );
 };

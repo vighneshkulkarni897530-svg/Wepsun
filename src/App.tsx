@@ -18,6 +18,7 @@ import { isMasterAdminAuthenticated } from './lib/masterAuthClient';
 import { WepsunModalContainer } from './components/common/WepsunModalContainer';
 import { AuthGuard } from './components/common/AuthGuard';
 import { NotificationHub } from './components/common/NotificationHub';
+import { LiftDigitalPassportModal } from './components/common/LiftDigitalPassportModal';
 
 // Lazy-loaded sub-dashboards and views for optimal Android startup & bundle splitting
 const OverviewDashboard = lazy(() => import('./components/admin/OverviewDashboard').then(m => ({ default: m.OverviewDashboard })));
@@ -72,6 +73,9 @@ const PUBLIC_HASHES = [
   'customer-review',
   'public-feedback',
   'rate',
+  'lift-passport',
+  'passport',
+  'lift-qr',
 ];
 
 const CLIENT_ALLOWED_TABS = [
@@ -115,6 +119,8 @@ const CLIENT_ALLOWED_TABS = [
   'emergency',
   'raise-complaint',
   'feedback',
+  'lift-passport',
+  'passport',
 ];
 
 const TECH_ALLOWED_TABS = [
@@ -137,6 +143,8 @@ const TECH_ALLOWED_TABS = [
   'settings',
   'edit-profile',
   'profile-edit',
+  'lift-passport',
+  'passport',
 ];
 
 const ADMIN_EXCLUSIVE_TABS = [
@@ -223,6 +231,7 @@ export const AppContent: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [passportLift, setPassportLift] = useState<Lift | null>(null);
   const [currentHash, setCurrentHash] = useState(() => {
     if (typeof window !== 'undefined') {
       const rawHash = window.location.hash.toLowerCase().replace('#', '');
@@ -344,7 +353,20 @@ export const AppContent: React.FC = () => {
           return;
         }
 
-        if (hash === 'emergency' || hash === 'emergency-breakdown' || hash === 'raise-complaint') {
+        if (hash === 'lift-passport' || hash === 'passport' || hash === 'lift-qr') {
+          setIsFullLoginPage(false);
+          const rawHashString = window.location.hash;
+          const queryPart = rawHashString.includes('?') ? rawHashString.split('?')[1] : '';
+          const urlParams = new URLSearchParams(queryPart);
+          const liftIdParam = urlParams.get('id') || urlParams.get('liftId');
+          const liftNumParam = urlParams.get('liftNumber');
+          const target = lifts.find(
+            (l) => (liftIdParam && l.id === liftIdParam) || (liftNumParam && l.liftNumber === liftNumParam)
+          ) || lifts[0];
+          if (target) {
+            setPassportLift(target);
+          }
+        } else if (hash === 'emergency' || hash === 'emergency-breakdown' || hash === 'raise-complaint') {
           setIsFullLoginPage(false);
           setIsEmergencyModalOpen(true);
         } else {
@@ -939,6 +961,24 @@ export const AppContent: React.FC = () => {
             }
           }}
         />
+
+        {/* Global Lift Digital Passport & QR Placard Modal */}
+        {passportLift && (
+          <LiftDigitalPassportModal
+            lift={passportLift}
+            isOpen={!!passportLift}
+            onClose={() => {
+              setPassportLift(null);
+              if (window.location.hash.includes('passport') || window.location.hash.includes('lift-qr')) {
+                window.location.hash = activeTab || 'home';
+              }
+            }}
+            onRaiseComplaint={(liftId) => {
+              setPassportLift(null);
+              setIsEmergencyModalOpen(true);
+            }}
+          />
+        )}
 
         {/* Login & Sign Up Modal */}
         <LoginModal

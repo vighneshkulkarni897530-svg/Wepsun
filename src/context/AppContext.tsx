@@ -2657,6 +2657,22 @@ function mapServerServiceReport(sr: any): ServiceReport {
       )
     );
 
+    // Trigger Low-Stock Notification if threshold reached
+    const targetItem = inventory.find((i) => i.id === movement.partId);
+    const minThreshold = targetItem?.minStockThreshold ?? 2;
+    if (movement.newStock <= minThreshold) {
+      addNotification({
+        type: 'inventory_alert',
+        category: 'system',
+        priority: 'high',
+        title: `⚠️ Low Stock Alert: ${movement.partName}`,
+        message: `${movement.partName} is at ${movement.newStock} units (Threshold: ${minThreshold}). Reorder recommended.`,
+        targetRole: 'all',
+        actionTab: 'inventory',
+        actionLabel: 'Restock Inventory',
+      });
+    }
+
     addAuditLog({
       companyId: movement.companyId,
       entityType: 'Inventory',
@@ -3139,6 +3155,16 @@ function mapServerServiceReport(sr: any): ServiceReport {
   // Convert Quotation -> Work Order -> Generate Invoice
   const convertQuotationToWorkOrder = (quoteId: string, technicianId?: string, scheduledDate?: string): WorkOrder => {
     const quote = quotations.find((q) => q.id === quoteId);
+
+    // Prevent duplicate work orders from repeated approval submissions
+    const existingWo = workOrders.find(
+      (w) => w.quotationId === quoteId || (quote?.convertedToWorkOrderId && w.id === quote.convertedToWorkOrderId)
+    );
+    if (existingWo) {
+      showToast('info', 'Work Order Already Exists', `Work order ${existingWo.workOrderNumber} was already created for this quotation.`);
+      return existingWo;
+    }
+
     const tech = technicians.find((t) => t.id === technicianId) || technicians[0];
     const woCount = workOrders.length + 1;
     const workOrderNumber = `WO-${new Date().getFullYear()}-${woCount.toString().padStart(4, '0')}`;

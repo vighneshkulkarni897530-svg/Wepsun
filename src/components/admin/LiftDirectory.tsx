@@ -14,15 +14,18 @@ import {
   Eye,
   Edit2,
   Calendar,
+  QrCode,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { Lift, LiftType, MachineType } from '../../types';
+import { LiftDigitalPassportModal } from '../common/LiftDigitalPassportModal';
 export const LiftDirectory: React.FC = () => {
   const { lifts, buildings, addNewLift, amcContracts } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingLift, setEditingLift] = useState<Lift | null>(null);
+  const [selectedPassportLift, setSelectedPassportLift] = useState<Lift | null>(null);
 
   // New lift form
   const [liftNumber, setLiftNumber] = useState('');
@@ -217,6 +220,14 @@ export const LiftDirectory: React.FC = () => {
                 {/* Actions: Edit Lift */}
                 <td className="py-3.5 px-3 text-right">
                   <div className="flex items-center justify-end gap-1.5">
+                    <button
+                      onClick={() => setSelectedPassportLift(lift)}
+                      className="px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-[#1976D2] font-bold text-[11px] transition-colors flex items-center gap-1 border border-blue-200"
+                      title="View Lift Digital Passport & QR Placard"
+                    >
+                      <QrCode className="w-3 h-3" />
+                      <span>Passport & QR</span>
+                    </button>
 
                     <button
                       onClick={() => {
@@ -377,6 +388,15 @@ export const LiftDirectory: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Lift Digital Passport Modal */}
+      {selectedPassportLift && (
+        <LiftDigitalPassportModal
+          lift={selectedPassportLift}
+          isOpen={!!selectedPassportLift}
+          onClose={() => setSelectedPassportLift(null)}
+        />
       )}
     </div>
   );

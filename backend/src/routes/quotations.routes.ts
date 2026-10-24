@@ -152,14 +152,27 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): 
         id: `qt-${Date.now()}`,
         companyId,
         branchId,
+        clientId: clientId || req.user?.clientId || 'client-1',
+        clientName: req.body.clientName || 'Client',
+        clientEmail: req.body.clientEmail || '',
+        clientPhone: req.body.clientPhone || '',
+        liftId: liftId || 'lift-1',
+        liftNumber: req.body.liftNumber || 'WPS-MUM-000501',
+        buildingName: req.body.buildingName || 'Building Complex',
+        complaintId: complaintId || null,
+        quoteNumber,
         quotationNumber: quoteNumber,
-        subject: subject || 'Elevator Repair',
+        subject: subject || 'Elevator Repair & Spares',
+        items: quotationItems,
         subtotal,
+        gstRate: 18.0,
         gstAmount,
         grandTotal,
-        status: 'draft',
+        terms: Array.isArray(terms) ? terms : ['Prices valid for 30 days.'],
+        status: req.body.status || 'sent_to_client',
         createdAt: new Date().toISOString(),
       };
+      db.quotations.unshift(createdQuote);
     }
 
     res.status(201).json({ success: true, data: createdQuote });
@@ -262,7 +275,37 @@ router.post('/:id/convert', requireAuth, async (req: AuthenticatedRequest, res: 
         return { quote, workOrder: wo, invoice: inv };
       });
     } catch {
-      // Fallback
+      const qIdx = db.quotations.findIndex((q) => q.id === id && q.companyId === companyId);
+      if (qIdx !== -1) {
+        const quote = db.quotations[qIdx];
+        const woNumber = `WO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+        const wo: any = {
+          id: `wo-${Date.now()}`,
+          companyId,
+          branchId: quote.branchId || branchId,
+          workOrderNumber: woNumber,
+          quotationId: quote.id,
+          complaintId: quote.complaintId || null,
+          liftId: quote.liftId,
+          liftNumber: quote.liftNumber || 'WPS-MUM-000501',
+          buildingName: quote.buildingName || 'Building Complex',
+          clientId: quote.clientId || 'client-1',
+          clientName: quote.clientName || 'Client',
+          technicianId: technicianId || null,
+          title: quote.subject,
+          description: `Execution for Quotation ${quote.quoteNumber || quote.quotationNumber}`,
+          priority: 'high',
+          status: technicianId ? 'assigned' : 'scheduled',
+          scheduledDate: new Date().toISOString(),
+          estimatedHours: 4.0,
+          totalAmount: quote.grandTotal,
+          createdAt: new Date().toISOString(),
+        };
+        db.workOrders.unshift(wo);
+        quote.status = 'converted_to_work_order';
+        (quote as any).convertedToWorkOrderId = wo.id;
+        result = { quote, workOrder: wo };
+      }
     }
 
     res.json({
@@ -286,8 +329,13 @@ router.patch('/:id', requireAuth, async (req: AuthenticatedRequest, res: Respons
     const clientId = req.user!.clientId;
 
     if (isClient) {
-      const existing = await prisma.quotation.findFirst({ where: { id, companyId } });
-      if (!existing || !clientId || existing.clientId !== clientId) {
+      let existing: any = null;
+      try {
+        existing = await prisma.quotation.findFirst({ where: { id, companyId } });
+      } catch {
+        existing = db.quotations.find((q) => q.id === id && q.companyId === companyId);
+      }
+      if (!existing || !clientId || (existing.clientId && existing.clientId !== clientId)) {
         res.status(403).json({ success: false, message: 'Access Denied – You are not authorized to update this quotation.', code: 'FORBIDDEN_OBJECT' });
         return;
       }

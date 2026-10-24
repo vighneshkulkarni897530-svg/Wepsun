@@ -247,6 +247,18 @@ export const INITIAL_USERS: User[] = [
     role: 'sales',
     avatar: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=150&auto=format&fit=crop&q=80',
     isActive: true,
+  },
+  {
+    id: 'usr-tech-rohan',
+    companyId: 'comp-1',
+    branchId: 'br-mum-1',
+    name: 'Rohan Gaikwad (Field Technician)',
+    email: 'rohan.tech@wepsun.com',
+    phone: '+91 98203 44556',
+    role: 'technician',
+    technicianId: 'tech-rohan',
+    avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80',
+    isActive: true,
   }
 ];
 
@@ -761,7 +773,29 @@ export const INITIAL_LIFTS: Lift[] = [
   }
 ];
 
-export const INITIAL_TECHNICIANS: Technician[] = [];
+export const INITIAL_TECHNICIANS: Technician[] = [
+  {
+    id: 'tech-rohan',
+    companyId: 'comp-1',
+    branchId: 'br-mum-1',
+    name: 'Rohan Gaikwad',
+    employeeCode: 'TECH-WPS-012',
+    phone: '+91 98203 44556',
+    email: 'rohan.tech@wepsun.com',
+    avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80',
+    zone: 'Mumbai Suburban / Navi Mumbai',
+    currentStatus: 'available',
+    currentLocationName: 'Sector 19, Vashi',
+    totalResolved: 42,
+    avgResolutionMinutes: 38,
+    customerRating: 4.9,
+    totalRatingsCount: 39,
+    repeatComplaintRatePct: 2.1,
+    pmCompletionPct: 98,
+    monthlyRevenueContribution: 145000,
+    specialization: 'Gearless PMSM & Monarch NICE 3000+',
+  },
+];
 
 export const INITIAL_COMPLAINTS: Complaint[] = [
   {

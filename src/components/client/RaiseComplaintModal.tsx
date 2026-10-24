@@ -257,10 +257,9 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
     if (!currentLift) return;
 
     setIsSubmitting(true);
-    const ticketId = '#CMP-10245';
 
     setTimeout(() => {
-      createComplaint({
+      const created = createComplaint({
         liftId: currentLift.id,
         liftNumber: currentLift.liftNumber,
         buildingId: currentLift.buildingId,
@@ -286,13 +285,14 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
         afterPhotos: [],
       });
 
+      const ticketNumber = created?.ticketNumber || '#CMP-' + Date.now().toString().slice(-5);
       setIsSubmitting(false);
       setSubmittedTicket({
-        id: ticketId,
+        id: ticketNumber,
         mode: 'normal',
         title: `${complaintType} — ${currentLift.liftNumber}`,
       });
-      showToast('success', 'Complaint Registered Successfully', `Ticket ID: ${ticketId}`);
+      showToast('success', 'Complaint Registered Successfully', `Ticket ID: ${ticketNumber}`);
     }, 400);
   };
 
@@ -301,10 +301,9 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
     if (!currentLift) return;
 
     setIsSubmitting(true);
-    const ticketId = '#EMG-10021';
 
     setTimeout(() => {
-      createComplaint({
+      const created = createComplaint({
         liftId: currentLift.id,
         liftNumber: currentLift.liftNumber,
         buildingId: currentLift.buildingId,
@@ -321,13 +320,14 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
         afterPhotos: [],
       });
 
+      const ticketNumber = created?.ticketNumber || '#EMG-' + Date.now().toString().slice(-5);
       setIsSubmitting(false);
       setSubmittedTicket({
-        id: ticketId,
+        id: ticketNumber,
         mode: 'emergency',
         title: `Emergency Breakdown — ${currentLift.liftNumber}`,
       });
-      showToast('error', 'Emergency Request Created', `Ticket ID: ${ticketId} • Service team notified`);
+      showToast('error', 'Emergency Request Created', `Ticket ID: ${ticketNumber} • Service team notified`);
     }, 400);
   };
 

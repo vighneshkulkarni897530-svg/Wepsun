@@ -17,10 +17,12 @@ import {
   Building,
   FileCheck,
   Download,
+  QrCode,
 } from 'lucide-react';
 import { Lift } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { downloadLiftSpecificationPdf } from '../../services/pdfGenerator';
+import { LiftDigitalPassportModal } from '../common/LiftDigitalPassportModal';
 
 interface ClientLiftsViewProps {
   lifts: Lift[];
@@ -37,6 +39,7 @@ export const ClientLiftsView: React.FC<ClientLiftsViewProps> = ({
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'operational' | 'under_maintenance' | 'breakdown'>('all');
+  const [selectedPassportLift, setSelectedPassportLift] = useState<Lift | null>(null);
 
   const filteredLifts = lifts.filter((l) => {
     const q = searchQuery.toLowerCase();
@@ -264,20 +267,29 @@ export const ClientLiftsView: React.FC<ClientLiftsViewProps> = ({
               </div>
 
               {/* Action Buttons */}
-              <div className="pt-3 border-t border-slate-100 grid grid-cols-2 gap-2">
+              <div className="pt-3 border-t border-slate-100 grid grid-cols-3 gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setSelectedPassportLift(lift)}
+                  className="min-h-[40px] py-2 px-2.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#1976D2] font-bold text-[11px] border border-blue-200 transition-colors flex items-center justify-center gap-1 cursor-pointer active:scale-95"
+                  title="View Lift Digital Passport & QR Placard"
+                >
+                  <QrCode className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">Passport</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => downloadLiftSpecificationPdf(lift, activeCompany)}
-                  className="min-h-[44px] py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-blue-50 text-[#1976D2] font-bold text-xs border border-slate-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                  className="min-h-[40px] py-2 px-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-[11px] border border-slate-200 transition-colors flex items-center justify-center gap-1 cursor-pointer active:scale-95"
                   title="Download Technical Specification PDF"
                 >
                   <Download className="w-3.5 h-3.5 shrink-0" />
-                  <span className="truncate">Specs PDF</span>
+                  <span className="truncate">Specs</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => onRaiseComplaint(lift.id)}
-                  className="min-h-[44px] py-2.5 px-3 rounded-xl bg-[#123B5D] hover:bg-[#0e2f4a] text-white font-bold text-xs shadow-sm transition-colors flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                  className="min-h-[40px] py-2 px-2.5 rounded-xl bg-[#123B5D] hover:bg-[#0e2f4a] text-white font-bold text-[11px] shadow-sm transition-colors flex items-center justify-center gap-1 cursor-pointer active:scale-95"
                 >
                   <AlertTriangle className="w-3.5 h-3.5 text-amber-300 shrink-0" />
                   <span className="truncate">Report</span>
@@ -333,6 +345,14 @@ export const ClientLiftsView: React.FC<ClientLiftsViewProps> = ({
                     <td className="p-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
+                          onClick={() => setSelectedPassportLift(lift)}
+                          className="px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#1976D2] font-bold text-xs flex items-center gap-1 border border-blue-200"
+                          title="View Lift Digital Passport & QR Placard"
+                        >
+                          <QrCode className="w-3.5 h-3.5" />
+                          <span>Passport</span>
+                        </button>
+                        <button
                           onClick={() => downloadLiftSpecificationPdf(lift, activeCompany)}
                           className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1"
                           title="Download Technical Specification Sheet"
@@ -354,6 +374,19 @@ export const ClientLiftsView: React.FC<ClientLiftsViewProps> = ({
             </table>
           </div>
         </div>
+      )}
+
+      {/* Lift Digital Passport Modal */}
+      {selectedPassportLift && (
+        <LiftDigitalPassportModal
+          lift={selectedPassportLift}
+          isOpen={!!selectedPassportLift}
+          onClose={() => setSelectedPassportLift(null)}
+          onRaiseComplaint={(liftId) => {
+            setSelectedPassportLift(null);
+            onRaiseComplaint(liftId);
+          }}
+        />
       )}
     </div>
   );
