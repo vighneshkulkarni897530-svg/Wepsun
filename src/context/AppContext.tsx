@@ -2366,10 +2366,10 @@ function mapServerServiceReport(sr: any): ServiceReport {
       priority: complaintData.priority || 'normal',
       isEmergency: !!complaintData.isEmergency,
       status: 'pending',
-      reportedAt: new Date().toISOString(),
-      partsReplaced: [],
-      beforePhotos: [],
-      afterPhotos: [],
+      reportedAt: complaintData.reportedAt || new Date().toISOString(),
+      partsReplaced: Array.isArray(complaintData.partsReplaced) ? complaintData.partsReplaced : [],
+      beforePhotos: Array.isArray(complaintData.beforePhotos) ? complaintData.beforePhotos : [],
+      afterPhotos: Array.isArray(complaintData.afterPhotos) ? complaintData.afterPhotos : [],
       clientOtp: otp,
       timeline: [
         {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   X,
   AlertTriangle,
@@ -12,6 +12,10 @@ import {
   ShieldAlert,
   ArrowRight,
   FileText,
+  Film,
+  Plus,
+  Eye,
+  Trash2,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { IssueType, ComplaintPriority, Lift } from '../../types';
@@ -242,14 +246,85 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
 
   const currentLift = liftOptions.find((l) => l.id === selectedLiftId) || liftOptions[0];
 
-  const handleFileUpload = () => {
-    const samplePhoto = 'https://images.unsplash.com/photo-1581092335397-9583fe92d232?w=500&auto=format&fit=crop&q=80';
-    if (modalMode === 'emergency') {
-      setEmergencyPhotos((prev) => [...prev, samplePhoto]);
-    } else {
-      setPhotos((prev) => [...prev, samplePhoto]);
+  // Media upload & preview states
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const [previewMediaUrl, setPreviewMediaUrl] = useState<string | null>(null);
+
+  const isVideoUrl = (url: string) => {
+    return url.startsWith('data:video') || /\.(mp4|webm|ogg|mov|m4v)($|\?)/i.test(url);
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const fileList = Array.from(files);
+    setIsUploadingMedia(true);
+
+    try {
+      const readPromises = fileList.map((file) => {
+        return new Promise<string>((resolve, reject) => {
+          if (file.size > 50 * 1024 * 1024) {
+            showToast('error', 'File Too Large', `${file.name} exceeds 50MB limit.`);
+            reject(new Error('File too large'));
+            return;
+          }
+
+          const reader = new FileReader();
+          reader.onload = () => {
+            if (typeof reader.result === 'string') {
+              resolve(reader.result);
+            } else {
+              reject(new Error('Failed to read file'));
+            }
+          };
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(file);
+        });
+      });
+
+      const results = await Promise.allSettled(readPromises);
+      const newUrls: string[] = [];
+      results.forEach((r) => {
+        if (r.status === 'fulfilled' && r.value) {
+          newUrls.push(r.value);
+        }
+      });
+
+      if (newUrls.length > 0) {
+        if (modalMode === 'emergency') {
+          setEmergencyPhotos((prev) => [...prev, ...newUrls]);
+        } else {
+          setPhotos((prev) => [...prev, ...newUrls]);
+        }
+        showToast(
+          'success',
+          'Media Attached',
+          `Successfully attached ${newUrls.length} file(s) (photo/video).`
+        );
+      }
+    } catch (err) {
+      console.error('Error uploading media', err);
+      showToast('error', 'Upload Failed', 'Could not process one or more files.');
+    } finally {
+      setIsUploadingMedia(false);
+      if (e.target) e.target.value = '';
     }
-    showToast('info', 'Photo Attached', 'File uploaded successfully.');
+  };
+
+  const handleFileUpload = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleRemovePhoto = (index: number) => {
+    if (modalMode === 'emergency') {
+      setEmergencyPhotos((prev) => prev.filter((_, i) => i !== index));
+    } else {
+      setPhotos((prev) => prev.filter((_, i) => i !== index));
+    }
+    showToast('info', 'Item Removed', 'Media attachment removed.');
   };
 
   const handleNormalSubmit = (e: React.FormEvent) => {
@@ -343,6 +418,26 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
         >
           <X className="w-4 h-4" />
         </button>
+
+        {/* Hidden Native File & Camera Inputs for Photos and Videos */}
+        <input
+          type="file"
+          ref={fileInputRef}
+          multiple
+          accept="image/*,video/*"
+          onChange={handleFileSelect}
+          className="hidden"
+          id="complaint-file-upload-input"
+        />
+        <input
+          type="file"
+          ref={cameraInputRef}
+          accept="image/*"
+          capture="environment"
+          onChange={handleFileSelect}
+          className="hidden"
+          id="complaint-camera-upload-input"
+        />
 
         {/* Success Confirmation View */}
         {submittedTicket ? (
@@ -539,25 +634,102 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
                   </div>
 
                   {/* Upload Photos / Videos */}
-                  <div>
-                    <label className="block text-slate-700 font-bold mb-1">
-                      Upload Photos / Videos
-                    </label>
-                    <div className="flex items-center gap-3">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-slate-700 font-bold">
+                        Upload Photos / Videos
+                      </label>
+                      <span className="text-[10px] text-slate-400">JPG, PNG, MP4, MOV (max 50MB)</span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
-                        onClick={handleFileUpload}
-                        className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-colors"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploadingMedia}
+                        className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-bold text-xs flex items-center gap-2 transition-all cursor-pointer active:scale-95 shadow-2xs"
                       >
                         <UploadCloud className="w-4 h-4 text-[#1976D2]" />
-                        <span>Upload Photos / Videos</span>
+                        <span>{isUploadingMedia ? 'Uploading...' : 'Upload Photos / Videos'}</span>
                       </button>
+
+                      <button
+                        type="button"
+                        onClick={() => cameraInputRef.current?.click()}
+                        disabled={isUploadingMedia}
+                        className="px-3.5 py-2.5 rounded-xl bg-sky-50 hover:bg-sky-100 border border-sky-200 text-[#1976D2] font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                        title="Capture Photo with Device Camera"
+                      >
+                        <Camera className="w-4 h-4" />
+                        <span>Take Photo</span>
+                      </button>
+
                       {photos.length > 0 && (
-                        <span className="text-xs text-emerald-700 font-semibold">
-                          ✓ {photos.length} photo attached
+                        <span className="text-xs text-emerald-700 font-semibold flex items-center gap-1 ml-auto">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>{photos.length} file{photos.length > 1 ? 's' : ''} attached</span>
                         </span>
                       )}
                     </div>
+
+                    {/* Preview Gallery */}
+                    {photos.length > 0 && (
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 pt-1.5">
+                        {photos.map((url, idx) => (
+                          <div
+                            key={idx}
+                            className="relative group rounded-xl overflow-hidden border border-slate-200 bg-slate-900 aspect-square shadow-2xs cursor-pointer"
+                            onClick={() => setPreviewMediaUrl(url)}
+                          >
+                            {isVideoUrl(url) ? (
+                              <div className="w-full h-full flex items-center justify-center bg-slate-950 text-white relative">
+                                <video src={url} className="w-full h-full object-cover opacity-80" />
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                                  <Film className="w-5 h-5 text-white/90" />
+                                </div>
+                                <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/75 text-[9px] font-mono text-white">
+                                  VIDEO
+                                </span>
+                              </div>
+                            ) : (
+                              <img
+                                src={url}
+                                alt={`Evidence ${idx + 1}`}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                              />
+                            )}
+
+                            {/* Remove button */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemovePhoto(idx);
+                              }}
+                              title="Remove file"
+                              aria-label="Remove file"
+                              className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/75 hover:bg-red-600 text-white flex items-center justify-center text-xs transition-colors shadow-sm z-10 cursor-pointer active:scale-90"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+
+                            {/* Eye icon overlay on hover */}
+                            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                              <Eye className="w-4 h-4 text-white drop-shadow-md" />
+                            </div>
+                          </div>
+                        ))}
+
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="rounded-xl border-2 border-dashed border-slate-300 hover:border-[#1976D2] hover:bg-blue-50/50 flex flex-col items-center justify-center aspect-square text-slate-500 hover:text-[#1976D2] transition-all cursor-pointer text-[10px] font-bold gap-1"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>Add More</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* Buttons: Submit Complaint & Cancel */}
@@ -668,26 +840,103 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
                     />
                   </div>
 
-                  {/* Upload Photo / Video */}
-                  <div>
-                    <label className="block text-slate-700 font-bold mb-1">
-                      Upload Photo / Video
-                    </label>
-                    <div className="flex items-center gap-3">
+                  {/* Upload Photo / Video (Emergency) */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-slate-700 font-bold">
+                        Upload Photo / Video
+                      </label>
+                      <span className="text-[10px] text-red-500 font-medium">Visual proof of breakdown</span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
-                        onClick={handleFileUpload}
-                        className="px-4 py-2.5 rounded-xl bg-red-50 hover:bg-red-100 border border-red-200 text-[#D32F2F] font-bold text-xs flex items-center gap-1.5 transition-colors"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploadingMedia}
+                        className="px-4 py-2.5 rounded-xl bg-red-50 hover:bg-red-100 border border-red-200 text-[#D32F2F] font-bold text-xs flex items-center gap-2 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                      >
+                        <UploadCloud className="w-4 h-4" />
+                        <span>{isUploadingMedia ? 'Uploading...' : 'Upload Photo / Video'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => cameraInputRef.current?.click()}
+                        disabled={isUploadingMedia}
+                        className="px-3.5 py-2.5 rounded-xl bg-red-100 hover:bg-red-200 border border-red-300 text-red-900 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                        title="Capture Photo with Device Camera"
                       >
                         <Camera className="w-4 h-4" />
-                        <span>Upload Photo / Video</span>
+                        <span>Capture Now</span>
                       </button>
+
                       {emergencyPhotos.length > 0 && (
-                        <span className="text-xs text-red-700 font-semibold">
-                          ✓ {emergencyPhotos.length} file attached
+                        <span className="text-xs text-red-700 font-semibold flex items-center gap-1 ml-auto">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>{emergencyPhotos.length} file{emergencyPhotos.length > 1 ? 's' : ''} attached</span>
                         </span>
                       )}
                     </div>
+
+                    {/* Preview Gallery */}
+                    {emergencyPhotos.length > 0 && (
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 pt-1.5">
+                        {emergencyPhotos.map((url, idx) => (
+                          <div
+                            key={idx}
+                            className="relative group rounded-xl overflow-hidden border border-red-200 bg-slate-900 aspect-square shadow-2xs cursor-pointer"
+                            onClick={() => setPreviewMediaUrl(url)}
+                          >
+                            {isVideoUrl(url) ? (
+                              <div className="w-full h-full flex items-center justify-center bg-slate-950 text-white relative">
+                                <video src={url} className="w-full h-full object-cover opacity-80" />
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                                  <Film className="w-5 h-5 text-white/90" />
+                                </div>
+                                <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/75 text-[9px] font-mono text-white">
+                                  VIDEO
+                                </span>
+                              </div>
+                            ) : (
+                              <img
+                                src={url}
+                                alt={`Emergency Evidence ${idx + 1}`}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                              />
+                            )}
+
+                            {/* Remove button */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemovePhoto(idx);
+                              }}
+                              title="Remove file"
+                              aria-label="Remove file"
+                              className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/75 hover:bg-red-600 text-white flex items-center justify-center text-xs transition-colors shadow-sm z-10 cursor-pointer active:scale-90"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+
+                            {/* Eye icon overlay on hover */}
+                            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                              <Eye className="w-4 h-4 text-white drop-shadow-md" />
+                            </div>
+                          </div>
+                        ))}
+
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="rounded-xl border-2 border-dashed border-red-300 hover:border-red-500 hover:bg-red-50/50 flex flex-col items-center justify-center aspect-square text-red-500 hover:text-red-700 transition-all cursor-pointer text-[10px] font-bold gap-1"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>Add More</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* Main Emergency Button */}
@@ -706,6 +955,42 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
                 </form>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Media Lightbox Viewer Modal */}
+        {previewMediaUrl && (
+          <div
+            className="fixed inset-0 z-60 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in"
+            onClick={() => setPreviewMediaUrl(null)}
+          >
+            <div
+              className="relative max-w-2xl max-h-[85vh] w-full flex flex-col items-center justify-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={() => setPreviewMediaUrl(null)}
+                aria-label="Close preview"
+                className="absolute -top-12 right-0 w-10 h-10 rounded-full bg-white/20 hover:bg-white/40 text-white flex items-center justify-center text-sm transition-all cursor-pointer shadow-md"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              {isVideoUrl(previewMediaUrl) ? (
+                <video
+                  src={previewMediaUrl}
+                  controls
+                  autoPlay
+                  className="max-h-[80vh] max-w-full rounded-2xl shadow-2xl border border-white/20 bg-black"
+                />
+              ) : (
+                <img
+                  src={previewMediaUrl}
+                  alt="Enlarged evidence"
+                  className="max-h-[80vh] max-w-full rounded-2xl object-contain shadow-2xl border border-white/20"
+                />
+              )}
+            </div>
           </div>
         )}
       </div>
