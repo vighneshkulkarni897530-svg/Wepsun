@@ -506,6 +506,62 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
             </div>
           </div>
 
+          {/* 1-Tap Quick Sign-In (Bypasses Browser Pop-up Blockers) */}
+          {recentAccounts.length > 0 && (
+            <div className="bg-blue-50/80 border border-blue-200/90 rounded-2xl p-3">
+              <div className="flex items-center justify-between gap-1.5 text-[10px] font-bold uppercase tracking-wider text-blue-700 mb-2 px-0.5">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>⚡ 1-Tap Instant Sign-In (No Pop-up Needed)</span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {recentAccounts.map((acc) => (
+                  <button
+                    key={acc.email}
+                    type="button"
+                    onClick={() =>
+                      handleExecuteGoogleLogin({
+                        email: acc.email,
+                        name: acc.name,
+                        role: selectedRole,
+                        avatarUrl: acc.avatarUrl,
+                      })
+                    }
+                    className="w-full p-2.5 rounded-xl bg-white border border-blue-300 hover:border-[#0066FF] hover:shadow-md flex items-center justify-between text-left transition-all cursor-pointer group active:scale-98"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-9 h-9 rounded-full bg-[#0066FF] text-white flex items-center justify-center text-xs font-black shrink-0 shadow-xs">
+                        {acc.name ? acc.name.charAt(0).toUpperCase() : acc.email.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-900 group-hover:text-[#0066FF] truncate transition-colors">
+                          {acc.name || acc.email}
+                        </p>
+                        <p className="text-[10px] text-slate-500 truncate">{acc.email}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-bold text-[#0066FF] group-hover:underline flex items-center gap-1">
+                        <span>Sign In</span>
+                        <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => removeRecentAccount(acc.email, e)}
+                        className="p-1 text-slate-300 hover:text-rose-500 rounded-md transition-colors"
+                        title="Remove from this device"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Quick Sign-In Button via Google Chooser */}
           <button
             type="button"
@@ -586,56 +642,6 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
-
-          {/* Recently Signed-In on this Device */}
-          {recentAccounts.length > 0 && (
-            <div className="pt-1">
-              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2 px-1">
-                <History className="w-3 h-3" />
-                <span>Recently Used on this Device</span>
-              </div>
-              <div className="space-y-1.5">
-                {recentAccounts.map((acc) => (
-                  <div
-                    key={acc.email}
-                    onClick={() =>
-                      handleExecuteGoogleLogin({
-                        email: acc.email,
-                        name: acc.name,
-                        role: acc.role,
-                        avatarUrl: acc.avatarUrl,
-                      })
-                    }
-                    className="w-full p-2.5 rounded-xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50/50 flex items-center justify-between text-left transition-all cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold shrink-0">
-                        {acc.name ? acc.name.charAt(0).toUpperCase() : acc.email.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-slate-800 truncate">{acc.name || acc.email}</p>
-                        <p className="text-[10px] text-slate-500 truncate">{acc.email}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-slate-500 font-semibold px-2 py-0.5 rounded-md bg-slate-100 uppercase">
-                        {acc.role}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={(e) => removeRecentAccount(acc.email, e)}
-                        className="p-1 text-slate-300 hover:text-rose-500 rounded-md transition-colors"
-                        title="Remove from this device"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
 
         </div>
