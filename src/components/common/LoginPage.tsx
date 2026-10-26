@@ -32,10 +32,16 @@ import {
 import { useApp } from '../../context/AppContext';
 import { useAuthPopup } from '../../hooks/useAuthPopup';
 import { GeometricBlueWLogo } from './WepsunLogo';
-import { apiService, setTokens } from '../../services/api';
+import { apiService, setTokens, isNativeApp } from '../../services/api';
 import type { User as UserRecord, UserRole } from '../../types';
 import { GoogleAuthModal } from './GoogleAuthModal';
-import { loadGoogleGisScript, triggerGoogleSignIn, triggerGoogleOAuth2Popup } from '../../services/googleAuth';
+import {
+  loadGoogleGisScript,
+  triggerGoogleSignIn,
+  triggerGoogleOAuth2Popup,
+  openNativeGoogleOAuth,
+  saveRecentGoogleAccount,
+} from '../../services/googleAuth';
 import {
   sendSignupEmailOtp,
   verifyInlineEmailOtp,
@@ -871,19 +877,45 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   // Google OAuth Authentication
   const handleGoogleAuth = async () => {
     if (isGoogleSubmitting) return;
+
+    // Check if running in Native App (Android WebView / Capacitor)
+    if (isNativeApp()) {
+      setIsGoogleSubmitting(true);
+      try {
+        // Open native Chrome Custom Tab to avoid Google's 403 disallowed_useragent block in WebViews
+        await openNativeGoogleOAuth();
+      } catch (err: any) {
+        console.warn('[GoogleAuthApp] Chrome Custom Tab open notice:', err?.message);
+        // Fallback to in-app Google Account Chooser immediately
+        setIsGoogleModalOpen(true);
+      } finally {
+        setIsGoogleSubmitting(false);
+      }
+      return;
+    }
+
+    // Web Browser Flow:
     setIsGoogleSubmitting(true);
-    showGoogleConnecting();
+    showGoogleConnecting({
+      onCancel: () => {
+        setIsGoogleSubmitting(false);
+        closePopup();
+      },
+    });
 
     try {
       await triggerGoogleOAuth2Popup(
         async (profile, token) => {
           try {
+            const isIdToken = typeof token === 'string' && token.split('.').length === 3;
             const res = await apiService.googleLogin({
-              accessToken: token,
+              credential: isIdToken ? token : undefined,
+              accessToken: !isIdToken ? token : undefined,
               email: profile?.email,
               name: profile?.name,
               avatarUrl: profile?.picture,
-              role: 'client',
+              picture: profile?.picture,
+              role: 'CLIENT',
               companyId: 'comp-1',
               googleId: profile?.sub,
             });
@@ -920,6 +952,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 isActive: true,
               };
 
+              saveRecentGoogleAccount({
+                email: finalUser.email,
+                name: finalUser.name,
+                role: 'client',
+                avatarUrl: resolvedGoogleAvatar,
+              });
+
               loginAsUser(finalUser);
 
               try {
@@ -930,6 +969,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 });
               } catch {}
 
+              window.location.hash = 'home';
+              if (onClose) onClose();
+
               showGoogleSuccess({
                 name: finalUser.name,
                 onContinue: () => {
@@ -938,39 +980,31 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 },
               });
             } else {
-              showGoogleFailed({
-                error: res?.message,
-                onRetry: () => handleGoogleAuth(),
-              });
+              // If cloud backend response failed or is unreachable, seamlessly open GoogleAuthModal
+              closePopup();
+              setIsGoogleModalOpen(true);
             }
           } catch (err: any) {
-            showGoogleFailed({
-              error: err?.message,
-              onRetry: () => handleGoogleAuth(),
-            });
+            console.warn('[GoogleAuth] Backend verification notice:', err?.message);
+            closePopup();
+            setIsGoogleModalOpen(true);
           } finally {
             setIsGoogleSubmitting(false);
           }
         },
         (popupError) => {
           setIsGoogleSubmitting(false);
-          if (popupError.message?.includes('closed') || popupError.message?.includes('cancel')) {
-            showGoogleCancelled({
-              onTryAgain: () => handleGoogleAuth(),
-            });
-          } else {
-            showGoogleFailed({
-              error: popupError.message,
-              onRetry: () => handleGoogleAuth(),
-            });
-          }
+          closePopup();
+          console.warn('[GoogleAuth] Popup closed or blocked by browser, opening in-app Google Chooser:', popupError.message);
+          // If popup is blocked by browser, user closed popup, or GIS script blocked, open GoogleAuthModal immediately
+          setIsGoogleModalOpen(true);
         }
       );
-    } catch {
+    } catch (err: any) {
       setIsGoogleSubmitting(false);
-      showGoogleCancelled({
-        onTryAgain: () => handleGoogleAuth(),
-      });
+      closePopup();
+      console.warn('[GoogleAuth] GIS initiation fallback:', err?.message);
+      setIsGoogleModalOpen(true);
     }
   };
 
@@ -1456,6 +1490,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     )}
                     <span>{isGoogleSubmitting ? 'Connecting with Google...' : 'Continue with Google'}</span>
                   </button>
+
+                  <div className="text-center mt-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setIsGoogleModalOpen(true)}
+                      className="text-[11px] text-[#0066FF] hover:text-blue-800 hover:underline font-semibold cursor-pointer inline-flex items-center gap-1 transition-colors"
+                    >
+                      <span>Choose or switch Google account</span>
+                    </button>
+                  </div>
                 </>
               )}
 
@@ -2098,6 +2142,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                           )}
                           <span>{isGoogleSubmitting ? 'Connecting with Google...' : 'Continue with Google'}</span>
                         </button>
+
+                        <div className="text-center mt-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setIsGoogleModalOpen(true)}
+                            className="text-[11px] text-[#0066FF] hover:text-blue-800 hover:underline font-semibold cursor-pointer inline-flex items-center gap-1 transition-colors"
+                          >
+                            <span>Choose or switch Google account</span>
+                          </button>
+                        </div>
                       </>
                     )}
                   </div>

@@ -23,9 +23,9 @@ export interface UseAuthPopupReturn {
   showVerificationFailed: (opts?: { onTryAgain?: () => void; onResendCode?: () => void }) => void;
   showVerificationSuccess: (opts?: { onContinue?: () => void }) => void;
   showPasswordResetSuccess: (opts?: { onSignIn?: () => void }) => void;
-  showGoogleConnecting: () => void;
-  showGoogleCancelled: (opts?: { onTryAgain?: () => void }) => void;
-  showGoogleFailed: (opts?: { error?: string; onRetry?: () => void }) => void;
+  showGoogleConnecting: (opts?: { onCancel?: () => void }) => void;
+  showGoogleCancelled: (opts?: { onTryAgain?: () => void; onChooseAccount?: () => void }) => void;
+  showGoogleFailed: (opts?: { error?: string; onRetry?: () => void; onChooseAccount?: () => void }) => void;
   showGoogleSuccess: (opts?: { name?: string; onContinue?: () => void }) => void;
   showMasterInvalid: (opts?: { onTryAgain?: () => void }) => void;
   showMasterSuccess: (opts?: { name?: string; onContinue?: () => void }) => void;
@@ -325,39 +325,66 @@ export const useAuthPopup = (): UseAuthPopupReturn => {
     });
   };
 
-  const showGoogleConnecting = () => {
+  const showGoogleConnecting = (opts?: { onCancel?: () => void }) => {
     openModal({
       type: 'google_connecting',
       title: 'Connecting to Google',
       message: 'Please wait while we securely authenticate your account.',
-      showCloseButton: false,
-      closeOnBackdropClick: false,
+      showCloseButton: true,
+      closeOnBackdropClick: true,
+      secondaryAction: opts?.onCancel
+        ? {
+            label: 'Cancel',
+            variant: 'secondary',
+            onClick: opts.onCancel,
+          }
+        : undefined,
     });
   };
 
-  const showGoogleCancelled = (opts?: { onTryAgain?: () => void }) => {
+  const showGoogleCancelled = (opts?: { onTryAgain?: () => void; onChooseAccount?: () => void }) => {
     openModal({
       type: 'google_cancelled',
       title: 'Sign-In Cancelled',
-      message: 'Google sign-in was cancelled. You can try again whenever you’re ready.',
+      message: 'Google sign-in was cancelled. You can try again or choose your Google account directly.',
       primaryAction: {
         label: 'Try Again',
         variant: 'primary',
         onClick: opts?.onTryAgain,
       },
+      secondaryAction: opts?.onChooseAccount
+        ? {
+            label: 'Choose Account',
+            variant: 'secondary',
+            onClick: opts.onChooseAccount,
+          }
+        : undefined,
     });
   };
 
-  const showGoogleFailed = (opts?: { error?: string; onRetry?: () => void }) => {
+  const showGoogleFailed = (opts?: { error?: string; onRetry?: () => void; onChooseAccount?: () => void }) => {
     openModal({
       type: 'google_error',
-      title: 'Google Sign-In Unsuccessful',
-      message: opts?.error || "We couldn't complete Google sign-in. Please try again.",
-      primaryAction: {
-        label: 'Retry',
-        variant: 'primary',
-        onClick: opts?.onRetry,
-      },
+      title: 'Google Sign-In Notice',
+      message: opts?.error || "We couldn't complete automatic Google sign-in. You can retry or choose your account directly.",
+      primaryAction: opts?.onChooseAccount
+        ? {
+            label: 'Choose Account',
+            variant: 'primary',
+            onClick: opts.onChooseAccount,
+          }
+        : {
+            label: 'Retry',
+            variant: 'primary',
+            onClick: opts?.onRetry,
+          },
+      secondaryAction: opts?.onChooseAccount && opts?.onRetry
+        ? {
+            label: 'Retry Popup',
+            variant: 'secondary',
+            onClick: opts.onRetry,
+          }
+        : undefined,
     });
   };
 

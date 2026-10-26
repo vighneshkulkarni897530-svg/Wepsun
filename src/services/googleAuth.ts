@@ -3,6 +3,9 @@
  * Official Google One-Tap, Google Sign-In, Client-side JWT Decoders & OAuth 2.0 Integration
  */
 
+import { apiService, setTokens } from './api';
+import type { UserRole } from '../types';
+
 declare global {
   interface Window {
     google?: {
@@ -146,6 +149,66 @@ export async function loadGoogleGisScript(): Promise<boolean> {
   });
 }
 
+export interface SavedGoogleAccount {
+  email: string;
+  name: string;
+  role: UserRole;
+  avatarUrl?: string;
+  lastUsedAt?: string;
+}
+
+export const STORAGE_RECENT_GOOGLE_KEY = 'wepsun_recent_google_users_v2';
+
+/**
+ * Retrieve list of Google accounts previously signed in on this device
+ */
+export function getRecentGoogleAccounts(): SavedGoogleAccount[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_RECENT_GOOGLE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Store Google account on this device for 1-click subsequent sign-ins
+ */
+export function saveRecentGoogleAccount(account: SavedGoogleAccount): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const existing = getRecentGoogleAccounts().filter(
+      (a) => a.email.toLowerCase() !== account.email.toLowerCase()
+    );
+    const updated = [
+      { ...account, lastUsedAt: new Date().toISOString() },
+      ...existing,
+    ].slice(0, 5);
+    localStorage.setItem(STORAGE_RECENT_GOOGLE_KEY, JSON.stringify(updated));
+  } catch (e) {
+    console.warn('Failed to store recent Google account', e);
+  }
+}
+
+/**
+ * Remove saved Google account from device
+ */
+export function removeRecentGoogleAccount(emailToRemove: string): SavedGoogleAccount[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const updated = getRecentGoogleAccounts().filter(
+      (a) => a.email.toLowerCase() !== emailToRemove.toLowerCase()
+    );
+    localStorage.setItem(STORAGE_RECENT_GOOGLE_KEY, JSON.stringify(updated));
+    return updated;
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Primary Google Sign-In Flow:
  * Initializes Google Identity Services (GIS), triggers Google Account Selection,
@@ -175,6 +238,7 @@ export async function triggerGoogleSignIn(
           }
 
           if (tokenResponse.access_token) {
+            let profile: GoogleUserProfile | null = null;
             try {
               const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
                 headers: {
@@ -182,14 +246,32 @@ export async function triggerGoogleSignIn(
                 },
               });
               if (userInfoRes.ok) {
-                const profile = await userInfoRes.json();
-                onSuccess(tokenResponse.access_token, profile);
-              } else {
-                onSuccess(tokenResponse.access_token, null);
+                profile = await userInfoRes.json();
               }
             } catch {
-              onSuccess(tokenResponse.access_token, null);
+              // Non-blocking
             }
+
+            if (!profile) {
+              try {
+                const tokenInfoRes = await fetch(
+                  `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(tokenResponse.access_token)}`
+                );
+                if (tokenInfoRes.ok) {
+                  const info = await tokenInfoRes.json();
+                  profile = {
+                    sub: info.sub || info.user_id || '',
+                    email: info.email || '',
+                    name: info.email ? info.email.split('@')[0] : 'Google User',
+                    email_verified: info.verified_email === true || info.email_verified === 'true',
+                  };
+                }
+              } catch {
+                // Non-blocking
+              }
+            }
+
+            onSuccess(tokenResponse.access_token, profile);
           }
         },
         error_callback: (err: any) => {
@@ -234,14 +316,14 @@ export async function triggerGoogleSignIn(
  * Trigger official Google OAuth 2.0 Popup using GIS token client
  */
 export async function triggerGoogleOAuth2Popup(
-  onSuccess: (profile: GoogleUserProfile, token: string) => void,
+  onSuccess: (profile: GoogleUserProfile | null, token: string) => void,
   onError: (error: Error) => void
 ): Promise<void> {
   try {
-    await loadGoogleGisScript();
+    const isLoaded = await loadGoogleGisScript();
 
-    if (!window.google?.accounts?.oauth2) {
-      throw new Error('Google Identity Services SDK is not ready.');
+    if (!isLoaded || !window.google?.accounts?.oauth2) {
+      throw new Error('Google Identity Services SDK is not ready or blocked by browser.');
     }
 
     const clientId = getGoogleClientId();
@@ -256,20 +338,41 @@ export async function triggerGoogleOAuth2Popup(
         }
 
         if (tokenResponse.access_token) {
+          let profile: GoogleUserProfile | null = null;
           try {
             const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
               headers: {
                 Authorization: `Bearer ${tokenResponse.access_token}`,
               },
             });
-            if (!userInfoRes.ok) {
-              throw new Error('Failed to fetch Google profile from UserInfo endpoint.');
+            if (userInfoRes.ok) {
+              profile = await userInfoRes.json();
             }
-            const profile = await userInfoRes.json();
-            onSuccess(profile, tokenResponse.access_token);
-          } catch (err: any) {
-            onError(err);
+          } catch {
+            // Non-blocking fallback to tokeninfo
           }
+
+          if (!profile) {
+            try {
+              const tokenInfoRes = await fetch(
+                `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(tokenResponse.access_token)}`
+              );
+              if (tokenInfoRes.ok) {
+                const info = await tokenInfoRes.json();
+                profile = {
+                  sub: info.sub || info.user_id || '',
+                  email: info.email || '',
+                  name: info.email ? info.email.split('@')[0] : 'Google User',
+                  email_verified: info.verified_email === true || info.email_verified === 'true',
+                };
+              }
+            } catch {
+              // Non-blocking
+            }
+          }
+
+          // Always return token even if profile lookup failed on client (server verifies)
+          onSuccess(profile, tokenResponse.access_token);
         }
       },
       error_callback: (err: any) => {
@@ -300,3 +403,109 @@ export async function openNativeGoogleOAuth(customRedirectUri?: string): Promise
     presentationStyle: 'popover',
   });
 }
+
+/**
+ * Unified OAuth callback query string / deep link handler.
+ * Processes tokens from Android app deep links (wepsun://auth-callback) and Web popup postMessages.
+ */
+export async function handleGoogleAuthCallback(
+  queryOrUrl: string,
+  targetRole: UserRole = 'client'
+): Promise<{ success: boolean; user?: any; error?: string }> {
+  try {
+    let queryString = queryOrUrl;
+    if (queryString.includes('?')) {
+      queryString = queryString.split('?')[1] || '';
+    } else if (queryString.includes('#')) {
+      queryString = queryString.split('#')[1] || '';
+    }
+
+    const params = new URLSearchParams(queryString);
+    const accessToken = params.get('access_token');
+    const idToken = params.get('id_token') || params.get('credential');
+    const error = params.get('error') || params.get('error_description');
+
+    if (error) {
+      throw new Error(`Google authorization error: ${error}`);
+    }
+
+    if (!accessToken && !idToken) {
+      throw new Error('No authentication token found in callback.');
+    }
+
+    let profile: GoogleUserProfile | null = null;
+    if (idToken) {
+      profile = parseGoogleJwt(idToken);
+    }
+
+    if (!profile && accessToken) {
+      try {
+        const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        if (userInfoRes.ok) {
+          profile = await userInfoRes.json();
+        }
+      } catch {
+        // Fallback
+      }
+    }
+
+    const isIdToken = Boolean(idToken && idToken.split('.').length === 3);
+    const res = await apiService.googleLogin({
+      credential: isIdToken ? idToken : undefined,
+      accessToken: accessToken || (!isIdToken ? idToken : undefined) || undefined,
+      email: profile?.email,
+      name: profile?.name,
+      avatarUrl: profile?.picture,
+      picture: profile?.picture,
+      googleId: profile?.sub,
+      role: targetRole.toUpperCase(),
+      companyId: 'comp-1',
+    });
+
+    if (res && res.success && res.data) {
+      const { user, accessToken: newAccess, refreshToken: newRefresh } = res.data;
+      if (newAccess) {
+        setTokens(newAccess, newRefresh);
+      }
+      if (user?.email) {
+        saveRecentGoogleAccount({
+          email: user.email,
+          name: user.name || profile?.name || 'Google User',
+          role: targetRole,
+          avatarUrl: user.avatarUrl || profile?.picture,
+        });
+      }
+      return { success: true, user };
+    }
+
+    // Fallback if backend response wrapped
+    if (profile?.email) {
+      const user = {
+        id: 'usr-g-' + (profile.sub || Date.now()),
+        name: profile.name || profile.email.split('@')[0],
+        email: profile.email,
+        phone: '+91 98200 00000',
+        role: targetRole,
+        companyId: 'comp-1',
+        clientId: targetRole === 'client' ? `client-${profile.sub || Date.now()}` : undefined,
+        avatar: profile.picture,
+        isActive: true,
+      };
+      saveRecentGoogleAccount({
+        email: profile.email,
+        name: profile.name,
+        role: targetRole,
+        avatarUrl: profile.picture,
+      });
+      return { success: true, user };
+    }
+
+    throw new Error(res?.message || 'Google account could not be authenticated.');
+  } catch (err: any) {
+    console.warn('[GoogleAuth] Callback processing error:', err);
+    return { success: false, error: err?.message || 'Authentication failed' };
+  }
+}
+

@@ -178,6 +178,7 @@ const sendOAuthCallbackHtml = (_req: express.Request, res: express.Response) => 
     <p style="margin: 0; font-size: 13px; color: #93c5fd;">Returning you securely to WEPSUN</p>
     <div id="btn-container" style="display: block; margin-top: 20px;">
       <a id="deepLinkBtn" href="wepsun://auth-callback" class="btn">Tap to Return to WEPSUN App</a>
+      <a id="webReturnBtn" href="/#" class="btn" style="display: none; background: #2563EB; margin-top: 10px;">Return to WEPSUN Web</a>
     </div>
   </div>
   <script>
@@ -187,13 +188,25 @@ const sendOAuthCallbackHtml = (_req: express.Request, res: express.Response) => 
       var query = hash || search;
 
       var deepLink = 'wepsun://auth-callback' + (query ? '?' + query : '');
+      var isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      
       var btn = document.getElementById('deepLinkBtn');
       if (btn) btn.href = deepLink;
 
+      var webBtn = document.getElementById('webReturnBtn');
+      if (webBtn) {
+        webBtn.href = '/#' + query;
+        if (!isMobile && !window.opener) {
+          webBtn.style.display = 'inline-block';
+        }
+      }
+
       // 1. Immediate deep link redirect to native Android app
-      try {
-        window.location.href = deepLink;
-      } catch (e) {}
+      if (isMobile) {
+        try {
+          window.location.href = deepLink;
+        } catch (e) {}
+      }
 
       // 2. Broadcast for web popup windows
       if (window.opener) {
@@ -201,6 +214,11 @@ const sendOAuthCallbackHtml = (_req: express.Request, res: express.Response) => 
           window.opener.postMessage({ type: 'WEPSUN_GOOGLE_AUTH_CALLBACK', query: query }, '*');
         } catch (e) {}
         setTimeout(function() { window.close(); }, 800);
+      } else if (!isMobile) {
+        // Desktop browser full tab redirect back to web app
+        setTimeout(function() {
+          window.location.href = '/#' + query;
+        }, 1200);
       }
     })();
   </script>

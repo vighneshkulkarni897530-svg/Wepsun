@@ -686,6 +686,7 @@ router.get('/google/callback', (_req, res: Response): void => {
     <p style="margin: 0; font-size: 13px; color: #93c5fd;">Returning you securely to WEPSUN</p>
     <div id="btn-container" style="display: none;">
       <a id="deepLinkBtn" href="#" class="btn">Tap to Open WEPSUN App</a>
+      <a id="webReturnBtn" href="/#" class="btn" style="display: none; background: #2563EB; margin-top: 10px;">Return to WEPSUN Web</a>
     </div>
   </div>
   <script>
@@ -696,20 +697,36 @@ router.get('/google/callback', (_req, res: Response): void => {
 
       if (query) {
         var deepLink = 'wepsun://auth-callback?' + query;
+        var isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
         var btn = document.getElementById('deepLinkBtn');
+        var webBtn = document.getElementById('webReturnBtn');
         var container = document.getElementById('btn-container');
-        if (btn) btn.href = deepLink;
+
         if (container) container.style.display = 'block';
+        if (btn) btn.href = deepLink;
+
+        if (webBtn) {
+          webBtn.href = '/#' + query;
+          if (!isMobile && !window.opener) {
+            webBtn.style.display = 'inline-block';
+          }
+        }
 
         // 1. Deep link to native Android app
-        try {
-          window.location.href = deepLink;
-        } catch (e) {}
+        if (isMobile) {
+          try {
+            window.location.href = deepLink;
+          } catch (e) {}
+        }
 
         // 2. Broadcast for web popup windows
         if (window.opener) {
           window.opener.postMessage({ type: 'WEPSUN_GOOGLE_AUTH_CALLBACK', query: query }, '*');
           setTimeout(function() { window.close(); }, 800);
+        } else if (!isMobile) {
+          setTimeout(function() {
+            window.location.href = '/#' + query;
+          }, 1200);
         }
       }
     })();

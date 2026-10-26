@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Company,
   Branch,
@@ -75,6 +75,7 @@ import {
 import { getNetworkStatus, subscribeNetworkStatus } from '../services/nativeApp';
 import { playNotificationSound, isSoundEnabled as getSoundPref, setSoundEnabled } from '../utils/notificationSound';
 import { isDummyAvatar, isValidCustomAvatar, getEffectiveProfilePhoto } from '../utils/avatarUtils';
+import { handleGoogleAuthCallback } from '../services/googleAuth';
 
 export interface ToastNotification {
   id: string;
@@ -1386,6 +1387,90 @@ function mapServerServiceReport(sr: any): ServiceReport {
   const removeToast = (_id: string) => {
     setToasts([]);
   };
+
+  // Google OAuth Deep Link & Web postMessage Listener
+  const loginAsUserRef = useRef(loginAsUser);
+  loginAsUserRef.current = loginAsUser;
+
+  useEffect(() => {
+    let isSubscribed = true;
+
+    const processAuthToken = async (queryOrUrl: string) => {
+      if (!queryOrUrl) return;
+      try {
+        const res = await handleGoogleAuthCallback(queryOrUrl, 'client');
+        if (!isSubscribed) return;
+
+        if (res.success && res.user) {
+          loginAsUserRef.current(res.user);
+          window.location.hash = 'home';
+          showToast('success', 'Google Sign-In Successful', `Welcome, ${res.user.name || 'valued user'}!`);
+        } else if (res.error) {
+          showToast('error', 'Google Sign-In Failed', res.error);
+        }
+      } catch (err: any) {
+        if (!isSubscribed) return;
+        showToast('error', 'Google Sign-In Error', err?.message || 'Could not complete Google authentication.');
+      }
+    };
+
+    // 1. Web Popup Window postMessage listener
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'WEPSUN_GOOGLE_AUTH_CALLBACK' && event.data.query) {
+        processAuthToken(event.data.query);
+      }
+    };
+    window.addEventListener('message', handleMessage);
+
+    // 2. Web URL check on load (if redirected with tokens in query or hash)
+    if (typeof window !== 'undefined') {
+      const urlHash = window.location.hash || '';
+      const urlSearch = window.location.search || '';
+      if (
+        (urlHash.includes('access_token=') || urlHash.includes('id_token=') || urlHash.includes('auth-callback')) ||
+        (urlSearch.includes('access_token=') || urlSearch.includes('id_token=') || urlSearch.includes('auth-callback'))
+      ) {
+        processAuthToken(urlHash || urlSearch);
+        try {
+          window.history.replaceState(null, '', window.location.pathname);
+        } catch {}
+      }
+    }
+
+    // 3. Native App Deep Link Handler (Capacitor App plugin)
+    let unsubAppUrl: (() => void) | undefined;
+    try {
+      if (Capacitor.isNativePlatform()) {
+        import('@capacitor/app').then(async ({ App }) => {
+          // Cold-start launch URL
+          try {
+            const launchUrl = await App.getLaunchUrl();
+            if (launchUrl?.url && (launchUrl.url.includes('auth-callback') || launchUrl.url.includes('wepsun://'))) {
+              import('@capacitor/browser').then(({ Browser }) => Browser.close().catch(() => {})).catch(() => {});
+              processAuthToken(launchUrl.url);
+            }
+          } catch {}
+
+          // Active app deep link listener
+          try {
+            const handle = await App.addListener('appUrlOpen', async (data) => {
+              if (data?.url && (data.url.includes('auth-callback') || data.url.includes('wepsun://'))) {
+                import('@capacitor/browser').then(({ Browser }) => Browser.close().catch(() => {})).catch(() => {});
+                processAuthToken(data.url);
+              }
+            });
+            unsubAppUrl = () => handle.remove();
+          } catch {}
+        }).catch(() => {});
+      }
+    } catch {}
+
+    return () => {
+      isSubscribed = false;
+      window.removeEventListener('message', handleMessage);
+      if (unsubAppUrl) unsubAppUrl();
+    };
+  }, [showToast]);
 
   // Modern WepSun Modal & Pop-up System
   const [modalState, setModalState] = useState<WepsunModalOptions | null>(null);
