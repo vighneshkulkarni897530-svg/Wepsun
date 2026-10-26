@@ -23,7 +23,7 @@ export interface UseAuthPopupReturn {
   showVerificationFailed: (opts?: { onTryAgain?: () => void; onResendCode?: () => void }) => void;
   showVerificationSuccess: (opts?: { onContinue?: () => void }) => void;
   showPasswordResetSuccess: (opts?: { onSignIn?: () => void }) => void;
-  showGoogleConnecting: (opts?: { onCancel?: () => void }) => void;
+  showGoogleConnecting: (opts?: { onCancel?: () => void; onChooseAccount?: () => void }) => void;
   showGoogleCancelled: (opts?: { onTryAgain?: () => void; onChooseAccount?: () => void }) => void;
   showGoogleFailed: (opts?: { error?: string; onRetry?: () => void; onChooseAccount?: () => void }) => void;
   showGoogleSuccess: (opts?: { name?: string; onContinue?: () => void }) => void;
@@ -325,13 +325,20 @@ export const useAuthPopup = (): UseAuthPopupReturn => {
     });
   };
 
-  const showGoogleConnecting = (opts?: { onCancel?: () => void }) => {
+  const showGoogleConnecting = (opts?: { onCancel?: () => void; onChooseAccount?: () => void }) => {
     openModal({
       type: 'google_connecting',
       title: 'Connecting to Google',
-      message: 'Please wait while we securely authenticate your account.',
+      message: 'Opening Google Sign-In. Seeing an authorization or origin mismatch error in popup? You can switch directly to Account Chooser.',
       showCloseButton: true,
       closeOnBackdropClick: true,
+      primaryAction: opts?.onChooseAccount
+        ? {
+            label: 'Choose Account Directly',
+            variant: 'primary',
+            onClick: opts.onChooseAccount,
+          }
+        : undefined,
       secondaryAction: opts?.onCancel
         ? {
             label: 'Cancel',

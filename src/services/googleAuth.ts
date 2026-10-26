@@ -5,6 +5,8 @@
 
 import { apiService, setTokens } from './api';
 import type { UserRole } from '../types';
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { auth } from './firebaseAuth';
 
 declare global {
   interface Window {
@@ -166,12 +168,23 @@ export function getRecentGoogleAccounts(): SavedGoogleAccount[] {
   if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(STORAGE_RECENT_GOOGLE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
   } catch {
-    return [];
+    // Non-blocking
   }
+
+  // Initial developer & client suggestions
+  return [
+    {
+      email: 'vighneshkulkarni897530@gmail.com',
+      name: 'Vighnesh Kulkarni',
+      role: 'client',
+      avatarUrl: 'https://lh3.googleusercontent.com/a/default-user',
+    },
+  ];
 }
 
 /**
@@ -319,6 +332,36 @@ export async function triggerGoogleOAuth2Popup(
   onSuccess: (profile: GoogleUserProfile | null, token: string) => void,
   onError: (error: Error) => void
 ): Promise<void> {
+  // 1. Attempt Firebase Google Sign-In first (uses pre-configured Firebase authDomain to avoid Google Cloud Console origin_mismatch errors on Vercel)
+  if (auth) {
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.addScope('email');
+      provider.addScope('profile');
+      provider.setCustomParameters({ prompt: 'select_account' });
+      const cred = await signInWithPopup(auth, provider);
+      if (cred?.user) {
+        const idToken = await cred.user.getIdToken();
+        const profile: GoogleUserProfile = {
+          sub: cred.user.uid,
+          email: cred.user.email || '',
+          name: cred.user.displayName || cred.user.email?.split('@')[0] || 'Google User',
+          picture: cred.user.photoURL || undefined,
+          email_verified: cred.user.emailVerified,
+        };
+        onSuccess(profile, idToken);
+        return;
+      }
+    } catch (fbErr: any) {
+      console.warn('[Firebase Google Auth] Notice:', fbErr?.code || fbErr?.message);
+      if (fbErr?.code === 'auth/popup-closed-by-user') {
+        onError(new Error('Google Sign-In popup was closed.'));
+        return;
+      }
+    }
+  }
+
+  // 2. Direct GIS Token Client
   try {
     const isLoaded = await loadGoogleGisScript();
 

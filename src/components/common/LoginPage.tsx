@@ -901,6 +901,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         setIsGoogleSubmitting(false);
         closePopup();
       },
+      onChooseAccount: () => {
+        setIsGoogleSubmitting(false);
+        closePopup();
+        setIsGoogleModalOpen(true);
+      },
     });
 
     try {
