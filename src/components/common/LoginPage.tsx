@@ -40,6 +40,8 @@ import {
   triggerGoogleSignIn,
   triggerGoogleOAuth2Popup,
   openNativeGoogleOAuth,
+  buildGoogleOAuthUrl,
+  triggerDirectGoogleOAuth,
   saveRecentGoogleAccount,
 } from '../../services/googleAuth';
 import {
@@ -878,12 +880,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const handleGoogleAuth = async () => {
     if (isGoogleSubmitting) return;
 
-    // Check if running in Native App (Android WebView / Capacitor)
+    // 1. Android Native App (Capacitor WebView)
     if (isNativeApp()) {
       setIsGoogleSubmitting(true);
       try {
         // Open native Chrome Custom Tab to avoid Google's 403 disallowed_useragent block in WebViews
-        await openNativeGoogleOAuth();
+        await openNativeGoogleOAuth({ role: selectedRole || 'client' });
       } catch (err: any) {
         console.warn('[GoogleAuthApp] Chrome Custom Tab open notice:', err?.message);
         // Fallback to in-app Google Account Chooser immediately
@@ -894,7 +896,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       return;
     }
 
-    // Web Browser Flow:
+    // 2. Mobile Web Browser (Brave, Chrome Mobile, Safari Mobile)
+    // Mobile browsers proactively block window.open popups. Full-page redirect provides a 100% reliable flow without pop-up blocking dialogs.
+    const isMobileBrowser = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (isMobileBrowser) {
+      triggerDirectGoogleOAuth({ role: selectedRole || 'client' });
+      return;
+    }
+
+    // 3. Desktop Web Browser Flow:
     setIsGoogleSubmitting(true);
     showGoogleConnecting({
       onCancel: () => {

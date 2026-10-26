@@ -54,10 +54,10 @@ function sanitizeUser(user: any) {
     isActive: user.isActive ?? true,
     company: user.company
       ? {
-          id: user.company.id,
-          name: user.company.name,
-          code: user.company.code,
-        }
+        id: user.company.id,
+        name: user.company.name,
+        code: user.company.code,
+      }
       : undefined,
   };
 }
@@ -108,7 +108,7 @@ async function ensureClientAccountWithEquipment(user: any): Promise<string | nul
       prisma.user.update({
         where: { id: user.id },
         data: { clientId },
-      }).catch(() => {});
+      }).catch(() => { });
       user.clientId = clientId;
     }
 
@@ -275,7 +275,7 @@ async function ensureClientAccountWithEquipment(user: any): Promise<string | nul
         );
       }
     }
-  } catch {}
+  } catch { }
 
   return clientId;
 }
@@ -822,7 +822,7 @@ router.post('/master-id/verify', authLimiter, async (req: AuthenticatedRequest, 
         userRole: 'MASTER_ADMIN',
         details: `Authorized Master ID authenticated with verified 2FA factors. Granted full Admin Dashboard access.`,
       },
-    }).catch(() => {});
+    }).catch(() => { });
 
     res.json({
       success: true,
@@ -1065,7 +1065,7 @@ router.post('/login', authLimiter, async (req: AuthenticatedRequest, res: Respon
               details: `Invalid Master Admin password attempt for ${candidateIdentifier}`,
             },
           });
-        } catch {}
+        } catch { }
 
         res.status(401).json({
           success: false,
@@ -1134,7 +1134,7 @@ router.post('/login', authLimiter, async (req: AuthenticatedRequest, res: Respon
             technician: techMatch,
           };
         }
-      } catch {}
+      } catch { }
     }
 
     if (!user) {
@@ -1272,7 +1272,7 @@ router.post('/login', authLimiter, async (req: AuthenticatedRequest, res: Respon
             data: { passwordHash: newHash },
           });
           user.passwordHash = newHash;
-        } catch {}
+        } catch { }
       }
     }
 
@@ -1311,7 +1311,7 @@ router.post('/login', authLimiter, async (req: AuthenticatedRequest, res: Respon
     prisma.user.update({
       where: { id: user.id },
       data: { failedLoginAttempts: 0, lockedUntil: null },
-    }).catch(() => {});
+    }).catch(() => { });
 
     // Ensure client or technician role has valid identity linkage and validate technician status
     if (user.role === 'CLIENT' || String(user.role).toUpperCase() === 'CLIENT') {
@@ -1339,7 +1339,7 @@ router.post('/login', authLimiter, async (req: AuthenticatedRequest, res: Respon
           await prisma.user.update({
             where: { id: user.id },
             data: { technicianId: technicianRecord.id },
-          }).catch(() => {});
+          }).catch(() => { });
           user.technicianId = technicianRecord.id;
         }
 
@@ -1416,7 +1416,7 @@ router.post('/login', authLimiter, async (req: AuthenticatedRequest, res: Respon
           await prisma.user.update({
             where: { id: user.id },
             data: { isActive: true },
-          }).catch(() => {});
+          }).catch(() => { });
           user.isActive = true;
         }
 
@@ -1427,14 +1427,14 @@ router.post('/login', authLimiter, async (req: AuthenticatedRequest, res: Respon
         prisma.technician.update({
           where: { id: technicianRecord.id },
           data: { lastLoginAt: new Date() },
-        }).catch(() => {});
+        }).catch(() => { });
       }
 
       // Update last login timestamp on User
       prisma.user.update({
         where: { id: user.id },
         data: { lastLoginAt: new Date() },
-      }).catch(() => {});
+      }).catch(() => { });
     }
 
     // Verify account active status before issuing token
@@ -1496,7 +1496,7 @@ router.post('/login', authLimiter, async (req: AuthenticatedRequest, res: Respon
         userRole: String(user.role),
         details: `User ${user.name} (${user.email}) logged in successfully`,
       },
-    }).catch(() => {});
+    }).catch(() => { });
 
     res.json({
       success: true,
@@ -2196,7 +2196,7 @@ router.post('/send-otp', authLimiter, async (req: AuthenticatedRequest, res: Res
           });
           return;
         }
-      } catch {}
+      } catch { }
     } else if (type === 'forgot_password') {
       // If forgot password, check if account exists
       let existingUser: any = null;
@@ -2395,7 +2395,7 @@ const handleAccountRegistration = async (req: AuthenticatedRequest, res: Respons
             where: { id: user.id },
             data: { passwordHash: newHash },
           });
-        } catch {}
+        } catch { }
         user.passwordHash = newHash;
       }
       if (user.role === 'CLIENT' || String(user.role).toUpperCase() === 'CLIENT') {
@@ -2521,7 +2521,7 @@ const handleAccountRegistration = async (req: AuthenticatedRequest, res: Respons
           details: `New account created and verified via Email OTP for ${user.email} (${user.role})`,
         },
       });
-    } catch {}
+    } catch { }
 
     res.json({
       success: true,
@@ -2687,7 +2687,7 @@ router.post('/verify-forgot-password-otp', authLimiter, async (req: Authenticate
           },
         });
       }
-    } catch {}
+    } catch { }
 
     res.json({
       success: true,

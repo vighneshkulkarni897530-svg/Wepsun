@@ -27,6 +27,8 @@ import {
   triggerGoogleSignIn,
   triggerGoogleOAuth2Popup,
   openNativeGoogleOAuth,
+  buildGoogleOAuthUrl,
+  triggerDirectGoogleOAuth,
   getRecentGoogleAccounts,
   saveRecentGoogleAccount,
   removeRecentGoogleAccount as removeRecentAccountStorage,
@@ -241,11 +243,12 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
   };
 
   const handleTriggerGisPopup = async () => {
+    // 1. Android Native App (Capacitor WebView)
     if (isNativeApp()) {
       setIsAuthenticating(true);
       setAuthStep('Opening Google in secure mobile browser...');
       try {
-        await openNativeGoogleOAuth();
+        await openNativeGoogleOAuth({ role: selectedRole });
       } catch (err: any) {
         console.warn('[GoogleModalApp] Error opening custom tab:', err);
         showGoogleFailed({
@@ -258,6 +261,14 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
       return;
     }
 
+    // 2. Mobile Web Browser (Brave, Chrome Mobile, Safari Mobile)
+    const isMobileBrowser = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (isMobileBrowser) {
+      triggerDirectGoogleOAuth({ role: selectedRole });
+      return;
+    }
+
+    // 3. Desktop Web Browser Flow
     setIsAuthenticating(true);
     setAuthStep('Opening official Google Sign-In popup...');
     try {

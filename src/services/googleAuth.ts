@@ -429,16 +429,47 @@ export async function triggerGoogleOAuth2Popup(
   }
 }
 
+export interface GoogleOAuthOptions {
+  role?: UserRole;
+  isNativeApp?: boolean;
+  returnUrl?: string;
+  customRedirectUri?: string;
+}
+
+/**
+ * Build standard Google OAuth 2.0 Account Selection URL.
+ * Works uniformly across Web (desktop & mobile) and Android Custom Tabs.
+ * Passes structured state { isNativeApp, returnUrl, role, nonce } to ensure Render gateway
+ * routes credentials back to the correct client without origin_mismatch errors.
+ */
+export function buildGoogleOAuthUrl(options: GoogleOAuthOptions = {}): string {
+  const clientId = getGoogleClientId();
+  const redirectUri = options.customRedirectUri || 'https://wepsun.onrender.com/api/auth/google/callback';
+  const nonce = 'wepsun_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
+
+  const statePayload = {
+    isNativeApp: options.isNativeApp ?? (typeof window !== 'undefined' ? Boolean((window as any).Capacitor?.isNativePlatform?.()) : false),
+    returnUrl: options.returnUrl ?? (typeof window !== 'undefined' ? window.location.origin : ''),
+    role: options.role ?? 'client',
+    nonce,
+  };
+
+  const state = encodeURIComponent(JSON.stringify(statePayload));
+  const scopes = encodeURIComponent('openid email profile');
+
+  return `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token%20id_token&scope=${scopes}&prompt=select_account&nonce=${nonce}&state=${state}`;
+}
+
 /**
  * Open official Google Account Chooser in native In-App Chrome Custom Tab on Android/iOS
  */
-export async function openNativeGoogleOAuth(customRedirectUri?: string): Promise<void> {
+export async function openNativeGoogleOAuth(options?: GoogleOAuthOptions | string): Promise<void> {
   const { Browser } = await import('@capacitor/browser');
-  const clientId = getGoogleClientId();
-  const redirectUri = customRedirectUri || 'https://wepsun.onrender.com/api/auth/google/callback';
-  const nonce = 'wepsun_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
-  
-  const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token%20id_token&scope=${encodeURIComponent('openid email profile')}&prompt=select_account&nonce=${nonce}`;
+  const opts: GoogleOAuthOptions = typeof options === 'string' ? { customRedirectUri: options } : options || {};
+  const googleAuthUrl = buildGoogleOAuthUrl({
+    ...opts,
+    isNativeApp: true,
+  });
 
   await Browser.open({
     url: googleAuthUrl,
@@ -446,6 +477,16 @@ export async function openNativeGoogleOAuth(customRedirectUri?: string): Promise
     presentationStyle: 'popover',
   });
 }
+
+/**
+ * Initiate full-page Google OAuth redirect (used for mobile web to prevent popup blocking)
+ */
+export function triggerDirectGoogleOAuth(options: GoogleOAuthOptions = {}): void {
+  if (typeof window !== 'undefined') {
+    window.location.href = buildGoogleOAuthUrl(options);
+  }
+}
+
 
 /**
  * Unified OAuth callback query string / deep link handler.

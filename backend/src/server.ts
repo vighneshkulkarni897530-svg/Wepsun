@@ -187,38 +187,58 @@ const sendOAuthCallbackHtml = (_req: express.Request, res: express.Response) => 
       var search = window.location.search ? window.location.search.substring(1) : '';
       var query = hash || search;
 
+      // Extract OAuth state payload if available
+      var stateObj = null;
+      try {
+        var params = new URLSearchParams(query);
+        var rawState = params.get('state');
+        if (rawState) {
+          stateObj = JSON.parse(decodeURIComponent(rawState));
+        }
+      } catch (e) {}
+
+      var isNative = Boolean(stateObj && stateObj.isNativeApp === true);
+      var returnUrl = (stateObj && stateObj.returnUrl) ? stateObj.returnUrl.replace(/\/+$/, '') : '';
       var deepLink = 'wepsun://auth-callback' + (query ? '?' + query : '');
-      var isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-      
+
       var btn = document.getElementById('deepLinkBtn');
       if (btn) btn.href = deepLink;
 
       var webBtn = document.getElementById('webReturnBtn');
       if (webBtn) {
-        webBtn.href = '/#' + query;
-        if (!isMobile && !window.opener) {
+        var webDestination = (returnUrl || '') + '/#' + query;
+        webBtn.href = webDestination;
+        if (!isNative && !window.opener) {
           webBtn.style.display = 'inline-block';
         }
       }
 
-      // 1. Immediate deep link redirect to native Android app
-      if (isMobile) {
+      // 1. Android Native App (In-App Custom Tab via Capacitor)
+      if (isNative) {
         try {
           window.location.href = deepLink;
         } catch (e) {}
+        return;
       }
 
-      // 2. Broadcast for web popup windows
+      // 2. Desktop Web Popup Window (Broadcast message to parent window and close)
       if (window.opener) {
         try {
           window.opener.postMessage({ type: 'WEPSUN_GOOGLE_AUTH_CALLBACK', query: query }, '*');
         } catch (e) {}
-        setTimeout(function() { window.close(); }, 800);
-      } else if (!isMobile) {
-        // Desktop browser full tab redirect back to web app
+        setTimeout(function() { window.close(); }, 600);
+        return;
+      }
+
+      // 3. Web Full-Page Navigation (Mobile web browser or desktop direct redirect)
+      if (returnUrl) {
+        setTimeout(function() {
+          window.location.href = returnUrl + '/#' + query;
+        }, 500);
+      } else {
         setTimeout(function() {
           window.location.href = '/#' + query;
-        }, 1200);
+        }, 800);
       }
     })();
   </script>
