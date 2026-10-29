@@ -264,7 +264,7 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
     // 2. Mobile Web Browser (Brave, Chrome Mobile, Safari Mobile)
     const isMobileBrowser = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     if (isMobileBrowser) {
-      triggerDirectGoogleOAuth({ role: selectedRole });
+      await triggerDirectGoogleOAuth({ role: selectedRole });
       return;
     }
 
@@ -517,13 +517,13 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
             </div>
           </div>
 
-          {/* 1-Tap Quick Sign-In (Bypasses Browser Pop-up Blockers) */}
+          {/* 1-Tap Quick Sign-In (Recent Google Accounts) */}
           {recentAccounts.length > 0 && (
             <div className="bg-blue-50/80 border border-blue-200/90 rounded-2xl p-3">
               <div className="flex items-center justify-between gap-1.5 text-[10px] font-bold uppercase tracking-wider text-blue-700 mb-2 px-0.5">
                 <div className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>⚡ 1-Tap Instant Sign-In (No Pop-up Needed)</span>
+                  <span>Recent Google Accounts on This Device</span>
                 </div>
               </div>
               <div className="space-y-2">
@@ -531,14 +531,7 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
                   <button
                     key={acc.email}
                     type="button"
-                    onClick={() =>
-                      handleExecuteGoogleLogin({
-                        email: acc.email,
-                        name: acc.name,
-                        role: selectedRole,
-                        avatarUrl: acc.avatarUrl,
-                      })
-                    }
+                    onClick={handleTriggerGisPopup}
                     className="w-full p-2.5 rounded-xl bg-white border border-blue-300 hover:border-[#0066FF] hover:shadow-md flex items-center justify-between text-left transition-all cursor-pointer group active:scale-98"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
@@ -555,7 +548,7 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
 
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] font-bold text-[#0066FF] group-hover:underline flex items-center gap-1">
-                        <span>Sign In</span>
+                        <span>Authenticate</span>
                         <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
                       </span>
                       <button
@@ -573,14 +566,14 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
             </div>
           )}
 
-          {/* Quick Sign-In Button via Google Chooser */}
+          {/* Official Google Sign-In Button */}
           <button
             type="button"
             onClick={handleTriggerGisPopup}
             disabled={isAuthenticating}
-            className="w-full py-2.5 px-4 rounded-2xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2.5 shadow-sm transition-all cursor-pointer active:scale-98 disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full py-3 px-4 rounded-2xl border border-slate-200 hover:border-[#0066FF] bg-white hover:bg-slate-50 text-slate-800 text-xs sm:text-sm font-bold flex items-center justify-center gap-3 shadow-md hover:shadow-lg transition-all cursor-pointer active:scale-98 disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
               <path
                 fill="#4285F4"
                 d="M22.56 12.25c0-.7-.06-1.4-.19-2.07H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -598,61 +591,14 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
               />
             </svg>
-            <span>{isNativeApp() ? 'Open Mobile Google Account Chooser' : 'Continue with Google Account Chooser'}</span>
+            <span>{isNativeApp() ? 'Sign In with Google (Mobile Browser)' : 'Continue with Google'}</span>
           </button>
 
-          <div className="relative flex items-center justify-center my-1">
-            <div className="border-t border-slate-200 w-full" />
-            <span className="bg-white px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-              OR USE ACCOUNT BELOW
-            </span>
-            <div className="border-t border-slate-200 w-full" />
+          <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 text-center">
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              Google will securely verify your account identity. If an account with your verified email exists, you will be signed in immediately. New accounts are provisioned with secure client access.
+            </p>
           </div>
-
-          {/* Primary Form: Any User Input */}
-          <form onSubmit={handleDirectFormSubmit} className="space-y-3 bg-slate-50/70 p-4 rounded-2xl border border-slate-200">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Your Google Account Email <span className="text-rose-500">*</span>
-              </label>
-              <div className="relative">
-                <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="email"
-                  required
-                  placeholder="name@gmail.com or @company.com"
-                  value={userEmail}
-                  onChange={(e) => setUserEmail(e.target.value)}
-                  className="w-full pl-10 pr-3.5 py-2.5 text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#0066FF] bg-white font-medium text-slate-800 placeholder:text-slate-400"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Full Name <span className="text-slate-400 font-normal">(optional)</span>
-              </label>
-              <div className="relative">
-                <UserIcon className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="e.g. John Doe"
-                  value={userName}
-                  onChange={(e) => setUserName(e.target.value)}
-                  className="w-full pl-10 pr-3.5 py-2.5 text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#0066FF] bg-white font-medium text-slate-800 placeholder:text-slate-400"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isAuthenticating}
-              className="w-full py-3 px-4 rounded-xl bg-[#0066FF] hover:bg-[#0052cc] text-white text-xs font-bold shadow-md hover:shadow-lg flex items-center justify-center gap-2 transition-all cursor-pointer"
-            >
-              <span>Continue with this Account</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </form>
 
 
         </div>

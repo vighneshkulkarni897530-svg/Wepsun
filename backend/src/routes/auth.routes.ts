@@ -16,11 +16,12 @@ import {
   revokeAllUserSessions,
   createPasswordResetToken,
   consumePasswordResetToken,
+  AuthSecurityError,
   JwtUserPayload,
 } from '../lib/auth.js';
 import { requireAuth, requireRole, AuthenticatedRequest } from '../middleware/auth.js';
 import { authLimiter } from '../middleware/rateLimiter.js';
-import { verifyGoogleIdToken, verifyGoogleAccessToken } from '../lib/googleAuth.js';
+import { verifyGoogleIdToken, verifyGoogleAccessToken, exchangeGooglePkceCode } from '../lib/googleAuth.js';
 import { validateMasterId, getMasterAdminUser, initiateMaster2FA, verifyMaster2FA, resendMaster2FA, validateMasterCredentials, getMasterAuthorizedEmails } from '../lib/masterAuth.js';
 import {
   sendEmailOtp,
@@ -285,27 +286,27 @@ router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Respo
   const {
     credential,
     accessToken: clientAccessToken,
-    email: bodyEmail,
-    name: bodyName,
-    avatarUrl: bodyAvatar,
-    picture: bodyPicture,
-    googleId: bodyGoogleId,
+    code,
+    codeVerifier,
+    redirectUri,
+    nonce,
+    platform,
   } = req.body;
   const userAgent = req.headers['user-agent'];
   const ipAddress = req.ip || req.socket.remoteAddress;
 
   try {
-    // 1. Validate incoming request payload
-    if (!credential && !clientAccessToken && !bodyEmail) {
+    // 1. Validate incoming request payload: ID token, Access Token, or Authorization Code is mandatory
+    if (!credential && !clientAccessToken && !code) {
       res.status(400).json({
         success: false,
-        message: 'Google authentication credential (ID token) or email is required.',
+        message: 'Google authentication credential (ID token or authorization code) is required.',
         code: 'CREDENTIAL_REQUIRED',
       });
       return;
     }
 
-    // 2. Cryptographically verify Google Identity with official Google Auth Library
+    // 2. Cryptographically verify Google Identity with official Google Auth Library or PKCE exchange
     let verified: {
       googleId: string;
       email: string;
@@ -315,60 +316,54 @@ router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Respo
       hostedDomain?: string;
     };
 
-    if (credential && typeof credential === 'string') {
+    if (code && typeof code === 'string') {
+      if (!codeVerifier || typeof codeVerifier !== 'string') {
+        res.status(400).json({
+          success: false,
+          message: 'PKCE codeVerifier is required for secure authorization code exchange.',
+          code: 'CODE_VERIFIER_REQUIRED',
+        });
+        return;
+      }
+      try {
+        const configuredRedirectUri = redirectUri || 'https://wepsun.onrender.com/api/auth/google/callback';
+        verified = await exchangeGooglePkceCode(code, codeVerifier, configuredRedirectUri, nonce);
+      } catch (err: any) {
+        console.warn('[AuthRoute] Google PKCE exchange rejected:', err.message);
+        const errorCode = err.message?.includes('code_verifier') || err.message?.includes('PKCE')
+          ? 'INVALID_PKCE_VERIFIER'
+          : 'INVALID_GOOGLE_CODE';
+        res.status(401).json({
+          success: false,
+          message: err.message || 'Invalid or expired Google authorization code.',
+          code: errorCode,
+        });
+        return;
+      }
+    } else if (credential && typeof credential === 'string') {
       try {
         verified = await verifyGoogleIdToken(credential);
       } catch (err: any) {
-        if (bodyEmail && typeof bodyEmail === 'string' && bodyEmail.includes('@')) {
-          console.warn('[AuthRoute] Google ID token verification notice, falling back to payload email:', bodyEmail);
-          verified = {
-            googleId: bodyGoogleId || 'google-' + bodyEmail.toLowerCase().trim(),
-            email: bodyEmail.toLowerCase().trim(),
-            name: bodyName || bodyEmail.split('@')[0],
-            picture: bodyAvatar || bodyPicture,
-            emailVerified: true,
-          };
-        } else {
-          console.warn('[AuthRoute] Google ID token verification rejected:', err.message);
-          res.status(401).json({
-            success: false,
-            message: err.message || 'Invalid or expired Google credential.',
-            code: 'INVALID_GOOGLE_CREDENTIAL',
-          });
-          return;
-        }
+        console.warn('[AuthRoute] Google ID token verification rejected:', err.message);
+        res.status(401).json({
+          success: false,
+          message: err.message || 'Invalid or expired Google credential.',
+          code: 'INVALID_GOOGLE_CREDENTIAL',
+        });
+        return;
       }
     } else if (clientAccessToken && typeof clientAccessToken === 'string') {
       try {
         verified = await verifyGoogleAccessToken(clientAccessToken);
       } catch (err: any) {
-        if (bodyEmail && typeof bodyEmail === 'string' && bodyEmail.includes('@')) {
-          console.warn('[AuthRoute] Google access token verification notice, falling back to payload email:', bodyEmail);
-          verified = {
-            googleId: bodyGoogleId || 'google-' + bodyEmail.toLowerCase().trim(),
-            email: bodyEmail.toLowerCase().trim(),
-            name: bodyName || bodyEmail.split('@')[0],
-            picture: bodyAvatar || bodyPicture,
-            emailVerified: true,
-          };
-        } else {
-          console.warn('[AuthRoute] Google access token verification rejected:', err.message);
-          res.status(401).json({
-            success: false,
-            message: err.message || 'Invalid or expired Google access token.',
-            code: 'INVALID_GOOGLE_ACCESS_TOKEN',
-          });
-          return;
-        }
+        console.warn('[AuthRoute] Google access token verification rejected:', err.message);
+        res.status(401).json({
+          success: false,
+          message: err.message || 'Invalid or expired Google access token.',
+          code: 'INVALID_GOOGLE_ACCESS_TOKEN',
+        });
+        return;
       }
-    } else if (bodyEmail && typeof bodyEmail === 'string' && bodyEmail.includes('@')) {
-      verified = {
-        googleId: bodyGoogleId || 'google-' + bodyEmail.toLowerCase().trim(),
-        email: bodyEmail.toLowerCase().trim(),
-        name: bodyName || bodyEmail.split('@')[0],
-        picture: bodyAvatar || bodyPicture,
-        emailVerified: true,
-      };
     } else {
       res.status(400).json({
         success: false,
@@ -423,7 +418,7 @@ router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Respo
           db.users.find((u) => u.email.toLowerCase() === cleanEmail) ||
           (db as any).demoAccounts?.find((d: any) => d.email.toLowerCase() === cleanEmail);
         if (mockEmailUser) {
-          user = { ...mockEmailUser };
+          user = mockEmailUser;
         }
       }
 
@@ -454,6 +449,13 @@ router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Respo
           user.googleId = googleSub;
           if (!user.avatarUrl && googleAvatar) {
             user.avatarUrl = googleAvatar;
+          }
+          const memUser = db.users.find((u: any) => u.id === user.id || (u.email && u.email.toLowerCase() === cleanEmail));
+          if (memUser) {
+            memUser.googleId = googleSub;
+            if (!memUser.avatarUrl && googleAvatar) {
+              memUser.avatarUrl = googleAvatar;
+            }
           }
         }
       }
@@ -497,13 +499,11 @@ router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Respo
           const newClient = await prisma.client.create({
             data: {
               companyId: defaultCompanyId,
-              branchId: 'br-mum-1',
               name: displayName + ' Property',
               contactPerson: displayName,
               email: cleanEmail,
               phone: '+91 98200 00000',
               billingAddress: 'Registered Office',
-              status: 'active',
             },
           });
           createdClientId = newClient.id;
@@ -530,24 +530,53 @@ router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Respo
           },
           include: { company: true },
         });
-      } catch {
-        // Fallback for in-memory / testing environment
-        user = {
-          id: newUserId,
-          name: displayName,
-          email: cleanEmail,
-          googleId: googleSub,
-          authProvider: 'google',
-          phone: '+91 98200 00000',
-          role: assignedRole,
-          companyId: defaultCompanyId,
-          branchId: null,
-          clientId: createdClientId || 'client-' + newUserId,
-          technicianId: null,
-          avatarUrl: googleAvatar || null,
-          isActive: true,
-          tokenVersion: 0,
-        };
+      } catch (createErr: any) {
+        // Handle race conditions during concurrent user registration
+        if (createErr?.code === 'P2002') {
+          try {
+            user = await prisma.user.findFirst({
+              where: {
+                OR: [
+                  { googleId: googleSub },
+                  { email: { equals: cleanEmail, mode: 'insensitive' as const } },
+                ],
+              },
+              include: { company: true },
+            });
+          } catch {
+            user = null;
+          }
+        }
+
+        if (!user) {
+          // Fallback for in-memory / testing environment
+          user = {
+            id: newUserId,
+            name: displayName,
+            email: cleanEmail,
+            googleId: googleSub,
+            authProvider: 'google',
+            phone: '+91 98200 00000',
+            role: assignedRole,
+            companyId: defaultCompanyId,
+            branchId: null,
+            clientId: createdClientId || 'client-' + newUserId,
+            technicianId: null,
+            avatarUrl: googleAvatar || null,
+            isActive: true,
+            tokenVersion: 0,
+          };
+          db.users.push(user);
+        }
+      }
+    }
+
+    // Mirror/cache user in memory for resilient cross-device lookup under volatile remote connection pools
+    if (user && user.id) {
+      const existingIdx = db.users.findIndex((u: any) => u.id === user.id || (u.email && u.email.toLowerCase() === cleanEmail));
+      if (existingIdx >= 0) {
+        db.users[existingIdx] = { ...db.users[existingIdx], ...user };
+      } else {
         db.users.push(user);
       }
     }
@@ -565,13 +594,11 @@ router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Respo
           clientRec = await prisma.client.create({
             data: {
               companyId: user.companyId || 'comp-1',
-              branchId: user.branchId || 'br-mum-1',
               name: user.name + ' Property',
               contactPerson: user.name,
               email: user.email,
               phone: user.phone || '+91 98200 00000',
               billingAddress: 'Registered Office',
-              status: 'active',
             },
           });
         }
@@ -593,6 +620,86 @@ router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Respo
         code: 'ACCOUNT_DEACTIVATED',
       });
       return;
+    }
+
+    // STRICT BUSINESS RULE: Validate Technician Account Status for technicians logging in with Google
+    if (user.role === 'TECHNICIAN') {
+      let technicianRecord: any = null;
+      if (user.technicianId) {
+        try {
+          technicianRecord = await prisma.technician.findUnique({
+            where: { id: user.technicianId },
+          });
+        } catch {
+          technicianRecord = db.technicians?.find((t: any) => t.id === user.technicianId);
+        }
+      }
+
+      if (!technicianRecord && cleanEmail) {
+        try {
+          technicianRecord = await prisma.technician.findFirst({
+            where: { email: { equals: cleanEmail, mode: 'insensitive' as const } },
+          });
+          if (technicianRecord && !user.technicianId) {
+            await prisma.user.update({
+              where: { id: user.id },
+              data: { technicianId: technicianRecord.id },
+            }).catch(() => {});
+            user.technicianId = technicianRecord.id;
+          }
+        } catch {
+          technicianRecord = db.technicians?.find((t: any) => t.email?.toLowerCase() === cleanEmail);
+        }
+      }
+
+      if (technicianRecord) {
+        if (technicianRecord.accountStatus === 'PENDING_APPROVAL') {
+          res.status(403).json({
+            success: false,
+            message: 'Your technician account is awaiting admin approval.',
+            code: 'ACCOUNT_PENDING_APPROVAL',
+          });
+          return;
+        }
+
+        if (technicianRecord.accountStatus === 'BLOCKED') {
+          res.status(403).json({
+            success: false,
+            message: 'Your technician account has been blocked. Please contact the administrator.',
+            code: 'ACCOUNT_BLOCKED',
+            reason: technicianRecord.blockReason || undefined,
+          });
+          return;
+        }
+
+        if (technicianRecord.accountStatus === 'REJECTED') {
+          res.status(403).json({
+            success: false,
+            message: 'Your technician registration was rejected. Please contact the administrator.',
+            code: 'ACCOUNT_REJECTED',
+            reason: technicianRecord.rejectionReason || undefined,
+          });
+          return;
+        }
+
+        if (technicianRecord.accountStatus === 'SUSPENDED') {
+          res.status(403).json({
+            success: false,
+            message: 'Your technician account has been suspended. Please contact the administrator.',
+            code: 'ACCOUNT_SUSPENDED',
+          });
+          return;
+        }
+
+        if (technicianRecord.accountStatus !== 'APPROVED') {
+          res.status(403).json({
+            success: false,
+            message: 'Your technician account is awaiting admin approval.',
+            code: 'ACCOUNT_NOT_APPROVED',
+          });
+          return;
+        }
+      }
     }
 
     // Generate Application's Own JWT Access Token (Never use Google's token as app session)
@@ -663,7 +770,16 @@ router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Respo
 });
 
 // GET /api/auth/google/callback — Google OAuth 2.0 Web & Mobile Callback Gateway
-router.get('/google/callback', (_req, res: Response): void => {
+router.get('/google/callback', (req: AuthenticatedRequest, res: Response): void => {
+  const safeParams = new URLSearchParams();
+  if (typeof req.query.code === 'string') safeParams.set('code', req.query.code);
+  if (typeof req.query.state === 'string') safeParams.set('state', req.query.state);
+  if (typeof req.query.error === 'string') safeParams.set('error', req.query.error);
+  if (typeof req.query.error_description === 'string') safeParams.set('error_description', req.query.error_description);
+
+  const initialQuery = safeParams.toString();
+  const initialDeepLink = 'wepsun://auth-callback' + (initialQuery ? '?' + initialQuery : '');
+
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(`<!DOCTYPE html>
 <html lang="en">
@@ -684,8 +800,8 @@ router.get('/google/callback', (_req, res: Response): void => {
     <div class="spinner"></div>
     <h2 style="margin: 0 0 8px; font-size: 18px;">Authenticating with Google...</h2>
     <p style="margin: 0; font-size: 13px; color: #93c5fd;">Returning you securely to WEPSUN</p>
-    <div id="btn-container" style="display: none;">
-      <a id="deepLinkBtn" href="#" class="btn">Tap to Open WEPSUN App</a>
+    <div id="btn-container" style="display: block; margin-top: 20px;">
+      <a id="deepLinkBtn" href="${initialDeepLink}" class="btn">Tap to Open WEPSUN App</a>
       <a id="webReturnBtn" href="/#" class="btn" style="display: none; background: #2563EB; margin-top: 10px;">Return to WEPSUN Web</a>
     </div>
   </div>
@@ -693,7 +809,18 @@ router.get('/google/callback', (_req, res: Response): void => {
     (function() {
       var hash = window.location.hash ? window.location.hash.substring(1) : '';
       var search = window.location.search ? window.location.search.substring(1) : '';
-      var query = hash || search;
+      var rawQuery = search || hash;
+
+      // PKCE Authorization Code Gateway Sanitization:
+      // Strictly extract ONLY code, state, error, error_description.
+      // Explicitly reject and strip any token smuggling in query or hash.
+      var params = new URLSearchParams(rawQuery);
+      var safeParams = new URLSearchParams();
+      if (params.get('code')) safeParams.set('code', params.get('code'));
+      if (params.get('state')) safeParams.set('state', params.get('state'));
+      if (params.get('error')) safeParams.set('error', params.get('error'));
+      if (params.get('error_description')) safeParams.set('error_description', params.get('error_description'));
+      var query = safeParams.toString();
 
       if (query) {
         var deepLink = 'wepsun://auth-callback?' + query;
@@ -1585,7 +1712,16 @@ router.post('/refresh', authLimiter, async (req: AuthenticatedRequest, res: Resp
         expiresIn: rotated.tokens.expiresIn,
       },
     });
-  } catch {
+  } catch (err: any) {
+    res.clearCookie('refreshToken', { path: '/api/auth' });
+    if (err instanceof AuthSecurityError || err?.code) {
+      res.status(err.statusCode || 401).json({
+        success: false,
+        message: err.message,
+        code: err.code,
+      });
+      return;
+    }
     res.status(500).json({
       success: false,
       message: 'Token refresh failed.',

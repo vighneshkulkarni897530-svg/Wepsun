@@ -900,7 +900,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     // Mobile browsers proactively block window.open popups. Full-page redirect provides a 100% reliable flow without pop-up blocking dialogs.
     const isMobileBrowser = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     if (isMobileBrowser) {
-      triggerDirectGoogleOAuth({ role: selectedRole || 'client' });
+      await triggerDirectGoogleOAuth({ role: selectedRole || 'client' });
       return;
     }
 
@@ -995,14 +995,20 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 },
               });
             } else {
-              // If cloud backend response failed or is unreachable, seamlessly open GoogleAuthModal
               closePopup();
-              setIsGoogleModalOpen(true);
+              const errorMsg = (res as any)?.message || 'Google sign-in could not be completed.';
+              showGoogleFailed({
+                error: errorMsg,
+                onRetry: () => handleGoogleAuth(),
+              });
             }
           } catch (err: any) {
             console.warn('[GoogleAuth] Backend verification notice:', err?.message);
             closePopup();
-            setIsGoogleModalOpen(true);
+            showGoogleFailed({
+              error: err?.message || 'Google authentication encountered an unexpected error.',
+              onRetry: () => handleGoogleAuth(),
+            });
           } finally {
             setIsGoogleSubmitting(false);
           }
@@ -1010,16 +1016,26 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         (popupError) => {
           setIsGoogleSubmitting(false);
           closePopup();
-          console.warn('[GoogleAuth] Popup closed or blocked by browser, opening in-app Google Chooser:', popupError.message);
-          // If popup is blocked by browser, user closed popup, or GIS script blocked, open GoogleAuthModal immediately
-          setIsGoogleModalOpen(true);
+          if (popupError?.message?.includes('closed')) {
+            showGoogleCancelled({
+              onTryAgain: () => handleGoogleAuth(),
+            });
+          } else {
+            showGoogleFailed({
+              error: popupError?.message || 'Google sign-in popup was blocked or closed.',
+              onRetry: () => handleGoogleAuth(),
+            });
+          }
         }
       );
     } catch (err: any) {
       setIsGoogleSubmitting(false);
       closePopup();
       console.warn('[GoogleAuth] GIS initiation fallback:', err?.message);
-      setIsGoogleModalOpen(true);
+      showGoogleFailed({
+        error: err?.message || 'Google Identity Services could not be initialized.',
+        onRetry: () => handleGoogleAuth(),
+      });
     }
   };
 

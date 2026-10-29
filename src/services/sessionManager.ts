@@ -13,12 +13,146 @@ import { App as CapApp } from '@capacitor/app';
 import { Preferences } from '@capacitor/preferences';
 import { isValidCustomAvatar, isDummyAvatar } from '../utils/avatarUtils';
 
+/**
+ * Application-Level AES-256-GCM Authenticated Encryption Vault
+ * 
+ * Provides confidentiality and integrity protection for confidential tokens
+ * stored in native Preferences (@capacitor/preferences) on Android and iOS.
+ * 
+ * Security Architecture & Guarantees:
+ * - Uses WebCrypto SubtleCrypto with a device-unique high-entropy installation seed (256-bit random).
+ * - Key Derivation: PBKDF2 with SHA-256 and 100,000 iterations to derive an AES-256-GCM key.
+ * - Authenticated Encryption: AES-256-GCM with a unique 12-byte cryptographically random IV per write.
+ *   Provides authenticated decryption (128-bit authentication tag) preventing tampering.
+ * - Key Loss & Recovery: If decryption fails (due to storage corruption, OS migration, or tampered storage),
+ *   the invalid entry is safely purged and returns null, enforcing clean re-authentication without leaking data.
+ * - Device Isolation: Android auto-backup is disabled (android:allowBackup="false") to prevent ADB
+ *   or Google Drive backup extraction of encrypted tokens.
+ * - Note on Hardware Keystore: This implementation provides application sandbox authenticated encryption.
+ *   Hardware-backed Keystore/Secure Enclave (TEE/SE) requires a dedicated native Java/Kotlin plugin.
+ */
+
+const VAULT_SEED_KEY = 'wepsun_vault_seed_v2';
+const VAULT_SALT_KEY = 'wepsun_vault_salt_v2';
+let cachedCryptoKey: CryptoKey | null = null;
+
+async function getDeviceVaultKey(): Promise<CryptoKey | null> {
+  if (typeof window === 'undefined' || !window.crypto?.subtle) return null;
+  if (cachedCryptoKey) return cachedCryptoKey;
+
+  try {
+    let rawSeed = localStorage.getItem(VAULT_SEED_KEY);
+    let rawSalt = localStorage.getItem(VAULT_SALT_KEY);
+
+    if (!rawSeed || !rawSalt) {
+      // Generate 256-bit cryptographically secure random installation seed & 128-bit salt
+      const seedBytes = new Uint8Array(32);
+      const saltBytes = new Uint8Array(16);
+      window.crypto.getRandomValues(seedBytes);
+      window.crypto.getRandomValues(saltBytes);
+
+      rawSeed = Array.from(seedBytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+      rawSalt = Array.from(saltBytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+
+      try {
+        localStorage.setItem(VAULT_SEED_KEY, rawSeed);
+        localStorage.setItem(VAULT_SALT_KEY, rawSalt);
+      } catch {
+        // Fallback for private browsing
+      }
+    }
+
+    const enc = new TextEncoder();
+    const keyMaterial = await window.crypto.subtle.importKey(
+      'raw',
+      enc.encode(rawSeed),
+      'PBKDF2',
+      false,
+      ['deriveKey']
+    );
+
+    cachedCryptoKey = await window.crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: enc.encode(rawSalt),
+        iterations: 100000,
+        hash: 'SHA-256',
+      },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt']
+    );
+
+    return cachedCryptoKey;
+  } catch (err) {
+    console.warn('[Vault] Failed to derive vault encryption key:', err);
+    return null;
+  }
+}
+
+async function encryptForVault(plaintext: string): Promise<string> {
+  try {
+    const key = await getDeviceVaultKey();
+    if (!key || typeof window === 'undefined') return plaintext;
+
+    const iv = window.crypto.getRandomValues(new Uint8Array(12));
+    const encoded = new TextEncoder().encode(plaintext);
+    const ciphertext = await window.crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv },
+      key,
+      encoded
+    );
+
+    const ivHex = Array.from(iv).map((b) => b.toString(16).padStart(2, '0')).join('');
+    const cipherHex = Array.from(new Uint8Array(ciphertext)).map((b) => b.toString(16).padStart(2, '0')).join('');
+    return `enc:v2:${ivHex}:${cipherHex}`;
+  } catch (err) {
+    console.warn('[Vault] Encryption error; falling back to plaintext:', err);
+    return plaintext;
+  }
+}
+
+async function decryptFromVault(storedValue: string): Promise<string | null> {
+  if (!storedValue) return null;
+  if (!storedValue.startsWith('enc:v2:') && !storedValue.startsWith('enc:v1:')) {
+    return storedValue;
+  }
+
+  try {
+    const key = await getDeviceVaultKey();
+    if (!key || typeof window === 'undefined') return storedValue;
+
+    const parts = storedValue.split(':');
+    if (parts.length !== 4) return null;
+
+    const ivHex = parts[2];
+    const cipherHex = parts[3];
+
+    const iv = new Uint8Array(ivHex.match(/.{1,2}/g)!.map((byte) => parseInt(byte, 16)));
+    const ciphertext = new Uint8Array(cipherHex.match(/.{1,2}/g)!.map((byte) => parseInt(byte, 16)));
+
+    const decrypted = await window.crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv },
+      key,
+      ciphertext
+    );
+
+    return new TextDecoder().decode(decrypted);
+  } catch {
+    console.warn('[Vault] Authenticated decryption failed. Data corrupted or key mismatch; purging invalid token.');
+    return null;
+  }
+}
+
 // Safe Native Preferences bridge for Android/iOS native app with web fallback.
-// Uses Android SharedPreferences on Android, UserDefaults on iOS, and localStorage on Web.
+// Uses AES-256-GCM authenticated encryption for confidential tokens before writing to native Preferences.
 async function nativePrefSet(key: string, value: string): Promise<void> {
   try {
     if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
-      await Preferences.set({ key, value });
+      const isConfidential = key.includes('token') || key.includes('session');
+      const valueToStore = isConfidential ? await encryptForVault(value) : value;
+      await Preferences.set({ key, value: valueToStore });
     }
   } catch {
     // Non-blocking fallback
@@ -29,7 +163,14 @@ async function nativePrefGet(key: string): Promise<string | null> {
   try {
     if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
       const res = await Preferences.get({ key });
-      return res.value || null;
+      if (!res.value) return null;
+      const decrypted = await decryptFromVault(res.value);
+      if (decrypted === null && res.value.startsWith('enc:')) {
+        // Corrupted ciphertext or key loss: clean invalid preference to prevent stale failure loops
+        await Preferences.remove({ key });
+        return null;
+      }
+      return decrypted;
     }
     return null;
   } catch {

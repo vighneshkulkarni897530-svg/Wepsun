@@ -436,28 +436,99 @@ export interface GoogleOAuthOptions {
   customRedirectUri?: string;
 }
 
+const STORAGE_OAUTH_PKCE_KEY = 'wepsun_oauth_pkce_session_v2';
+
+export interface PkceSessionData {
+  codeVerifier: string;
+  state: string;
+  nonce: string;
+  role: UserRole;
+  redirectUri: string;
+  timestamp: number;
+}
+
 /**
- * Build standard Google OAuth 2.0 Account Selection URL.
- * Works uniformly across Web (desktop & mobile) and Android Custom Tabs.
- * Passes structured state { isNativeApp, returnUrl, role, nonce } to ensure Render gateway
- * routes credentials back to the correct client without origin_mismatch errors.
+ * Generate cryptographically secure random string using WebCrypto
  */
-export function buildGoogleOAuthUrl(options: GoogleOAuthOptions = {}): string {
+export function generateRandomString(length: number = 64): string {
+  if (typeof window !== 'undefined' && window.crypto?.getRandomValues) {
+    const array = new Uint8Array(length);
+    window.crypto.getRandomValues(array);
+    const unreservedChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+    return Array.from(array, (byte) => unreservedChars[byte % unreservedChars.length]).join('');
+  }
+  let result = '';
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+/**
+ * Generate SHA-256 base64url code challenge from verifier (RFC 7636 PKCE)
+ */
+export async function generateCodeChallenge(codeVerifier: string): Promise<string> {
+  if (typeof window !== 'undefined' && window.crypto?.subtle) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(codeVerifier);
+    const digest = await window.crypto.subtle.digest('SHA-256', data);
+    const binary = String.fromCharCode(...new Uint8Array(digest));
+    const base64 = btoa(binary);
+    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  return codeVerifier;
+}
+
+/**
+ * Build standard Google OAuth 2.0 PKCE Authorization URL.
+ * Works uniformly across Web (desktop & mobile) and Android Chrome Custom Tabs.
+ * Secures the request using RFC 7636 (PKCE S256) and an unguessable CSRF state parameter.
+ * Stores { codeVerifier, state, nonce, redirectUri, role } in sessionStorage.
+ */
+export async function buildGoogleOAuthUrl(options: GoogleOAuthOptions = {}): Promise<string> {
   const clientId = getGoogleClientId();
   const redirectUri = options.customRedirectUri || 'https://wepsun.onrender.com/api/auth/google/callback';
-  const nonce = 'wepsun_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
+  
+  const codeVerifier = generateRandomString(64);
+  const codeChallenge = await generateCodeChallenge(codeVerifier);
+  const nonce = 'wepsun_nonce_' + generateRandomString(16);
+  const csrfToken = generateRandomString(24);
+
+  const isNative = options.isNativeApp ?? (typeof window !== 'undefined' ? Boolean((window as any).Capacitor?.isNativePlatform?.()) : false);
+  const role = options.role ?? 'client';
+  const returnUrl = options.returnUrl ?? (typeof window !== 'undefined' ? window.location.origin : '');
 
   const statePayload = {
-    isNativeApp: options.isNativeApp ?? (typeof window !== 'undefined' ? Boolean((window as any).Capacitor?.isNativePlatform?.()) : false),
-    returnUrl: options.returnUrl ?? (typeof window !== 'undefined' ? window.location.origin : ''),
-    role: options.role ?? 'client',
+    csrf: csrfToken,
+    isNativeApp: isNative,
+    returnUrl,
+    role,
     nonce,
   };
 
-  const state = encodeURIComponent(JSON.stringify(statePayload));
+  const stateString = encodeURIComponent(JSON.stringify(statePayload));
+
+  // Store PKCE session context in sessionStorage for callback validation
+  if (typeof window !== 'undefined') {
+    try {
+      const sessionData: PkceSessionData = {
+        codeVerifier,
+        state: stateString,
+        nonce,
+        role,
+        redirectUri,
+        timestamp: Date.now(),
+      };
+      sessionStorage.setItem(STORAGE_OAUTH_PKCE_KEY, JSON.stringify(sessionData));
+    } catch (e) {
+      console.warn('[GoogleOAuth] Could not cache PKCE session in sessionStorage:', e);
+    }
+  }
+
   const scopes = encodeURIComponent('openid email profile');
 
-  return `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token%20id_token&scope=${scopes}&prompt=select_account&nonce=${nonce}&state=${state}`;
+  return `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scopes}&prompt=select_account&code_challenge=${encodeURIComponent(codeChallenge)}&code_challenge_method=S256&nonce=${encodeURIComponent(nonce)}&state=${stateString}`;
 }
 
 /**
@@ -466,7 +537,7 @@ export function buildGoogleOAuthUrl(options: GoogleOAuthOptions = {}): string {
 export async function openNativeGoogleOAuth(options?: GoogleOAuthOptions | string): Promise<void> {
   const { Browser } = await import('@capacitor/browser');
   const opts: GoogleOAuthOptions = typeof options === 'string' ? { customRedirectUri: options } : options || {};
-  const googleAuthUrl = buildGoogleOAuthUrl({
+  const googleAuthUrl = await buildGoogleOAuthUrl({
     ...opts,
     isNativeApp: true,
   });
@@ -481,16 +552,18 @@ export async function openNativeGoogleOAuth(options?: GoogleOAuthOptions | strin
 /**
  * Initiate full-page Google OAuth redirect (used for mobile web to prevent popup blocking)
  */
-export function triggerDirectGoogleOAuth(options: GoogleOAuthOptions = {}): void {
+export async function triggerDirectGoogleOAuth(options: GoogleOAuthOptions = {}): Promise<void> {
   if (typeof window !== 'undefined') {
-    window.location.href = buildGoogleOAuthUrl(options);
+    const url = await buildGoogleOAuthUrl(options);
+    window.location.href = url;
   }
 }
 
-
 /**
  * Unified OAuth callback query string / deep link handler.
- * Processes tokens from Android app deep links (wepsun://auth-callback) and Web popup postMessages.
+ * Validates state, exchanges PKCE code with the backend over HTTPS POST,
+ * and handles Android deep links (wepsun://auth-callback) and Web popup postMessages.
+ * Eliminates raw tokens from URLs and URL query strings.
  */
 export async function handleGoogleAuthCallback(
   queryOrUrl: string,
@@ -505,16 +578,87 @@ export async function handleGoogleAuthCallback(
     }
 
     const params = new URLSearchParams(queryString);
-    const accessToken = params.get('access_token');
-    const idToken = params.get('id_token') || params.get('credential');
+    const code = params.get('code');
+    const returnedState = params.get('state');
     const error = params.get('error') || params.get('error_description');
 
     if (error) {
       throw new Error(`Google authorization error: ${error}`);
     }
 
-    if (!accessToken && !idToken) {
-      throw new Error('No authentication token found in callback.');
+    // 1. Retrieve stored PKCE session
+    let storedSession: PkceSessionData | null = null;
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = sessionStorage.getItem(STORAGE_OAUTH_PKCE_KEY);
+        if (raw) {
+          storedSession = JSON.parse(raw);
+        }
+      } catch (e) {
+        console.warn('[GoogleAuth] Failed to parse stored PKCE session:', e);
+      }
+    }
+
+    // 2. PKCE Authorization Code Flow
+    if (code) {
+      const codeVerifier = storedSession?.codeVerifier;
+      const nonce = storedSession?.nonce;
+      const redirectUri = storedSession?.redirectUri || 'https://wepsun.onrender.com/api/auth/google/callback';
+      const role = storedSession?.role || targetRole;
+
+      // Validate CSRF state
+      if (returnedState && storedSession?.state) {
+        const decodedReturned = decodeURIComponent(returnedState);
+        const decodedStored = decodeURIComponent(storedSession.state);
+        if (decodedReturned !== decodedStored && returnedState !== storedSession.state) {
+          throw new Error('OAuth state verification failed. Potential login CSRF or session mismatch.');
+        }
+      }
+
+      // Purge PKCE session to prevent replay
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.removeItem(STORAGE_OAUTH_PKCE_KEY);
+        } catch {}
+      }
+
+      const isNative = typeof window !== 'undefined' ? Boolean((window as any).Capacitor?.isNativePlatform?.()) : false;
+
+      const res = await apiService.googleLogin({
+        code,
+        codeVerifier,
+        redirectUri,
+        nonce,
+        platform: isNative ? 'android' : 'web',
+        role: role.toUpperCase(),
+        companyId: 'comp-1',
+      });
+
+      if (res && res.success && res.data) {
+        const { user, accessToken: newAccess, refreshToken: newRefresh } = res.data;
+        if (newAccess) {
+          setTokens(newAccess, newRefresh);
+        }
+        if (user?.email) {
+          saveRecentGoogleAccount({
+            email: user.email,
+            name: user.name || 'Google User',
+            role,
+            avatarUrl: user.avatarUrl,
+          });
+        }
+        return { success: true, user };
+      }
+
+      throw new Error(res?.message || 'Google authorization code could not be verified by server.');
+    }
+
+    // Fallback: Check if legacy ID token or access token was provided
+    const accessToken = params.get('access_token');
+    const idToken = params.get('id_token') || params.get('credential');
+
+    if (!code && !accessToken && !idToken) {
+      throw new Error('No authorization code or authentication credential found in callback.');
     }
 
     let profile: GoogleUserProfile | null = null;
@@ -564,29 +708,7 @@ export async function handleGoogleAuthCallback(
       return { success: true, user };
     }
 
-    // Fallback if backend response wrapped
-    if (profile?.email) {
-      const user = {
-        id: 'usr-g-' + (profile.sub || Date.now()),
-        name: profile.name || profile.email.split('@')[0],
-        email: profile.email,
-        phone: '+91 98200 00000',
-        role: targetRole,
-        companyId: 'comp-1',
-        clientId: targetRole === 'client' ? `client-${profile.sub || Date.now()}` : undefined,
-        avatar: profile.picture,
-        isActive: true,
-      };
-      saveRecentGoogleAccount({
-        email: profile.email,
-        name: profile.name,
-        role: targetRole,
-        avatarUrl: profile.picture,
-      });
-      return { success: true, user };
-    }
-
-    throw new Error(res?.message || 'Google account could not be authenticated.');
+    throw new Error(res?.message || 'Google account could not be authenticated by server.');
   } catch (err: any) {
     console.warn('[GoogleAuth] Callback processing error:', err);
     return { success: false, error: err?.message || 'Authentication failed' };

@@ -155,7 +155,16 @@ app.get('/api/health', async (_req, res) => {
 });
 
 // OAuth Deep Link Callback Handler for Android Mobile & Web Popup Handshakes
-const sendOAuthCallbackHtml = (_req: express.Request, res: express.Response) => {
+const sendOAuthCallbackHtml = (req: express.Request, res: express.Response) => {
+  const safeParams = new URLSearchParams();
+  if (typeof req.query.code === 'string') safeParams.set('code', req.query.code);
+  if (typeof req.query.state === 'string') safeParams.set('state', req.query.state);
+  if (typeof req.query.error === 'string') safeParams.set('error', req.query.error);
+  if (typeof req.query.error_description === 'string') safeParams.set('error_description', req.query.error_description);
+
+  const initialQuery = safeParams.toString();
+  const initialDeepLink = 'wepsun://auth-callback' + (initialQuery ? '?' + initialQuery : '');
+
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(`<!DOCTYPE html>
 <html lang="en">
@@ -177,7 +186,7 @@ const sendOAuthCallbackHtml = (_req: express.Request, res: express.Response) => 
     <h2 style="margin: 0 0 8px; font-size: 18px;">Authenticating with Google...</h2>
     <p style="margin: 0; font-size: 13px; color: #93c5fd;">Returning you securely to WEPSUN</p>
     <div id="btn-container" style="display: block; margin-top: 20px;">
-      <a id="deepLinkBtn" href="wepsun://auth-callback" class="btn">Tap to Return to WEPSUN App</a>
+      <a id="deepLinkBtn" href="${initialDeepLink}" class="btn">Tap to Return to WEPSUN App</a>
       <a id="webReturnBtn" href="/#" class="btn" style="display: none; background: #2563EB; margin-top: 10px;">Return to WEPSUN Web</a>
     </div>
   </div>
@@ -185,12 +194,22 @@ const sendOAuthCallbackHtml = (_req: express.Request, res: express.Response) => 
     (function() {
       var hash = window.location.hash ? window.location.hash.substring(1) : '';
       var search = window.location.search ? window.location.search.substring(1) : '';
-      var query = hash || search;
+      var rawQuery = search || hash;
+
+      // PKCE Authorization Code Gateway Sanitization:
+      // Strictly extract ONLY code, state, error, error_description.
+      // Explicitly reject and strip any token smuggling in query or hash.
+      var params = new URLSearchParams(rawQuery);
+      var safeParams = new URLSearchParams();
+      if (params.get('code')) safeParams.set('code', params.get('code'));
+      if (params.get('state')) safeParams.set('state', params.get('state'));
+      if (params.get('error')) safeParams.set('error', params.get('error'));
+      if (params.get('error_description')) safeParams.set('error_description', params.get('error_description'));
+      var query = safeParams.toString();
 
       // Extract OAuth state payload if available
       var stateObj = null;
       try {
-        var params = new URLSearchParams(query);
         var rawState = params.get('state');
         if (rawState) {
           stateObj = JSON.parse(decodeURIComponent(rawState));

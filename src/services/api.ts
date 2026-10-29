@@ -384,6 +384,11 @@ export const apiService = {
   googleLogin: (payload: {
     credential?: string;
     accessToken?: string;
+    code?: string;
+    codeVerifier?: string;
+    redirectUri?: string;
+    nonce?: string;
+    platform?: string;
     email?: string;
     name?: string;
     avatarUrl?: string;
