@@ -10,7 +10,11 @@ router.get('/', requireAuth, requireRole(['SUPER_ADMIN', 'COMPANY_ADMIN']), asyn
   try {
     const user = req.user!;
     const isSuper = user.role === 'SUPER_ADMIN';
-    const companyId = isSuper ? (req.query.companyId as string) || user.companyId || 'comp-1' : user.companyId || 'comp-1';
+    const companyId = isSuper ? (req.query.companyId as string) || user.companyId : user.companyId;
+    if (!companyId) {
+      res.status(403).json({ success: false, message: 'Tenant company context required', code: 'TENANT_REQUIRED' });
+      return;
+    }
     const { entityType, userRole, search } = req.query;
 
     let result: any[] = [];

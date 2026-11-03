@@ -3,8 +3,11 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
 import apiRouter from './routes/index.js';
 import { checkDatabaseConnection } from './lib/prisma.js';
+import { scrubLegacyUserAgentCredentials, pruneExpiredSessionRotations } from './lib/auth.js';
 
 dotenv.config();
 
@@ -77,7 +80,10 @@ app.use(
         return callback(null, true);
       }
 
-      callback(null, true); // Gracefully allow to avoid blocking legitimate cross-origin web apps
+      if (process.env.NODE_ENV === 'production') {
+        return callback(new Error(`CORS policy blocked access for origin: ${origin}`));
+      }
+      callback(null, true);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
@@ -152,6 +158,29 @@ app.get('/api/health', async (_req, res) => {
       provider: 'postgresql',
     },
   });
+});
+
+// Digital Asset Links for Android App Links verification
+app.get('/.well-known/assetlinks.json', (_req, res) => {
+  const assetLinksPath = path.resolve(process.cwd(), 'public/.well-known/assetlinks.json');
+  if (fs.existsSync(assetLinksPath)) {
+    res.setHeader('Content-Type', 'application/json');
+    res.sendFile(assetLinksPath);
+  } else {
+    res.setHeader('Content-Type', 'application/json');
+    res.json([
+      {
+        relation: ['delegate_permission/common.handle_all_urls'],
+        target: {
+          namespace: 'android_app',
+          package_name: 'com.wepsun.engineering',
+          sha256_cert_fingerprints: [
+            'AE:7B:A4:4A:55:AC:FF:42:26:76:04:6F:45:1A:EE:D6:43:1C:10:26:EC:0E:84:91:7B:7F:D9:E8:41:E0:BD:34',
+          ],
+        },
+      },
+    ]);
+  }
 });
 
 // OAuth Deep Link Callback Handler for Android Mobile & Web Popup Handshakes
@@ -240,10 +269,17 @@ const sendOAuthCallbackHtml = (req: express.Request, res: express.Response) => {
         return;
       }
 
-      // 2. Desktop Web Popup Window (Broadcast message to parent window and close)
+      // 2. Desktop Web Popup Window (Broadcast message to parent window with strict targetOrigin and close)
       if (window.opener) {
         try {
-          window.opener.postMessage({ type: 'WEPSUN_GOOGLE_AUTH_CALLBACK', query: query }, '*');
+          var targetOrigin = window.location.origin;
+          if (returnUrl && (returnUrl.startsWith('http://localhost') || returnUrl.startsWith('https://') || returnUrl.startsWith('capacitor://'))) {
+            try {
+              var parsedUrl = new URL(returnUrl);
+              targetOrigin = parsedUrl.origin;
+            } catch(e) {}
+          }
+          window.opener.postMessage({ type: 'WEPSUN_GOOGLE_AUTH_CALLBACK', query: query }, targetOrigin);
         } catch (e) {}
         setTimeout(function() { window.close(); }, 600);
         return;
@@ -291,6 +327,28 @@ const server = app.listen(PORT, HOST, () => {
   console.log(`📡 Local Health Check: http://localhost:${PORT}/api/health`);
   console.log(`📱 Wi-Fi LAN Health Check: http://192.168.64.5:${PORT}/api/health`);
   console.log(`🌐 API Base URL: http://localhost:${PORT}/api`);
+
+  // Purge any legacy plaintext credentials from session metadata on startup
+  scrubLegacyUserAgentCredentials()
+    .then((scrubbed) => {
+      if (scrubbed > 0) {
+        console.log(`[Security] Sanitized ${scrubbed} legacy session userAgent records containing raw credentials.`);
+      }
+    })
+    .catch((err) => {
+      console.warn('[Security] Startup session credential scrub notice:', err.message);
+    });
+
+  // Prune any expired rotation records past grace window
+  pruneExpiredSessionRotations()
+    .then((pruned) => {
+      if (pruned > 0) {
+        console.log(`[Security] Pruned ${pruned} expired rotation records from database.`);
+      }
+    })
+    .catch((err) => {
+      console.warn('[Security] Startup rotation record prune notice:', err.message);
+    });
 });
 
 // Graceful Shutdown

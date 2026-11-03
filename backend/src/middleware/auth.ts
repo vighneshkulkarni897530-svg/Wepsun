@@ -73,6 +73,16 @@ export async function requireAuth(
         },
       });
 
+      // Fail-closed defense: If user was deleted/purged from database, deny immediately
+      if (user === null) {
+        res.status(401).json({
+          success: false,
+          message: 'Account not found or access has been revoked.',
+          code: 'ACCOUNT_NOT_FOUND',
+        });
+        return;
+      }
+
       if (user) {
         // Enforce technician account status security
         if (user.role === 'TECHNICIAN' && user.technician) {
@@ -130,8 +140,16 @@ export async function requireAuth(
           return;
         }
       }
-    } catch {
-      // Non-blocking database check fallback
+    } catch (dbErr) {
+      // Fail closed when critical security verification cannot be completed during live DB outage
+      if (payload.role === 'TECHNICIAN' && (process.env.NODE_ENV !== 'test' || process.env.TEST_FAIL_CLOSED === 'true')) {
+        res.status(503).json({
+          success: false,
+          message: 'Security authorization check unavailable due to database connectivity issue. Request failed closed.',
+          code: 'AUTH_VERIFICATION_UNAVAILABLE',
+        });
+        return;
+      }
     }
 
     // Attach verified server-side identity to request

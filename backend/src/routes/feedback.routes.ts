@@ -10,7 +10,11 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
   try {
     const user = req.user!;
     const isSuper = user.role === 'SUPER_ADMIN';
-    const companyId = isSuper ? (req.query.companyId as string) || user.companyId || 'comp-1' : user.companyId || 'comp-1';
+    const companyId = isSuper ? (req.query.companyId as string) || user.companyId : user.companyId;
+    if (!companyId) {
+      res.status(403).json({ success: false, message: 'Tenant company context required', code: 'TENANT_REQUIRED' });
+      return;
+    }
     const { stars, serviceType, search } = req.query;
 
     let result: any[] = [];
@@ -86,7 +90,11 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
 // POST /api/feedback/submit — Submit customer review (Authenticated Client or Public Link submission)
 router.post('/submit', async (req: any, res: Response): Promise<void> => {
   try {
-    const companyId = req.body.companyId || req.user?.companyId || 'comp-1';
+    const companyId = req.user?.companyId || req.body.companyId;
+    if (!companyId) {
+      res.status(400).json({ success: false, message: 'Valid companyId required for feedback submission.', code: 'COMPANY_REQUIRED' });
+      return;
+    }
     const {
       clientName,
       clientPhone,

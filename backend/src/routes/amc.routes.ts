@@ -54,7 +54,11 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response): P
 // GET /api/amc/expiring-renewals — Scans 30/60/90-day expiring AMC contracts & pipeline analytics
 router.get('/expiring-renewals', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const companyId = req.user!.companyId || 'comp-1';
+    const companyId = req.user!.companyId;
+    if (!companyId) {
+      res.status(403).json({ success: false, message: 'Tenant company context required', code: 'TENANT_REQUIRED' });
+      return;
+    }
     const isClient = req.user!.role?.toUpperCase() === 'CLIENT';
     const clientId = req.user!.clientId;
 
@@ -322,7 +326,11 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): 
 // POST /api/amc/generate-renewal-quote — 1-Click Quotation Generator for AMC Renewal
 router.post('/generate-renewal-quote', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const companyId = req.user!.companyId || 'comp-1';
+    const companyId = req.user!.companyId;
+    if (!companyId) {
+      res.status(403).json({ success: false, message: 'Tenant company context required', code: 'TENANT_REQUIRED' });
+      return;
+    }
     const { contractId, escalationRate = 8.0, tenureYears = 1, applyDiscount = 0, customNotes } = req.body;
 
     let contract: any = null;
@@ -432,7 +440,11 @@ router.post('/generate-renewal-quote', requireAuth, async (req: AuthenticatedReq
 // POST /api/amc/send-renewal-alert — Multi-Channel WhatsApp & SMS Renewal Notice Dispatcher
 router.post('/send-renewal-alert', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const companyId = req.user!.companyId || 'comp-1';
+    const companyId = req.user!.companyId;
+    if (!companyId) {
+      res.status(403).json({ success: false, message: 'Tenant company context required', code: 'TENANT_REQUIRED' });
+      return;
+    }
     const { contractId, channel = 'whatsapp', customRecipientPhone } = req.body;
 
     let contract: any = null;
@@ -513,7 +525,11 @@ router.post('/send-renewal-alert', requireAuth, async (req: AuthenticatedRequest
 // POST /api/amc/accept-and-renew — Digital E-Signing & Contract Renewal Engine
 router.post('/accept-and-renew', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const companyId = req.user!.companyId || 'comp-1';
+    const companyId = req.user!.companyId;
+    if (!companyId) {
+      res.status(403).json({ success: false, message: 'Tenant company context required', code: 'TENANT_REQUIRED' });
+      return;
+    }
     const { contractId, tenureYears = 1, agreedAmount, digitalSignature, signatoryName, signatoryRole = 'Secretary' } = req.body;
 
     let renewedContract: any = null;
@@ -640,7 +656,11 @@ router.post('/accept-and-renew', requireAuth, async (req: AuthenticatedRequest, 
 router.post('/:id/renew', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   req.body.contractId = req.params.id;
   try {
-    const companyId = req.user!.companyId || 'comp-1';
+    const companyId = req.user!.companyId;
+    if (!companyId) {
+      res.status(403).json({ success: false, message: 'Tenant company context required', code: 'TENANT_REQUIRED' });
+      return;
+    }
     const id = req.params.id as string;
     const { newEndDate, agreedAmount, digitalSignature, signatoryName } = req.body;
     

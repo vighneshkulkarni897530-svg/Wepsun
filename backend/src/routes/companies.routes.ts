@@ -9,7 +9,11 @@ const router = Router();
 router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const isSuperAdmin = req.user?.role?.toUpperCase() === 'SUPER_ADMIN';
-    const effectiveCompanyId = req.user?.companyId || 'comp-1';
+    const effectiveCompanyId = req.user?.companyId;
+    if (!isSuperAdmin && !effectiveCompanyId) {
+      res.status(403).json({ success: false, message: 'Tenant company context required', code: 'TENANT_REQUIRED' });
+      return;
+    }
     let companies = [];
 
     try {
@@ -44,7 +48,11 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response) =>
 // GET /api/companies/branches — Get branches for active tenant company
 router.get('/branches', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const companyId = req.user?.companyId || 'comp-1';
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(403).json({ success: false, message: 'Tenant company context required', code: 'TENANT_REQUIRED' });
+      return;
+    }
     let branches = [];
 
     try {
@@ -65,7 +73,11 @@ router.get('/branches', requireAuth, async (req: AuthenticatedRequest, res: Resp
 router.get('/buildings', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = req.user!;
-    const companyId = user.companyId || 'comp-1';
+    const companyId = user.companyId;
+    if (!companyId) {
+      res.status(403).json({ success: false, message: 'Tenant company context required', code: 'TENANT_REQUIRED' });
+      return;
+    }
     const userRole = (user.role || '').toUpperCase();
     const isClient = userRole === 'CLIENT';
 

@@ -9,7 +9,11 @@ const router = Router();
 router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = req.user!;
-    const companyId = user.companyId || 'comp-1';
+    const companyId = user.companyId;
+    if (!companyId) {
+      res.status(403).json({ success: false, message: 'Tenant company context required', code: 'TENANT_REQUIRED' });
+      return;
+    }
     const userRole = (user.role || '').toUpperCase();
     const isClient = userRole === 'CLIENT';
     const isTech = userRole === 'TECHNICIAN';
@@ -92,7 +96,11 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response) =>
 router.get('/:id', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const user = req.user!;
-    const companyId = user.companyId || 'comp-1';
+    const companyId = user.companyId;
+    if (!companyId) {
+      res.status(403).json({ success: false, message: 'Tenant company context required', code: 'TENANT_REQUIRED' });
+      return;
+    }
     const id = req.params.id as string;
     const userRole = (user.role || '').toUpperCase();
     const currentUserId = user.userId || user.sub;
@@ -161,7 +169,11 @@ router.get('/:id', requireAuth, async (req: AuthenticatedRequest, res: Response)
 router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const user = req.user!;
-    const companyId = user.companyId || 'comp-1';
+    const companyId = user.companyId;
+    if (!companyId) {
+      res.status(403).json({ success: false, message: 'Tenant company context required', code: 'TENANT_REQUIRED' });
+      return;
+    }
     const userRole = (user.role || '').toUpperCase();
     const currentUserId = user.userId || user.sub;
     let {
@@ -424,7 +436,11 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): 
 router.patch('/:id', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const user = req.user!;
-    const companyId = user.companyId || 'comp-1';
+    const companyId = user.companyId;
+    if (!companyId) {
+      res.status(403).json({ success: false, message: 'Tenant company context required', code: 'TENANT_REQUIRED' });
+      return;
+    }
     const id = req.params.id as string;
     const userRole = (user.role || '').toUpperCase();
     const currentUserId = user.userId || user.sub;

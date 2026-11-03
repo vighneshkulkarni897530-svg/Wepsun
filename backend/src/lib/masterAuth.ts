@@ -171,8 +171,8 @@ export function getMasterAdminUser(slot: 1 | 2) {
 export function verifyMasterPassword(slot: 1 | 2, candidatePassword: string): boolean {
   if (!candidatePassword || typeof candidatePassword !== 'string') return false;
   const expectedPassword = slot === 1
-    ? (process.env.MASTER_PASSWORD_1 || 'Wepsun@928')
-    : (process.env.MASTER_PASSWORD_2 || 'Wepsun@2025');
+    ? (process.env.MASTER_PASSWORD_1 || (process.env.NODE_ENV !== 'production' ? 'Wepsun@928' : ''))
+    : (process.env.MASTER_PASSWORD_2 || (process.env.NODE_ENV !== 'production' ? 'Wepsun@2025' : ''));
 
   const candidateHash = crypto.createHash('sha256').update(candidatePassword.trim()).digest();
   const expectedHash = crypto.createHash('sha256').update(expectedPassword.trim()).digest();

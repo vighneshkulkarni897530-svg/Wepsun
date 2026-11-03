@@ -10,7 +10,11 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
   try {
     const user = req.user!;
     const isSuper = user.role === 'SUPER_ADMIN';
-    const companyId = isSuper ? (req.query.companyId as string) || user.companyId || 'comp-1' : user.companyId || 'comp-1';
+    const companyId = isSuper ? (req.query.companyId as string) || user.companyId : user.companyId;
+    if (!companyId) {
+      res.status(403).json({ success: false, message: 'Tenant company context required', code: 'TENANT_REQUIRED' });
+      return;
+    }
 
     let notificationsList: any[] = [];
 
@@ -85,7 +89,11 @@ router.post('/push', requireAuth, requireRole(['SUPER_ADMIN', 'COMPANY_ADMIN', '
   try {
     const user = req.user!;
     const isSuper = user.role === 'SUPER_ADMIN';
-    const companyId = isSuper ? (req.body.companyId as string) || user.companyId || 'comp-1' : user.companyId || 'comp-1';
+    const companyId = isSuper ? (req.body.companyId as string) || user.companyId : user.companyId;
+    if (!companyId) {
+      res.status(403).json({ success: false, message: 'Tenant company context required', code: 'TENANT_REQUIRED' });
+      return;
+    }
     const { title, message, type, entityType, entityId, userId } = req.body;
 
     let newNotif: any = null;
@@ -276,7 +284,11 @@ router.post('/enquiries', async (req: any, res: Response): Promise<void> => {
 // GET /api/notifications/enquiries — Get business enquiries
 router.get('/enquiries', requireAuth, requireRole(['SUPER_ADMIN', 'COMPANY_ADMIN', 'SALES']), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const companyId = req.user!.companyId || 'comp-1';
+    const companyId = req.user!.companyId;
+    if (!companyId) {
+      res.status(403).json({ success: false, message: 'Tenant company context required', code: 'TENANT_REQUIRED' });
+      return;
+    }
     let notifs: any[] = [];
     try {
       notifs = await prisma.notification.findMany({

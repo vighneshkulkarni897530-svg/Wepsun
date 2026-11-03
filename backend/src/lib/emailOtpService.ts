@@ -841,17 +841,18 @@ export async function sendEmailOtp(params: {
   });
 
   // Log clearly to console for development visibility
-  console.log(`\n🔑 [WEPSUN OTP] Target: ${cleanEmail} | Type: ${params.type} | Code: ${otp} | Provider: ${dispatchResult.provider} (Accepted: ${dispatchResult.accepted})\n`);
+  console.log(`[OTP_EMAIL] Target: ${cleanEmail} | Type: ${params.type} | Provider: ${dispatchResult.provider} (Accepted: ${dispatchResult.accepted})`);
 
   if (!dispatchResult.accepted) {
-    console.warn(`[OTP_EMAIL] External email dispatch failed for ${maskEmail(cleanEmail)} (${dispatchResult.error}). Activating development fallback.`);
+    console.warn(`[OTP_EMAIL] External email dispatch failed for ${maskEmail(cleanEmail)} (${dispatchResult.error}).`);
     return {
       success: true,
-      message: `Verification code generated for ${cleanEmail}. (Code: ${otp})`,
+      message: isDev
+        ? `Verification code generated for ${cleanEmail}. (Code: ${otp})`
+        : `Verification code sent to ${cleanEmail}. Please check your inbox and spam folder.`,
       expiresIn: Math.floor(OTP_EXPIRY_MS / 1000),
-      provider: 'dev_fallback',
-      devOtp: otp,
-      otp,
+      provider: isDev ? 'dev_fallback' : dispatchResult.provider,
+      devOtp: isDev ? otp : undefined,
     };
   }
 
@@ -861,7 +862,6 @@ export async function sendEmailOtp(params: {
     expiresIn: Math.floor(OTP_EXPIRY_MS / 1000),
     provider: dispatchResult.provider,
     devOtp: isDev ? otp : undefined,
-    otp,
   };
 }
 

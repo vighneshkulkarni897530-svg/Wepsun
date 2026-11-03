@@ -3,6 +3,7 @@
  * Cryptographic JWT, Bcrypt Hashing, Refresh Token Rotation, Session Revocation & Audit Logging
  */
 
+import crypto from 'crypto';
 import { Router, Response } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { db } from '../data/mockDb.js';
@@ -74,7 +75,8 @@ async function ensureClientAccountWithEquipment(user: any): Promise<string | nul
   const roleStr = String(user.role || '').toUpperCase();
   if (roleStr !== 'CLIENT') return null;
 
-  const companyId = user.companyId || 'comp-1';
+  const companyId = user.companyId;
+  if (!companyId) return null;
   const branchId = user.branchId || 'br-mum-1';
   let clientId = user.clientId;
 
@@ -149,7 +151,7 @@ async function ensureClientAccountWithEquipment(user: any): Promise<string | nul
               branchId,
               buildingId: building.id,
               clientId,
-              permanentLiftId: 'WPS-MUM-001',
+              permanentLiftId: 'WPS-' + (clientId ? clientId.replace(/[^a-zA-Z0-9]/g, '').slice(-5).toUpperCase() : Date.now().toString(36).toUpperCase()) + '-01',
               brand: 'WEPSUN Gearless PMSM',
               model: 'AeroGlide-V3',
               type: 'PASSENGER',
@@ -172,7 +174,7 @@ async function ensureClientAccountWithEquipment(user: any): Promise<string | nul
               branchId,
               buildingId: building.id,
               clientId,
-              permanentLiftId: 'WPS-MUM-002',
+              permanentLiftId: 'WPS-' + (clientId ? clientId.replace(/[^a-zA-Z0-9]/g, '').slice(-5).toUpperCase() : Date.now().toString(36).toUpperCase()) + '-02',
               brand: 'WEPSUN Heavy Duty',
               model: 'CargoMaster-Pro',
               type: 'FREIGHT_GOODS',
@@ -285,19 +287,23 @@ async function ensureClientAccountWithEquipment(user: any): Promise<string | nul
 router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const {
     credential,
+    idToken,
     accessToken: clientAccessToken,
     code,
     codeVerifier,
     redirectUri,
     nonce,
     platform,
+    companyId: requestedCompanyId,
+    companyCode: requestedCompanyCode,
   } = req.body;
+  const effectiveCredential = credential || idToken;
   const userAgent = req.headers['user-agent'];
   const ipAddress = req.ip || req.socket.remoteAddress;
 
   try {
     // 1. Validate incoming request payload: ID token, Access Token, or Authorization Code is mandatory
-    if (!credential && !clientAccessToken && !code) {
+    if (!effectiveCredential && !clientAccessToken && !code) {
       res.status(400).json({
         success: false,
         message: 'Google authentication credential (ID token or authorization code) is required.',
@@ -340,9 +346,9 @@ router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Respo
         });
         return;
       }
-    } else if (credential && typeof credential === 'string') {
+    } else if (effectiveCredential && typeof effectiveCredential === 'string') {
       try {
-        verified = await verifyGoogleIdToken(credential);
+        verified = await verifyGoogleIdToken(effectiveCredential);
       } catch (err: any) {
         console.warn('[AuthRoute] Google ID token verification rejected:', err.message);
         res.status(401).json({
@@ -450,7 +456,7 @@ router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Respo
           if (!user.avatarUrl && googleAvatar) {
             user.avatarUrl = googleAvatar;
           }
-          const memUser = db.users.find((u: any) => u.id === user.id || (u.email && u.email.toLowerCase() === cleanEmail));
+          const memUser: any = db.users.find((u: any) => u.id === user.id || (u.email && u.email.toLowerCase() === cleanEmail));
           if (memUser) {
             memUser.googleId = googleSub;
             if (!memUser.avatarUrl && googleAvatar) {
@@ -462,54 +468,144 @@ router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Respo
     }
 
     // --------------------------------------------------------------------------
-    // CASE C: Completely new user — Auto-provision with strict default CLIENT role
+    // CASE C: Completely new user — Multi-tenant isolation & safe provisioning
     // --------------------------------------------------------------------------
     if (!user) {
-      // Find active company for multi-tenancy provisioning
-      let defaultCompanyId = 'comp-1';
-      try {
-        const activeComp = await prisma.company.findFirst({
-          where: { isActive: true },
-          select: { id: true },
-        });
-        if (activeComp) {
-          defaultCompanyId = activeComp.id;
-        }
-      } catch {
-        defaultCompanyId = 'comp-1';
-      }
+      // STRICT MULTI-TENANCY SECURITY:
+      // 1. Check if an administrator pre-registered this email as a Technician
+      // 2. Check if an administrator pre-registered this email as a Client profile
+      // 3. For uninvited self-signups: Allocate an isolated company workspace (comp-self-${newUserId}).
+      // CRITICAL: NEVER trust client-supplied requestedCompanyId / requestedCompanyCode as authorization.
+      // CRITICAL: NEVER silently assign uninvited users to 'comp-1' or any other tenant's organization.
 
-      // STRICT SECURITY: Default role is always CLIENT. Frontend cannot request or elevate role.
-      const assignedRole = 'CLIENT';
-      const displayName = googleName || cleanEmail.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+      const displayName = googleName || cleanEmail.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
       const newUserId = 'usr-g-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
 
-      let createdClientId: string | null = null;
+      let resolvedCompanyId: string | null = null;
+      let prelinkedClient: any = null;
+      let prelinkedTechnician: any = null;
+
       try {
-        // Find or create Client profile for this Google user
-        const existingClient = await prisma.client.findFirst({
+        prelinkedTechnician = await prisma.technician.findFirst({
           where: {
-            companyId: defaultCompanyId,
             email: { equals: cleanEmail, mode: 'insensitive' as const },
+            company: { isActive: true },
           },
+          include: { company: true },
         });
-        if (existingClient) {
-          createdClientId = existingClient.id;
+
+        if (prelinkedTechnician && prelinkedTechnician.companyId) {
+          resolvedCompanyId = prelinkedTechnician.companyId;
+        }
+
+        if (!resolvedCompanyId) {
+          prelinkedClient = await prisma.client.findFirst({
+            where: {
+              email: { equals: cleanEmail, mode: 'insensitive' as const },
+              company: { isActive: true },
+            },
+            include: { company: true },
+          });
+
+          if (prelinkedClient && prelinkedClient.companyId) {
+            resolvedCompanyId = prelinkedClient.companyId;
+          }
+        }
+      } catch (lookupErr) {
+        // Fallback for in-memory db during testing/offline
+        prelinkedTechnician = db.technicians?.find((t: any) => t.email?.toLowerCase() === cleanEmail);
+        if (prelinkedTechnician) {
+          resolvedCompanyId = prelinkedTechnician.companyId;
         } else {
-          const newClient = await prisma.client.create({
-            data: {
-              companyId: defaultCompanyId,
-              name: displayName + ' Property',
-              contactPerson: displayName,
-              email: cleanEmail,
-              phone: '+91 98200 00000',
-              billingAddress: 'Registered Office',
+          prelinkedClient = (db as any).clients?.find((c: any) => c.email?.toLowerCase() === cleanEmail);
+          if (prelinkedClient) {
+            resolvedCompanyId = prelinkedClient.companyId;
+          }
+        }
+      }
+
+      // If no administrator pre-registered this email, provision a dedicated isolated tenant company.
+      // Uninvited self-signups must NEVER share a company with existing tenants.
+      if (!resolvedCompanyId) {
+        const emailHash = crypto.createHash('sha256').update(cleanEmail).digest('hex').substring(0, 16);
+        const isolatedCompanyId = 'comp-self-' + emailHash;
+        const isolatedCompanyCode = 'ORG-' + emailHash.substring(0, 6).toUpperCase();
+
+        try {
+          const newCompany = await prisma.company.upsert({
+            where: { id: isolatedCompanyId },
+            create: {
+              id: isolatedCompanyId,
+              name: displayName + "'s Workspace",
+              code: isolatedCompanyCode,
+              contactEmail: cleanEmail,
+              contactPhone: '+91 98200 00000',
+              address: 'Self-Registered Workspace',
+              city: 'Mumbai',
+              state: 'Maharashtra',
+              isActive: true,
+            },
+            update: {
+              name: displayName + "'s Workspace",
+              contactEmail: cleanEmail,
+              isActive: true,
             },
           });
-          createdClientId = newClient.id;
+          resolvedCompanyId = newCompany.id;
+        } catch (compErr) {
+          resolvedCompanyId = isolatedCompanyId;
         }
-      } catch (clientErr) {
-        console.warn('[AuthRoute] Client auto-creation notice:', clientErr);
+
+        if (!db.companies) (db as any).companies = [];
+        const existingMockComp = (db as any).companies.find((c: any) => c.id === isolatedCompanyId);
+        if (!existingMockComp) {
+          (db as any).companies.push({
+            id: isolatedCompanyId,
+            name: displayName + "'s Workspace",
+            code: isolatedCompanyCode,
+            contactEmail: cleanEmail,
+            contactPhone: '+91 98200 00000',
+            address: 'Self-Registered Workspace',
+            city: 'Mumbai',
+            state: 'Maharashtra',
+            isActive: true,
+          });
+        }
+      }
+
+      const assignedRole = prelinkedTechnician ? 'TECHNICIAN' : 'CLIENT';
+      let createdClientId: string | null = null;
+      const linkedTechnicianId: string | null = prelinkedTechnician ? prelinkedTechnician.id : null;
+
+      if (prelinkedClient) {
+        createdClientId = prelinkedClient.id;
+      } else if (!prelinkedTechnician) {
+        try {
+          // Find or create Client profile for this Google user in their dedicated/assigned company
+          const existingClient = await prisma.client.findFirst({
+            where: {
+              companyId: resolvedCompanyId,
+              email: { equals: cleanEmail, mode: 'insensitive' as const },
+            },
+          });
+          if (existingClient) {
+            createdClientId = existingClient.id;
+          } else {
+            const newClient = await prisma.client.create({
+              data: {
+                companyId: resolvedCompanyId,
+                name: displayName + ' Property',
+                contactPerson: displayName,
+                email: cleanEmail,
+                phone: '+91 98200 00000',
+                billingAddress: 'Registered Office',
+              },
+            });
+            createdClientId = newClient.id;
+          }
+        } catch (clientErr) {
+          console.warn('[AuthRoute] Client auto-creation notice:', clientErr);
+        }
       }
 
       try {
@@ -521,11 +617,12 @@ router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Respo
             googleId: googleSub,
             authProvider: 'google',
             role: assignedRole as any,
-            companyId: defaultCompanyId,
+            companyId: resolvedCompanyId,
             clientId: createdClientId,
+            technicianId: linkedTechnicianId,
             avatarUrl: googleAvatar || null,
             isActive: true,
-            phone: '+91 98200 00000',
+            phone: prelinkedTechnician?.phone || '+91 98200 00000',
             passwordHash: await hashPassword('GoogleSecured@' + Date.now() + Math.random().toString(36).substring(2, 10)),
           },
           include: { company: true },
@@ -556,12 +653,12 @@ router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Respo
             email: cleanEmail,
             googleId: googleSub,
             authProvider: 'google',
-            phone: '+91 98200 00000',
+            phone: prelinkedTechnician?.phone || '+91 98200 00000',
             role: assignedRole,
-            companyId: defaultCompanyId,
+            companyId: resolvedCompanyId,
             branchId: null,
-            clientId: createdClientId || 'client-' + newUserId,
-            technicianId: null,
+            clientId: createdClientId || (!prelinkedTechnician ? 'client-' + newUserId : null),
+            technicianId: linkedTechnicianId,
             avatarUrl: googleAvatar || null,
             isActive: true,
             tokenVersion: 0,
@@ -586,14 +683,14 @@ router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Respo
       try {
         let clientRec = await prisma.client.findFirst({
           where: {
-            companyId: user.companyId || 'comp-1',
+            companyId: user.companyId,
             email: { equals: cleanEmail, mode: 'insensitive' as const },
           },
         });
         if (!clientRec) {
           clientRec = await prisma.client.create({
             data: {
-              companyId: user.companyId || 'comp-1',
+              companyId: user.companyId,
               name: user.name + ' Property',
               contactPerson: user.name,
               email: user.email,
@@ -707,7 +804,7 @@ router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Respo
       sub: user.id,
       email: user.email,
       role: (user.role || 'CLIENT').toUpperCase(),
-      companyId: user.companyId || 'comp-1',
+      companyId: user.companyId,
       branchId: user.branchId || undefined,
       clientId: user.clientId || undefined,
       technicianId: user.technicianId || undefined,
@@ -716,7 +813,7 @@ router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Respo
     const accessToken = generateAccessToken(jwtPayload);
 
     // Create persistent session & refresh token in database
-    const session = await createSession(user.id, user.companyId || 'comp-1', userAgent, ipAddress);
+    const session = await createSession(user.id, user.companyId, userAgent, ipAddress);
 
     // Set secure HTTP-only refresh cookie
     res.cookie('refreshToken', session.refreshToken, {
@@ -731,7 +828,7 @@ router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Respo
     try {
       await prisma.auditLog.create({
         data: {
-          companyId: user.companyId || 'comp-1',
+          companyId: user.companyId,
           entityType: 'User',
           entityId: user.id,
           action: 'LOGIN_SUCCESS',
@@ -1686,22 +1783,18 @@ router.post('/refresh', authLimiter, async (req: AuthenticatedRequest, res: Resp
       path: '/api/auth',
     });
 
-    // Record audit event
-    try {
-      await prisma.auditLog.create({
-        data: {
-          companyId: rotated.user.companyId,
-          entityType: 'User',
-          entityId: rotated.user.id,
-          action: 'TOKEN_REFRESH',
-          performedBy: rotated.user.name,
-          userRole: String(rotated.user.role),
-          details: `Session refreshed for ${rotated.user.email}`,
-        },
-      });
-    } catch {
-      // Non-blocking
-    }
+    // Record audit event asynchronously (non-blocking to prevent database latency from causing client retry timeouts)
+    prisma.auditLog.create({
+      data: {
+        companyId: rotated.user.companyId,
+        entityType: 'User',
+        entityId: rotated.user.id,
+        action: 'TOKEN_REFRESH',
+        performedBy: rotated.user.name,
+        userRole: String(rotated.user.role),
+        details: `Session refreshed for ${rotated.user.email}`,
+      },
+    }).catch(() => {});
 
     res.json({
       success: true,
@@ -2452,7 +2545,7 @@ router.post('/invalidate-email', async (req: AuthenticatedRequest, res: Response
 
 // POST /api/auth/verify-otp or POST /api/auth/register — Complete registration with verification proof
 const handleAccountRegistration = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  const { email, otp, verificationToken, name, fullName, phone, role = 'CLIENT', password, companyId = 'comp-1' } = req.body;
+  const { email, otp, verificationToken, name, fullName, phone, role = 'CLIENT', password } = req.body;
   const cleanEmail = String(email || '').toLowerCase().trim();
   const cleanOtp = String(otp || '').trim();
   const displayName = String(name || fullName || '').trim();
@@ -2544,12 +2637,55 @@ const handleAccountRegistration = async (req: AuthenticatedRequest, res: Respons
 
       let clientId: string | undefined = undefined;
       let technicianId: string | undefined = undefined;
+      let resolvedCompanyId: string | null = null;
+
+      try {
+        const prelinkedTech = await prisma.technician.findFirst({
+          where: { email: { equals: cleanEmail, mode: 'insensitive' as const } },
+        });
+        if (prelinkedTech?.companyId) {
+          resolvedCompanyId = prelinkedTech.companyId;
+          technicianId = prelinkedTech.id;
+        }
+
+        if (!resolvedCompanyId) {
+          const prelinkedCli = await prisma.client.findFirst({
+            where: { email: { equals: cleanEmail, mode: 'insensitive' as const } },
+          });
+          if (prelinkedCli?.companyId) {
+            resolvedCompanyId = prelinkedCli.companyId;
+            clientId = prelinkedCli.id;
+          }
+        }
+      } catch {}
+
+      if (!resolvedCompanyId) {
+        const isolatedCompanyId = 'comp-self-' + crypto.createHash('sha256').update(cleanEmail).digest('hex').substring(0, 16);
+        try {
+          await prisma.company.upsert({
+            where: { id: isolatedCompanyId },
+            create: {
+              id: isolatedCompanyId,
+              name: (displayName || cleanEmail.split('@')[0]) + "'s Workspace",
+              code: 'SELF-' + crypto.createHash('sha256').update(cleanEmail).digest('hex').substring(0, 6).toUpperCase(),
+              contactEmail: cleanEmail,
+              contactPhone: phone || '+91 98200 00000',
+              address: 'Self-Registered Workspace',
+              city: 'Mumbai',
+              state: 'Maharashtra',
+              isActive: true,
+            },
+            update: {},
+          });
+        } catch {}
+        resolvedCompanyId = isolatedCompanyId;
+      }
 
       if (assignedRole === 'CLIENT') {
         try {
           const clientRec = await prisma.client.create({
             data: {
-              companyId,
+              companyId: resolvedCompanyId,
               name: displayName || cleanEmail.split('@')[0],
               contactPerson: displayName || cleanEmail.split('@')[0],
               phone: phone || '+91 98200 00000',
@@ -2565,7 +2701,7 @@ const handleAccountRegistration = async (req: AuthenticatedRequest, res: Respons
         try {
           const techRec = await prisma.technician.create({
             data: {
-              companyId,
+              companyId: resolvedCompanyId,
               branchId: 'branch-1',
               employeeCode: 'EMP-' + Date.now().toString().slice(-4),
               zone: 'Central Zone',
@@ -2588,7 +2724,7 @@ const handleAccountRegistration = async (req: AuthenticatedRequest, res: Respons
             email: cleanEmail,
             phone: phone || '+91 98200 00000',
             role: assignedRole as any,
-            companyId: companyId,
+            companyId: resolvedCompanyId,
             passwordHash,
             isActive: true,
             authProvider: 'email_otp',
@@ -2605,7 +2741,7 @@ const handleAccountRegistration = async (req: AuthenticatedRequest, res: Respons
           email: cleanEmail,
           phone: phone || '+91 98200 00000',
           role: assignedRole,
-          companyId: companyId,
+          companyId: resolvedCompanyId,
           branchId: null,
           clientId,
           technicianId,

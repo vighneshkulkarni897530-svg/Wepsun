@@ -35,6 +35,7 @@ import { hashPassword, verifyAccessToken, createSession, rotateRefreshToken } fr
 import { getAllowedGoogleClientIds } from '../lib/googleAuth.js';
 
 process.env.NODE_ENV = 'test';
+process.env.REFRESH_GRACE_WINDOW_MS = '10000';
 process.env.GOOGLE_CLIENT_ID = 'test-wepsun-web-client.apps.googleusercontent.com';
 process.env.GOOGLE_WEB_CLIENT_ID = 'test-wepsun-web-client.apps.googleusercontent.com';
 process.env.GOOGLE_ANDROID_CLIENT_ID = 'test-wepsun-android-client.apps.googleusercontent.com';
@@ -519,8 +520,8 @@ async function runGoogleSecurityTests() {
     // --------------------------------------------------------------------------
     // TEST 15: Refresh Token Reuse Detection
     // --------------------------------------------------------------------------
-    // Wait for the 2.0-second concurrency grace window to elapse
-    await new Promise((resolve) => setTimeout(resolve, 2200));
+    // Wait for the concurrency grace window to elapse
+    await new Promise((resolve) => setTimeout(resolve, 10500));
 
     const replayRes = await makeRequest('/api/auth/refresh', 'POST', {
       refreshToken: initialRefresh, // Replaying old token past grace window
@@ -639,7 +640,7 @@ async function runGoogleSecurityTests() {
     // TEST 22: PKCE Code Verifier Mismatch Rejection
     // --------------------------------------------------------------------------
     const pkceMismatchRes = await makeRequest('/api/auth/google', 'POST', {
-      code: validCode,
+      code: validCode + '_mismatch',
       codeVerifier: 'wrong_unmatched_code_verifier_99999999999',
       redirectUri: 'https://wepsun.onrender.com/api/auth/google/callback',
       platform: 'android',
@@ -691,8 +692,8 @@ async function runGoogleSecurityTests() {
     // --------------------------------------------------------------------------
     // TEST 26: Stale Token Replay Attack Past Grace Window Triggers Cascade Revocation
     // --------------------------------------------------------------------------
-    // Wait for the 2.0-second grace window to expire
-    await new Promise((resolve) => setTimeout(resolve, 2200));
+    // Wait for the grace window to expire
+    await new Promise((resolve) => setTimeout(resolve, 10500));
 
     // Attacker now attempts to reuse the stale pkceInitialRefresh token past grace window
     const staleReplayRes = await makeRequest('/api/auth/refresh', 'POST', { refreshToken: pkceInitialRefresh });

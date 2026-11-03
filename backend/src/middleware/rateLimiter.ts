@@ -19,10 +19,7 @@ export const authLimiter = rateLimit({
       ip === '127.0.0.1' ||
       ip === '::1' ||
       ip === '::ffff:127.0.0.1' ||
-      ip.includes('localhost') ||
-      ip.startsWith('192.168.') ||
-      ip.startsWith('10.') ||
-      ip.startsWith('172.')
+      ip.includes('localhost')
     );
   },
   standardHeaders: true,

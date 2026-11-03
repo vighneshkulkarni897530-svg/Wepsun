@@ -195,7 +195,8 @@ router.post('/register', authLimiter, async (req: AuthenticatedRequest, res: Res
     let companyId = reqCompanyId;
     if (!companyId) {
       const defaultComp = await prisma.company.findFirst();
-      companyId = defaultComp?.id || 'comp-1';
+      res.status(400).json({ success: false, message: 'Valid company ID or invitation required to register as a technician.', code: 'COMPANY_REQUIRED' });
+      return;
     }
 
     let branchId = reqBranchId;

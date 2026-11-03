@@ -10,7 +10,11 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
   try {
     const user = req.user!;
     const isSuper = user.role === 'SUPER_ADMIN';
-    const companyId = isSuper ? (req.query.companyId as string) || user.companyId || 'comp-1' : user.companyId || 'comp-1';
+    const companyId = isSuper ? (req.query.companyId as string) || user.companyId : user.companyId;
+    if (!companyId) {
+      res.status(403).json({ success: false, message: 'Tenant company context required', code: 'TENANT_REQUIRED' });
+      return;
+    }
     const isClient = user.role === 'CLIENT';
 
     if (isClient && !user.clientId) {
@@ -57,7 +61,11 @@ router.get('/:id', requireAuth, async (req: AuthRequest, res: Response): Promise
     const user = req.user!;
     const id = req.params.id as string;
     const isSuper = user.role === 'SUPER_ADMIN';
-    const companyId = isSuper ? (req.query.companyId as string) || user.companyId || 'comp-1' : user.companyId || 'comp-1';
+    const companyId = isSuper ? (req.query.companyId as string) || user.companyId : user.companyId;
+    if (!companyId) {
+      res.status(403).json({ success: false, message: 'Tenant company context required', code: 'TENANT_REQUIRED' });
+      return;
+    }
 
     let invoice: any = null;
 
@@ -100,7 +108,11 @@ router.post('/:id/pay', requireAuth, requireRole(['CLIENT', 'ACCOUNTS', 'SUPER_A
     const user = req.user!;
     const id = req.params.id as string;
     const isSuper = user.role === 'SUPER_ADMIN';
-    const companyId = isSuper ? (req.query.companyId as string) || user.companyId || 'comp-1' : user.companyId || 'comp-1';
+    const companyId = isSuper ? (req.query.companyId as string) || user.companyId : user.companyId;
+    if (!companyId) {
+      res.status(403).json({ success: false, message: 'Tenant company context required', code: 'TENANT_REQUIRED' });
+      return;
+    }
     const { paymentMethod, transactionId, amount } = req.body;
 
     const txnId = transactionId || `TXN-WEP-${Math.floor(10000000 + Math.random() * 90000000)}`;

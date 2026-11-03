@@ -225,6 +225,8 @@ export async function verifyGoogleAccessToken(accessToken: string): Promise<Veri
  * Validates PKCE challenge S256, exchanges with Google's token endpoint over back-channel TLS,
  * and cryptographically verifies the resulting Google ID token.
  */
+const consumedMockPkceCodes = new Set<string>();
+
 export async function exchangeGooglePkceCode(
   code: string,
   codeVerifier: string,
@@ -243,6 +245,9 @@ export async function exchangeGooglePkceCode(
 
   // Test mode mock PKCE support
   if (process.env.NODE_ENV === 'test' && cleanCode.startsWith('mock-pkce-code:')) {
+    if (consumedMockPkceCodes.has(cleanCode)) {
+      throw new Error('Authorization code has already been consumed. Replay attack blocked.');
+    }
     try {
       let testData: any;
       const stripped = cleanCode.replace('mock-pkce-code:', '');
@@ -285,7 +290,9 @@ export async function exchangeGooglePkceCode(
         nonce: testData.nonce,
       })).toString('base64')}`;
 
-      return await verifyGoogleIdToken(idTokenStr);
+      const verifiedUser = await verifyGoogleIdToken(idTokenStr);
+      consumedMockPkceCodes.add(cleanCode);
+      return verifiedUser;
     } catch (e: any) {
       throw new Error(e.message || 'Mock PKCE exchange failed.');
     }

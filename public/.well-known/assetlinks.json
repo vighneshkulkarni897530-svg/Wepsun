@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.wepsun.engineering",
+      "sha256_cert_fingerprints": [
+        "AE:7B:A4:4A:55:AC:FF:42:26:76:04:6F:45:1A:EE:D6:43:1C:10:26:EC:0E:84:91:7B:7F:D9:E8:41:E0:BD:34"
+      ]
+    }
+  }
+]

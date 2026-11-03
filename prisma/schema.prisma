@@ -1071,4 +1071,19 @@ model PasswordResetToken {
   @@map("password_reset_tokens")
 }
 
+model SessionRotation {
+  id               String   @id @default(uuid())
+  oldTokenHash     String   @unique
+  userId           String
+  encryptedPayload String
+  rotatedAt        DateTime @default(now())
+  expiresAt        DateTime
+  revocationReason String   @default("ROTATED")
+
+  @@index([oldTokenHash])
+  @@index([userId])
+  @@map("session_rotations")
+}
+
+
 

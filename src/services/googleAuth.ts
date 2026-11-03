@@ -631,7 +631,6 @@ export async function handleGoogleAuthCallback(
         nonce,
         platform: isNative ? 'android' : 'web',
         role: role.toUpperCase(),
-        companyId: 'comp-1',
       });
 
       if (res && res.success && res.data) {
@@ -689,7 +688,6 @@ export async function handleGoogleAuthCallback(
       picture: profile?.picture,
       googleId: profile?.sub,
       role: targetRole.toUpperCase(),
-      companyId: 'comp-1',
     });
 
     if (res && res.success && res.data) {

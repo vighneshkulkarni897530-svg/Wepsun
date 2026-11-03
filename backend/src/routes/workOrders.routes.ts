@@ -10,7 +10,11 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
   try {
     const user = req.user!;
     const isSuper = user.role === 'SUPER_ADMIN';
-    const companyId = isSuper ? (req.query.companyId as string) || user.companyId || 'comp-1' : user.companyId || 'comp-1';
+    const companyId = isSuper ? (req.query.companyId as string) || user.companyId : user.companyId;
+    if (!companyId) {
+      res.status(403).json({ success: false, message: 'Tenant company context required', code: 'TENANT_REQUIRED' });
+      return;
+    }
     const isTechnician = user.role === 'TECHNICIAN';
     const isClient = user.role === 'CLIENT';
 
@@ -66,7 +70,11 @@ router.get('/:id', requireAuth, async (req: AuthRequest, res: Response): Promise
     const user = req.user!;
     const id = req.params.id as string;
     const isSuper = user.role === 'SUPER_ADMIN';
-    const companyId = isSuper ? (req.query.companyId as string) || user.companyId || 'comp-1' : user.companyId || 'comp-1';
+    const companyId = isSuper ? (req.query.companyId as string) || user.companyId : user.companyId;
+    if (!companyId) {
+      res.status(403).json({ success: false, message: 'Tenant company context required', code: 'TENANT_REQUIRED' });
+      return;
+    }
 
     let wo: any = null;
 
@@ -115,7 +123,11 @@ router.post('/', requireAuth, requireRole(['SUPER_ADMIN', 'COMPANY_ADMIN', 'SERV
   try {
     const user = req.user!;
     const isSuper = user.role === 'SUPER_ADMIN';
-    const companyId = isSuper ? req.body.companyId || user.companyId || 'comp-1' : user.companyId || 'comp-1';
+    const companyId = isSuper ? req.body.companyId || user.companyId : user.companyId;
+    if (!companyId) {
+      res.status(403).json({ success: false, message: 'Tenant company context required', code: 'TENANT_REQUIRED' });
+      return;
+    }
     const branchId = user.branchId || req.body.branchId || 'br-mum-1';
     const { liftId, technicianId, title, description, priority, scheduledDate, totalAmount, quotationId, complaintId } = req.body;
 
@@ -178,7 +190,11 @@ router.patch('/:id', requireAuth, requireRole(['SUPER_ADMIN', 'COMPANY_ADMIN', '
     const user = req.user!;
     const id = req.params.id as string;
     const isSuper = user.role === 'SUPER_ADMIN';
-    const companyId = isSuper ? (req.query.companyId as string) || user.companyId || 'comp-1' : user.companyId || 'comp-1';
+    const companyId = isSuper ? (req.query.companyId as string) || user.companyId : user.companyId;
+    if (!companyId) {
+      res.status(403).json({ success: false, message: 'Tenant company context required', code: 'TENANT_REQUIRED' });
+      return;
+    }
     const { status, technicianId, remarks } = req.body;
 
     if (user.role === 'TECHNICIAN') {
