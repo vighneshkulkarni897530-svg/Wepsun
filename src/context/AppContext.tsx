@@ -182,6 +182,7 @@ interface AppContextType {
   isSoundEnabled: boolean;
   toggleSound: () => void;
   createComplaint: (complaintData: Partial<Complaint>) => Complaint;
+  createComplaintAsync: (complaintData: Partial<Complaint>) => Promise<Complaint>;
   assignTechnician: (ticketId: string, technicianId: string, eta?: string) => void;
   updateComplaintStatus: (ticketId: string, status: ComplaintStatus, extra?: Partial<Complaint>) => void;
   checkInJob: (ticketId: string, gpsData?: { lat: number; lng: number; address: string; accuracy?: number }) => void;
@@ -2592,6 +2593,140 @@ function mapServerServiceReport(sr: any): ServiceReport {
     return newComplaint;
   };
 
+  const createComplaintAsync = async (complaintData: Partial<Complaint>): Promise<Complaint> => {
+    const targetLift = lifts.find((l) => l.id === complaintData.liftId);
+    const companyId = complaintData.companyId || targetLift?.companyId || activeCompanyId;
+    const branchId = complaintData.branchId || targetLift?.branchId || (activeBranchId !== 'all' ? activeBranchId : 'br-thn-1');
+    const clientId = complaintData.clientId || targetLift?.clientId || currentUser.clientId || activeClientId || '';
+    const liftNumber = complaintData.liftNumber || targetLift?.liftNumber || 'LIFT-00';
+    const buildingId = complaintData.buildingId || targetLift?.buildingId || '';
+    const buildingName = complaintData.buildingName || targetLift?.buildingName || '';
+    const clientPhone = complaintData.clientPhone || targetLift?.clientPhone || currentUser.phone || '';
+    const clientName = complaintData.clientName || targetLift?.clientName || currentUser.companyName || currentUser.name || 'Valued Society';
+    const clientEmail = complaintData.clientEmail || currentUser.email || '';
+    const title = complaintData.title || `Breakdown Reported: ${liftNumber}`;
+    const description = complaintData.description || '';
+    const priority = complaintData.priority || 'normal';
+    const isEmergency = !!complaintData.isEmergency;
+    const issueType = complaintData.issueType || 'lift_not_moving';
+
+    const count = complaints.length + 1;
+    const fallbackTicketNumber = `TKT-${new Date().getFullYear()}-${count.toString().padStart(4, '0')}`;
+    const tempId = 'tkt-' + Date.now();
+    const otp = Math.floor(1000 + Math.random() * 9000).toString();
+
+    const payload = {
+      liftId: complaintData.liftId,
+      branchId,
+      issueType,
+      title,
+      description,
+      priority,
+      isEmergency,
+      clientId,
+      beforePhotos: Array.isArray(complaintData.beforePhotos) ? complaintData.beforePhotos : [],
+      afterPhotos: [],
+    };
+
+    // Authoritative Cloud / Server Persistence
+    const apiRes = await apiService.createComplaint(payload, {
+      companyId,
+      branchId,
+      userRole: currentRole,
+      userId: activeUserId,
+    });
+
+    if (!apiRes || apiRes.success === false) {
+      const errMsg = apiRes?.message || apiRes?.error || 'Failed to register complaint in backend database.';
+      throw new Error(errMsg);
+    }
+
+    const serverRec = apiRes.data || {};
+    const mapped = mapServerComplaint(serverRec);
+    const finalId = serverRec.id || tempId;
+    const finalTicketNumber = serverRec.ticketNumber || fallbackTicketNumber;
+
+    const savedComplaint: Complaint = {
+      id: finalId,
+      companyId,
+      branchId,
+      ticketNumber: finalTicketNumber,
+      liftId: complaintData.liftId || '',
+      liftNumber,
+      buildingId,
+      buildingName,
+      clientId,
+      clientName,
+      clientPhone,
+      clientEmail,
+      issueType,
+      title,
+      description,
+      priority,
+      isEmergency,
+      status: (serverRec.status || 'pending').toLowerCase() as any,
+      reportedAt: serverRec.reportedAt || serverRec.createdAt || new Date().toISOString(),
+      partsReplaced: [],
+      beforePhotos: Array.isArray(complaintData.beforePhotos) ? complaintData.beforePhotos : [],
+      afterPhotos: [],
+      clientOtp: otp,
+      ...mapped,
+      timeline: serverRec.timeline || [
+        {
+          id: 'tl-' + Date.now(),
+          status: 'pending',
+          title: isEmergency ? 'EMERGENCY SOS REGISTERED' : 'Complaint Registered',
+          description: `Ticket ${finalTicketNumber} confirmed by service desk.`,
+          timestamp: new Date().toISOString(),
+          actorName: currentUser.name,
+          actorRole: currentRole,
+        },
+      ],
+    };
+
+    setComplaints((prev) => [
+      savedComplaint,
+      ...prev.filter((c) => c.id !== savedComplaint.id && c.ticketNumber !== savedComplaint.ticketNumber),
+    ]);
+
+    if (complaintData.liftId) {
+      setLifts((prev) =>
+        prev.map((lift) =>
+          lift.id === complaintData.liftId
+            ? { ...lift, currentStatus: isEmergency ? 'breakdown' : 'under_maintenance' }
+            : lift
+        )
+      );
+    }
+
+    addAuditLog({
+      companyId,
+      entityType: 'Complaint',
+      entityId: savedComplaint.id,
+      action: 'CREATE_COMPLAINT',
+      performedBy: currentUser.name,
+      userRole: currentRole,
+      details: `Created complaint ${savedComplaint.ticketNumber} for lift ${savedComplaint.liftNumber}. Priority: ${savedComplaint.priority}`,
+    });
+
+    addNotification({
+      type: isEmergency ? 'emergency_breakdown' : 'complaint_assigned',
+      category: isEmergency ? 'emergency' : 'complaint',
+      priority: isEmergency ? 'critical' : priority === 'high' ? 'high' : 'normal',
+      title: isEmergency ? `🚨 Emergency SOS: ${buildingName}` : `Breakdown Ticket #${finalTicketNumber}`,
+      message: `${title} - ${buildingName} (${liftNumber}).`,
+      targetRole: 'all',
+      buildingName,
+      liftNumber,
+      ticketNumber: finalTicketNumber,
+      clientId: savedComplaint.clientId,
+      actionTab: 'complaints',
+      actionLabel: 'View Ticket',
+    });
+
+    return savedComplaint;
+  };
+
   const assignTechnician = (ticketId: string, technicianId: string, eta = '45 mins') => {
     const tech = technicians.find((t) => t.id === technicianId);
     if (!tech) return;
@@ -3969,6 +4104,7 @@ function mapServerServiceReport(sr: any): ServiceReport {
         isSoundEnabled: soundEnabled,
         toggleSound,
         createComplaint,
+        createComplaintAsync,
         assignTechnician,
         updateComplaintStatus,
         checkInJob,

@@ -1641,6 +1641,14 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
       {/* Emergency / Raise Modal */}
       <RaiseComplaintModal
         isOpen={isRaiseModalOpen}
+        onNavigateTab={(tab) => {
+          setIsRaiseModalOpen(false);
+          if (tab === 'complaints') {
+            onNavigateTab('complaints');
+          } else {
+            onNavigateTab('dashboard');
+          }
+        }}
         onClose={() => setIsRaiseModalOpen(false)}
       />
     </div>

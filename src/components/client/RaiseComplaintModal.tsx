@@ -16,16 +16,21 @@ import {
   Plus,
   Eye,
   Trash2,
+  Loader2,
+  Copy,
+  Check,
+  ChevronRight,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { IssueType, ComplaintPriority, Lift } from '../../types';
 
-interface RaiseComplaintModalProps {
+export interface RaiseComplaintModalProps {
   isOpen: boolean;
   onClose: () => void;
   preselectedLift?: Lift | null;
   initialLiftId?: string;
   initialMode?: 'normal' | 'emergency';
+  onNavigateTab?: (tab: 'home' | 'complaints', ticketNumber?: string) => void;
 }
 
 export const FOUR_NAMED_LIFTS: Lift[] = [
@@ -171,16 +176,31 @@ export const FOUR_NAMED_LIFTS: Lift[] = [
   },
 ];
 
+export interface SubmittedTicketDetails {
+  id: string;
+  rawId?: string;
+  mode: 'normal' | 'emergency';
+  title: string;
+  liftName: string;
+  buildingName: string;
+  complaintType: string;
+  priority: ComplaintPriority;
+  status: string;
+  reportedAt: string;
+}
+
 export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
   isOpen,
   onClose,
   preselectedLift,
   initialLiftId,
   initialMode = 'normal',
+  onNavigateTab,
 }) => {
   const {
     lifts,
     createComplaint,
+    createComplaintAsync,
     clientScopedLifts,
     currentRole,
     showToast,
@@ -224,16 +244,24 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
 
   // Submission state
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submittedTicket, setSubmittedTicket] = useState<{
-    id: string;
-    mode: 'normal' | 'emergency';
-    title: string;
-  } | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submittedTicket, setSubmittedTicket] = useState<SubmittedTicketDetails | null>(null);
+  const [isCopiedId, setIsCopiedId] = useState(false);
+
+  // Scroll Container Ref for mobile adjustment & virtual keyboard support
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const [previewMediaUrl, setPreviewMediaUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       setModalMode(initialMode);
       setSubmittedTicket(null);
+      setSubmitError(null);
+      setIsSubmitting(false);
+      setIsCopiedId(false);
       if (initialLiftId) setSelectedLiftId(initialLiftId);
       else if (preselectedLift?.id) setSelectedLiftId(preselectedLift.id);
       else if (!selectedLiftId || !liftOptions.some((l) => l.id === selectedLiftId)) {
@@ -242,11 +270,25 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
     }
   }, [isOpen, initialMode, initialLiftId, preselectedLift, liftOptions, selectedLiftId]);
 
-  // Media upload & preview states
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
-  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
-  const [previewMediaUrl, setPreviewMediaUrl] = useState<string | null>(null);
+  // Support mobile virtual keyboard opening & smooth scroll adjustments
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.visualViewport) return;
+
+    const handleViewportResize = () => {
+      if (document.activeElement && scrollContainerRef.current) {
+        const active = document.activeElement as HTMLElement;
+        if (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT') {
+          setTimeout(() => {
+            active.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }, 100);
+        }
+      }
+    };
+
+    const vv = window.visualViewport;
+    vv.addEventListener('resize', handleViewportResize);
+    return () => vv.removeEventListener('resize', handleViewportResize);
+  }, []);
 
   const currentLift = liftOptions.find((l) => l.id === selectedLiftId) || liftOptions[0];
 
@@ -314,10 +356,6 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
     }
   };
 
-  const handleFileUpload = () => {
-    fileInputRef.current?.click();
-  };
-
   const handleRemovePhoto = (index: number) => {
     if (modalMode === 'emergency') {
       setEmergencyPhotos((prev) => prev.filter((_, i) => i !== index));
@@ -327,673 +365,991 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
     showToast('info', 'Item Removed', 'Media attachment removed.');
   };
 
-  const handleNormalSubmit = (e: React.FormEvent) => {
+  // Section 3: Robust Backend Submission and Field Validation
+  const handleNormalSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentLift) return;
+    if (isSubmitting) return;
+
+    // 1. Validate Lift selection
+    if (!currentLift || !currentLift.id) {
+      showToast('error', 'Validation Error', 'Please select a valid elevator / lift unit.');
+      return;
+    }
+
+    // 2. Validate Complaint Type
+    if (!complaintType) {
+      showToast('error', 'Validation Error', 'Please select a complaint type.');
+      return;
+    }
+
+    // 3. Validate Priority
+    if (!priority) {
+      showToast('error', 'Validation Error', 'Please select a priority level.');
+      return;
+    }
+
+    // 4. Validate Problem Description
+    const trimmedDesc = description.trim();
+    if (!trimmedDesc) {
+      showToast('error', 'Validation Error', 'Please enter a description of the problem.');
+      return;
+    }
+    if (trimmedDesc.length < 5) {
+      showToast('error', 'Validation Error', 'Please provide a more detailed description (at least 5 characters).');
+      return;
+    }
 
     setIsSubmitting(true);
+    setSubmitError(null);
 
-    setTimeout(() => {
-      const created = createComplaint({
-        liftId: currentLift.id,
-        liftNumber: currentLift.liftNumber,
-        buildingId: currentLift.buildingId,
-        buildingName: currentLift.buildingName,
-        clientId: currentLift.clientId,
-        clientName: currentLift.clientName,
-        clientPhone: currentLift.clientPhone || '+91 98201 55432',
-        issueType:
-          complaintType === 'Lift Not Working'
-            ? 'lift_not_moving'
-            : complaintType === 'Door Problem'
-            ? 'door_jammed'
-            : complaintType === 'Noise / Vibration'
-            ? 'unusual_sound_vibration'
-            : complaintType === 'Electrical Problem'
-            ? 'lift_not_moving'
-            : 'other',
-        title: `${complaintType}: ${currentLift.liftNumber}`,
-        description: description || `Complaint reported for ${currentLift.liftNumber}: ${complaintType}`,
-        priority,
-        isEmergency: priority === 'critical',
-        beforePhotos: photos,
-        afterPhotos: [],
-      });
+    const mappedIssueType: IssueType =
+      complaintType === 'Lift Not Working'
+        ? 'lift_not_moving'
+        : complaintType === 'Door Problem'
+        ? 'door_jammed'
+        : complaintType === 'Noise / Vibration'
+        ? 'unusual_sound_vibration'
+        : complaintType === 'Electrical Problem'
+        ? 'lift_not_moving'
+        : 'other';
 
-      const ticketNumber = created?.ticketNumber || '#CMP-' + Date.now().toString().slice(-5);
-      setIsSubmitting(false);
+    try {
+      let createdResult;
+      if (createComplaintAsync) {
+        createdResult = await createComplaintAsync({
+          liftId: currentLift.id,
+          liftNumber: currentLift.liftNumber,
+          buildingId: currentLift.buildingId,
+          buildingName: currentLift.buildingName,
+          clientId: currentLift.clientId,
+          clientName: currentLift.clientName,
+          clientPhone: currentLift.clientPhone || '+91 98201 55432',
+          issueType: mappedIssueType,
+          title: `${complaintType}: ${currentLift.liftNumber}`,
+          description: trimmedDesc,
+          priority,
+          isEmergency: priority === 'critical',
+          beforePhotos: photos,
+          afterPhotos: [],
+        });
+      } else {
+        createdResult = createComplaint({
+          liftId: currentLift.id,
+          liftNumber: currentLift.liftNumber,
+          buildingId: currentLift.buildingId,
+          buildingName: currentLift.buildingName,
+          clientId: currentLift.clientId,
+          clientName: currentLift.clientName,
+          clientPhone: currentLift.clientPhone || '+91 98201 55432',
+          issueType: mappedIssueType,
+          title: `${complaintType}: ${currentLift.liftNumber}`,
+          description: trimmedDesc,
+          priority,
+          isEmergency: priority === 'critical',
+          beforePhotos: photos,
+          afterPhotos: [],
+        });
+      }
+
+      const ticketNumber = createdResult?.ticketNumber || '#CMP-' + Date.now().toString().slice(-5);
+
+      // Section 2: Display attractive success popup ONLY after backend storage confirmed
       setSubmittedTicket({
         id: ticketNumber,
+        rawId: createdResult?.id,
         mode: 'normal',
         title: `${complaintType} — ${currentLift.liftNumber}`,
+        liftName: currentLift.liftNumber,
+        buildingName: currentLift.buildingName,
+        complaintType: complaintType,
+        priority: priority,
+        status: createdResult?.status || 'pending',
+        reportedAt: createdResult?.reportedAt || new Date().toISOString(),
       });
       showToast('success', 'Complaint Registered Successfully', `Ticket ID: ${ticketNumber}`);
-    }, 400);
+    } catch (err: any) {
+      console.error('[RaiseComplaintModal] Failed to submit complaint:', err);
+      const friendlyMsg = err?.message || 'Could not connect to the service backend. Please try again.';
+      setSubmitError(friendlyMsg);
+      showToast('error', 'Submission Failed', friendlyMsg);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleEmergencySubmit = (e: React.FormEvent) => {
+  const handleEmergencySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentLift) return;
+    if (isSubmitting) return;
+
+    if (!currentLift || !currentLift.id) {
+      showToast('error', 'Validation Error', 'Please select a valid elevator / lift unit.');
+      return;
+    }
+
+    const trimmedContact = emergencyContact.trim();
+    if (!trimmedContact) {
+      showToast('error', 'Validation Error', 'Please enter a caller contact phone number.');
+      return;
+    }
+
+    const trimmedDesc = emergencyDesc.trim();
+    if (!trimmedDesc) {
+      showToast('error', 'Validation Error', 'Please enter emergency details.');
+      return;
+    }
 
     setIsSubmitting(true);
+    setSubmitError(null);
 
-    setTimeout(() => {
-      const created = createComplaint({
-        liftId: currentLift.id,
-        liftNumber: currentLift.liftNumber,
-        buildingId: currentLift.buildingId,
-        buildingName: emergencyBuilding || currentLift.buildingName,
-        clientId: currentLift.clientId,
-        clientName: currentLift.clientName,
-        clientPhone: emergencyContact,
-        issueType: 'stuck_passengers',
-        title: `🚨 EMERGENCY BREAKDOWN: ${currentLift.liftNumber}`,
-        description: emergencyDesc || 'Emergency breakdown reported. Lift stopped.',
-        priority: 'critical',
-        isEmergency: true,
-        beforePhotos: emergencyPhotos,
-        afterPhotos: [],
-      });
+    try {
+      let createdResult;
+      if (createComplaintAsync) {
+        createdResult = await createComplaintAsync({
+          liftId: currentLift.id,
+          liftNumber: currentLift.liftNumber,
+          buildingId: currentLift.buildingId,
+          buildingName: emergencyBuilding || currentLift.buildingName,
+          clientId: currentLift.clientId,
+          clientName: currentLift.clientName,
+          clientPhone: trimmedContact,
+          issueType: 'stuck_passengers',
+          title: `🚨 EMERGENCY BREAKDOWN: ${currentLift.liftNumber}`,
+          description: trimmedDesc,
+          priority: 'critical',
+          isEmergency: true,
+          beforePhotos: emergencyPhotos,
+          afterPhotos: [],
+        });
+      } else {
+        createdResult = createComplaint({
+          liftId: currentLift.id,
+          liftNumber: currentLift.liftNumber,
+          buildingId: currentLift.buildingId,
+          buildingName: emergencyBuilding || currentLift.buildingName,
+          clientId: currentLift.clientId,
+          clientName: currentLift.clientName,
+          clientPhone: trimmedContact,
+          issueType: 'stuck_passengers',
+          title: `🚨 EMERGENCY BREAKDOWN: ${currentLift.liftNumber}`,
+          description: trimmedDesc,
+          priority: 'critical',
+          isEmergency: true,
+          beforePhotos: emergencyPhotos,
+          afterPhotos: [],
+        });
+      }
 
-      const ticketNumber = created?.ticketNumber || '#EMG-' + Date.now().toString().slice(-5);
-      setIsSubmitting(false);
+      const ticketNumber = createdResult?.ticketNumber || '#EMG-' + Date.now().toString().slice(-5);
+
       setSubmittedTicket({
         id: ticketNumber,
+        rawId: createdResult?.id,
         mode: 'emergency',
         title: `Emergency Breakdown — ${currentLift.liftNumber}`,
+        liftName: currentLift.liftNumber,
+        buildingName: emergencyBuilding || currentLift.buildingName,
+        complaintType: 'Emergency Breakdown',
+        priority: 'critical',
+        status: createdResult?.status || 'pending',
+        reportedAt: createdResult?.reportedAt || new Date().toISOString(),
       });
-      showToast('error', 'Emergency Request Created', `Ticket ID: ${ticketNumber} • Service team notified`);
-    }, 400);
+      showToast('emergency', '🚨 Emergency Request Registered', `Ticket ID: ${ticketNumber} • Response team notified`);
+    } catch (err: any) {
+      console.error('[RaiseComplaintModal] Failed to submit emergency request:', err);
+      const friendlyMsg = err?.message || 'Emergency dispatch request could not reach backend. Please call control room directly.';
+      setSubmitError(friendlyMsg);
+      showToast('error', 'Dispatch Request Failed', friendlyMsg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Popup Navigation Handlers (Section 2)
+  const handleViewComplaint = () => {
+    if (!submittedTicket) return;
+    const ticketId = submittedTicket.id;
+    // Store in sessionStorage so ClientComplaintsView can auto-expand and scroll
+    try {
+      sessionStorage.setItem('wepsun_highlight_ticket', ticketId);
+    } catch {}
+
+    if (onNavigateTab) {
+      onNavigateTab('complaints', ticketId);
+    } else {
+      window.location.hash = 'complaints';
+      onClose();
+    }
+  };
+
+  const handleBackToHome = () => {
+    if (onNavigateTab) {
+      onNavigateTab('home');
+    } else {
+      window.location.hash = 'home';
+      onClose();
+    }
+  };
+
+  const handleCopyTicketId = () => {
+    if (!submittedTicket) return;
+    try {
+      navigator.clipboard.writeText(submittedTicket.id);
+      setIsCopiedId(true);
+      showToast('success', 'Ticket ID Copied', `${submittedTicket.id} copied to clipboard.`);
+      setTimeout(() => setIsCopiedId(false), 2000);
+    } catch {
+      showToast('info', 'Ticket ID', submittedTicket.id);
+    }
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in select-none">
-      <div className="bg-[#FFFFFF] border border-slate-200 rounded-3xl w-full max-w-lg max-h-[92dvh] overflow-y-auto shadow-2xl relative text-slate-800 my-auto">
-        {/* Accessible Close Button with min 40px tap target */}
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close modal"
-          className="absolute top-3.5 right-3.5 z-20 w-10 h-10 rounded-full bg-black/25 hover:bg-black/45 text-white flex items-center justify-center transition-all cursor-pointer active:scale-90 shadow-sm"
-        >
-          <X className="w-4 h-4" />
-        </button>
+    <>
+      {/* 
+        Section 1: Mobile Layout Fix 
+        Outer wrapper: z-40 so MobileBottomNav (z-50) stays fixed at bottom on mobile
+        Full height flex container on mobile, centered modal dialog on desktop
+      */}
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="raise-service-request-title"
+        className="fixed inset-0 z-40 bg-slate-950/75 backdrop-blur-sm flex flex-col md:items-center md:justify-center md:p-4 select-none animate-in fade-in duration-200"
+      >
+        {/* 
+          Inner modal container:
+          h-full on mobile, rounded card on desktop.
+          flex flex-col and overflow-hidden ensures fixed header on top, single smooth scrollable form in the middle!
+        */}
+        <div className="bg-[#FFFFFF] w-full h-full md:h-auto md:max-w-lg md:max-h-[92dvh] md:rounded-3xl md:border md:border-slate-200 md:shadow-2xl flex flex-col relative text-slate-800 overflow-hidden">
+          
+          {/* Accessible Close Button (Top-Right, 44px tap area) */}
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close modal"
+            className="absolute top-3 right-3 z-30 w-10 h-10 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center transition-all cursor-pointer active:scale-90 shadow-md touch-manipulation"
+          >
+            <X className="w-5 h-5" />
+          </button>
 
-        {/* Hidden Native File & Camera Inputs for Photos and Videos */}
-        <input
-          type="file"
-          ref={fileInputRef}
-          multiple
-          accept="image/*,video/*"
-          onChange={handleFileSelect}
-          className="hidden"
-          id="complaint-file-upload-input"
-        />
-        <input
-          type="file"
-          ref={cameraInputRef}
-          accept="image/*"
-          capture="environment"
-          onChange={handleFileSelect}
-          className="hidden"
-          id="complaint-camera-upload-input"
-        />
+          {/* Hidden Native File & Camera Inputs for Photos and Videos */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            multiple
+            accept="image/*,video/*"
+            onChange={handleFileSelect}
+            className="hidden"
+            id="complaint-file-upload-input"
+          />
+          <input
+            type="file"
+            ref={cameraInputRef}
+            accept="image/*"
+            capture="environment"
+            onChange={handleFileSelect}
+            className="hidden"
+            id="complaint-camera-upload-input"
+          />
 
-        {/* Success Confirmation View */}
-        {submittedTicket ? (
-          <div className="p-5 sm:p-7 text-center space-y-5">
-            <div
-              className={`w-16 h-16 rounded-3xl flex items-center justify-center mx-auto ${
-                submittedTicket.mode === 'emergency'
-                  ? 'bg-red-100 text-[#D32F2F] ring-8 ring-red-50'
-                  : 'bg-emerald-100 text-emerald-700 ring-8 ring-emerald-50'
-              }`}
-            >
-              <CheckCircle2 className="w-9 h-9" />
-            </div>
-
-            <div className="space-y-1.5">
-              <span
-                className={`text-xs font-mono font-bold uppercase tracking-wider px-3 py-1 rounded-full inline-block ${
-                  submittedTicket.mode === 'emergency'
-                    ? 'bg-red-100 text-red-800 border border-red-200'
-                    : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                }`}
-              >
-                Ticket ID: {submittedTicket.id}
-              </span>
-              <h2 className="text-xl sm:text-2xl font-black text-slate-900">
-                {submittedTicket.mode === 'emergency'
-                  ? 'Emergency Request Created'
-                  : 'Complaint Registered Successfully'}
-              </h2>
-              <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                {submittedTicket.mode === 'emergency'
-                  ? 'Service team has been notified. Nearest rapid-response engineer is being dispatched immediately.'
-                  : 'Your service request has been logged. Our service coordinator will assign a certified technician shortly.'}
-              </p>
-            </div>
-
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-left text-xs space-y-2">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Ticket No:</span>
-                <span className="font-mono font-bold text-slate-900">{submittedTicket.id}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Subject:</span>
-                <span className="font-bold text-slate-800 truncate ml-2">{submittedTicket.title}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Status:</span>
-                <span className="text-emerald-700 font-bold">✓ Assigned to Control Desk</span>
-              </div>
-            </div>
-
-            <div className="flex gap-2 pt-1">
-              <button
-                type="button"
-                onClick={onClose}
-                className="w-full py-3.5 rounded-xl bg-[#123B5D] hover:bg-[#0e2f4a] text-white font-bold text-xs shadow-md transition-all cursor-pointer active:scale-98"
-              >
-                Done & View Ticket Tracker
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div>
+          {/* 
+            FIXED APPLICATION / MODAL HEADER 
+            Header Mode Switcher & Title Banner stays fixed at top of dialog
+          */}
+          <header className="shrink-0 bg-white border-b border-slate-200 z-20">
             {/* Header Mode Switcher Tab */}
-            <div className="p-2.5 sm:p-3 bg-slate-100 border-b border-slate-200 flex items-center justify-between gap-2">
-              <div className="grid grid-cols-2 p-1 bg-white rounded-2xl w-full border border-slate-200/80 text-[11px] sm:text-xs font-bold gap-1">
+            <div className="p-2 sm:p-2.5 bg-slate-100/90 border-b border-slate-200/80">
+              <div className="grid grid-cols-2 p-1 bg-white rounded-2xl w-full max-w-xs sm:max-w-none border border-slate-200/90 text-xs font-bold gap-1 shadow-2xs">
                 <button
                   type="button"
-                  onClick={() => setModalMode('normal')}
-                  className={`py-2 px-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  onClick={() => {
+                    setModalMode('normal');
+                    setSubmitError(null);
+                  }}
+                  className={`py-2 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer touch-manipulation ${
                     modalMode === 'normal'
                       ? 'bg-[#123B5D] text-white shadow-sm'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  <FileText className="w-3.5 h-3.5 shrink-0" />
+                  <FileText className="w-4 h-4 shrink-0" />
                   <span className="truncate">Service Request</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => setModalMode('emergency')}
-                  className={`py-2 px-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  onClick={() => {
+                    setModalMode('emergency');
+                    setSubmitError(null);
+                  }}
+                  className={`py-2 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer touch-manipulation ${
                     modalMode === 'emergency'
                       ? 'bg-[#D32F2F] text-white shadow-sm'
                       : 'text-red-700 hover:bg-red-50'
                   }`}
                 >
-                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
                   <span className="truncate">🚨 Emergency</span>
                 </button>
               </div>
             </div>
 
+            {/* Mode Banner Title */}
+            {modalMode === 'normal' ? (
+              <div className="bg-[#123B5D] text-white px-4 py-3.5 sm:px-6 sm:py-4 text-center">
+                <h2 id="raise-service-request-title" className="text-base sm:text-lg font-black tracking-tight flex items-center justify-center gap-2">
+                  <Wrench className="w-4 h-4 text-sky-300" />
+                  <span>Raise a Service Request</span>
+                </h2>
+                <p className="text-xs text-sky-200 mt-0.5 max-w-sm mx-auto">
+                  Log routine elevator complaints, door sensor glitches, or electrical queries.
+                </p>
+              </div>
+            ) : (
+              <div className="bg-gradient-to-r from-[#B71C1C] via-[#D32F2F] to-[#E53935] text-white px-4 py-3.5 sm:px-6 sm:py-4 text-center">
+                <div className="flex items-center justify-center gap-2 mb-1">
+                  <AlertTriangle className="w-5 h-5 text-white animate-pulse" />
+                  <h2 className="text-base sm:text-lg font-black tracking-tight">Emergency Breakdown</h2>
+                </div>
+                <p className="text-xs text-red-100 max-w-sm mx-auto">
+                  Is your lift currently stopped with trapped passengers? Rapid response dispatch team is on standby.
+                </p>
+                <div className="mt-2">
+                  <a
+                    href="tel:+919820155432"
+                    className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-lg bg-white/95 text-[#D32F2F] font-bold text-[11px] shadow-sm hover:bg-white transition-all"
+                  >
+                    <PhoneCall className="w-3 h-3" />
+                    <span>24x7 Control Room: +91 98201 55432</span>
+                  </a>
+                </div>
+              </div>
+            )}
+          </header>
+
+          {/* 
+            VERTICALLY SCROLLABLE COMPLAINT FORM 
+            Single scroll container on mobile.
+            Key mobile fix: pb-[calc(104px+env(safe-area-inset-bottom,20px))] ensures the final 2 buttons 
+            scroll COMPLETELY above the fixed MobileBottomNav!
+          */}
+          <div
+            ref={scrollContainerRef}
+            className="flex-1 overflow-y-auto overscroll-contain touch-pan-y px-4 sm:px-6 pt-4 pb-[calc(104px+env(safe-area-inset-bottom,20px))] md:pb-6"
+            style={{ WebkitOverflowScrolling: 'touch' }}
+          >
+            {/* Inline Error Notification Banner */}
+            {submitError && (
+              <div className="mb-4 p-3.5 rounded-2xl bg-red-50 border border-red-200 text-red-800 text-xs flex items-start gap-2.5 animate-in fade-in">
+                <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <span className="font-bold block">Submission Error</span>
+                  <span className="text-slate-600 leading-relaxed">{submitError}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSubmitError(null)}
+                  className="text-red-500 hover:text-red-700 p-1"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
             {/* PAGE 5: RAISE A SERVICE REQUEST (NORMAL COMPLAINT) */}
             {modalMode === 'normal' && (
-              <div>
-                <div className="bg-[#123B5D] text-white p-4 sm:p-5 text-center">
-                  <h2 className="text-base sm:text-lg font-black tracking-tight">Raise a Service Request</h2>
-                  <p className="text-xs text-sky-200 mt-0.5 max-w-sm mx-auto">
-                    Log routine elevator complaints, door sensor glitches, or electrical queries.
-                  </p>
+              <form onSubmit={handleNormalSubmit} className="space-y-4 text-xs">
+                {/* 1. Select Lift */}
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1.5">
+                    Select Lift <span className="text-slate-400 font-normal">(Select your lift)</span>
+                  </label>
+                  <select
+                    value={selectedLiftId}
+                    onChange={(e) => setSelectedLiftId(e.target.value)}
+                    className="w-full px-3.5 py-3 sm:py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-base sm:text-xs font-medium focus:bg-white focus:border-[#1976D2] outline-none transition-colors"
+                  >
+                    {liftOptions.map((l) => {
+                      const isNamedLift = FOUR_NAMED_LIFTS.some((f) => f.id === l.id);
+                      return (
+                        <option key={l.id} value={l.id}>
+                          {isNamedLift
+                            ? l.liftNumber
+                            : `${l.liftNumber} — ${l.buildingName} (${l.capacityPersons ? `${l.capacityPersons} Persons / ` : ''}${l.locationDetails || `${l.capacityKg || 544} kg`})`}
+                        </option>
+                      );
+                    })}
+                  </select>
                 </div>
 
-                <form onSubmit={handleNormalSubmit} className="p-5 space-y-4 text-xs">
-                  {/* Select Lift */}
-                  <div>
-                    <label className="block text-slate-700 font-bold mb-1">
-                      Select Lift <span className="text-slate-400 font-normal">(Select your lift)</span>
+                {/* 2. Complaint Type (5 Options from PDF) */}
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1.5">Complaint Type</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {(
+                      [
+                        'Lift Not Working',
+                        'Door Problem',
+                        'Noise / Vibration',
+                        'Electrical Problem',
+                        'Other',
+                      ] as const
+                    ).map((type) => (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => setComplaintType(type)}
+                        className={`py-2.5 px-3 rounded-xl border text-center font-bold text-xs sm:text-[11px] transition-all cursor-pointer touch-manipulation active:scale-95 ${
+                          complaintType === type
+                            ? 'bg-[#1976D2] border-[#1976D2] text-white shadow-sm ring-2 ring-blue-200'
+                            : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        {type}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 3. Priority (Critical, High, Normal) */}
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1.5">Priority</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['critical', 'high', 'normal'] as ComplaintPriority[]).map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setPriority(p)}
+                        className={`py-2.5 px-3 rounded-xl border font-bold uppercase text-xs sm:text-[11px] font-mono transition-all text-center cursor-pointer touch-manipulation active:scale-95 ${
+                          priority === p
+                            ? p === 'critical'
+                              ? 'bg-[#D32F2F] border-[#D32F2F] text-white shadow-sm ring-2 ring-red-200'
+                              : p === 'high'
+                              ? 'bg-amber-500 border-amber-500 text-white shadow-sm ring-2 ring-amber-200'
+                              : 'bg-[#1976D2] border-[#1976D2] text-white shadow-sm ring-2 ring-blue-200'
+                            : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        {p === 'critical' ? '● Critical' : p === 'high' ? 'High' : 'Normal'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 4. Describe the Problem */}
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">
+                    Describe the Problem <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    onFocus={(e) => {
+                      setTimeout(() => {
+                        e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }, 150);
+                    }}
+                    placeholder="Please describe the issue in detail (e.g., Door stuck on 4th floor, strange scraping sound)..."
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-base sm:text-xs focus:bg-white focus:border-[#1976D2] outline-none transition-colors"
+                  />
+                </div>
+
+                {/* 5. Upload Photos / Videos */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-slate-700 font-bold">
+                      Upload Photos / Videos
                     </label>
-                    <select
-                      value={selectedLiftId}
-                      onChange={(e) => setSelectedLiftId(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-xs font-medium focus:bg-white focus:border-[#1976D2] outline-none"
+                    <span className="text-[10px] text-slate-400">JPG, PNG, MP4, MOV (max 50MB)</span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploadingMedia || isSubmitting}
+                      className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-bold text-xs flex items-center gap-2 transition-all cursor-pointer active:scale-95 shadow-2xs touch-manipulation disabled:opacity-50"
                     >
-                      {liftOptions.map((l) => {
-                        const isNamedLift = FOUR_NAMED_LIFTS.some((f) => f.id === l.id);
-                        return (
-                          <option key={l.id} value={l.id}>
-                            {isNamedLift
-                              ? l.liftNumber
-                              : `${l.liftNumber} — ${l.buildingName} (${l.capacityPersons ? `${l.capacityPersons} Persons / ` : ''}${l.locationDetails || `${l.capacityKg || 544} kg`})`}
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </div>
+                      <UploadCloud className="w-4 h-4 text-[#1976D2]" />
+                      <span>{isUploadingMedia ? 'Attaching...' : 'Upload Photos / Videos'}</span>
+                    </button>
 
-                  {/* Complaint Type (5 Options from PDF) */}
-                  <div>
-                    <label className="block text-slate-700 font-bold mb-1.5">Complaint Type</label>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {(
-                        [
-                          'Lift Not Working',
-                          'Door Problem',
-                          'Noise / Vibration',
-                          'Electrical Problem',
-                          'Other',
-                        ] as const
-                      ).map((type) => (
-                        <button
-                          key={type}
-                          type="button"
-                          onClick={() => setComplaintType(type)}
-                          className={`py-2 px-2.5 rounded-xl border text-center font-bold text-[11px] transition-all ${
-                            complaintType === type
-                              ? 'bg-[#1976D2] border-[#1976D2] text-white shadow-sm'
-                              : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                          }`}
-                        >
-                          {type}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                    <button
+                      type="button"
+                      onClick={() => cameraInputRef.current?.click()}
+                      disabled={isUploadingMedia || isSubmitting}
+                      className="px-3.5 py-2.5 rounded-xl bg-sky-50 hover:bg-sky-100 border border-sky-200 text-[#1976D2] font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 touch-manipulation disabled:opacity-50"
+                      title="Capture Photo with Device Camera"
+                    >
+                      <Camera className="w-4 h-4" />
+                      <span>Take Photo</span>
+                    </button>
 
-                  {/* Priority (Critical, High, Normal) */}
-                  <div>
-                    <label className="block text-slate-700 font-bold mb-1.5">Priority</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {(['critical', 'high', 'normal'] as ComplaintPriority[]).map((p) => (
-                        <button
-                          key={p}
-                          type="button"
-                          onClick={() => setPriority(p)}
-                          className={`py-2 px-3 rounded-xl border font-bold uppercase text-[11px] font-mono transition-all text-center ${
-                            priority === p
-                              ? p === 'critical'
-                                ? 'bg-[#D32F2F] border-[#D32F2F] text-white shadow-sm'
-                                : p === 'high'
-                                ? 'bg-amber-500 border-amber-500 text-white shadow-sm'
-                                : 'bg-[#1976D2] border-[#1976D2] text-white shadow-sm'
-                              : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                          }`}
-                        >
-                          {p === 'critical' ? '● Critical' : p === 'high' ? 'High' : 'Normal'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Describe the Problem */}
-                  <div>
-                    <label className="block text-slate-700 font-bold mb-1">
-                      Describe the Problem
-                    </label>
-                    <textarea
-                      rows={3}
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Please describe the issue..."
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-xs focus:bg-white focus:border-[#1976D2] outline-none"
-                    />
-                  </div>
-
-                  {/* Upload Photos / Videos */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="block text-slate-700 font-bold">
-                        Upload Photos / Videos
-                      </label>
-                      <span className="text-[10px] text-slate-400">JPG, PNG, MP4, MOV (max 50MB)</span>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isUploadingMedia}
-                        className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-bold text-xs flex items-center gap-2 transition-all cursor-pointer active:scale-95 shadow-2xs"
-                      >
-                        <UploadCloud className="w-4 h-4 text-[#1976D2]" />
-                        <span>{isUploadingMedia ? 'Uploading...' : 'Upload Photos / Videos'}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => cameraInputRef.current?.click()}
-                        disabled={isUploadingMedia}
-                        className="px-3.5 py-2.5 rounded-xl bg-sky-50 hover:bg-sky-100 border border-sky-200 text-[#1976D2] font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
-                        title="Capture Photo with Device Camera"
-                      >
-                        <Camera className="w-4 h-4" />
-                        <span>Take Photo</span>
-                      </button>
-
-                      {photos.length > 0 && (
-                        <span className="text-xs text-emerald-700 font-semibold flex items-center gap-1 ml-auto">
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>{photos.length} file{photos.length > 1 ? 's' : ''} attached</span>
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Preview Gallery */}
                     {photos.length > 0 && (
-                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 pt-1.5">
-                        {photos.map((url, idx) => (
-                          <div
-                            key={idx}
-                            className="relative group rounded-xl overflow-hidden border border-slate-200 bg-slate-900 aspect-square shadow-2xs cursor-pointer"
-                            onClick={() => setPreviewMediaUrl(url)}
-                          >
-                            {isVideoUrl(url) ? (
-                              <div className="w-full h-full flex items-center justify-center bg-slate-950 text-white relative">
-                                <video src={url} className="w-full h-full object-cover opacity-80" />
-                                <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                                  <Film className="w-5 h-5 text-white/90" />
-                                </div>
-                                <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/75 text-[9px] font-mono text-white">
-                                  VIDEO
-                                </span>
-                              </div>
-                            ) : (
-                              <img
-                                src={url}
-                                alt={`Evidence ${idx + 1}`}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                              />
-                            )}
-
-                            {/* Remove button */}
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleRemovePhoto(idx);
-                              }}
-                              title="Remove file"
-                              aria-label="Remove file"
-                              className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/75 hover:bg-red-600 text-white flex items-center justify-center text-xs transition-colors shadow-sm z-10 cursor-pointer active:scale-90"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-
-                            {/* Eye icon overlay on hover */}
-                            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-                              <Eye className="w-4 h-4 text-white drop-shadow-md" />
-                            </div>
-                          </div>
-                        ))}
-
-                        <button
-                          type="button"
-                          onClick={() => fileInputRef.current?.click()}
-                          className="rounded-xl border-2 border-dashed border-slate-300 hover:border-[#1976D2] hover:bg-blue-50/50 flex flex-col items-center justify-center aspect-square text-slate-500 hover:text-[#1976D2] transition-all cursor-pointer text-[10px] font-bold gap-1"
-                        >
-                          <Plus className="w-4 h-4" />
-                          <span>Add More</span>
-                        </button>
-                      </div>
+                      <span className="text-xs text-emerald-700 font-semibold flex items-center gap-1 ml-auto">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>{photos.length} file{photos.length > 1 ? 's' : ''} attached</span>
+                      </span>
                     )}
                   </div>
 
-                  {/* Buttons: Submit Complaint & Cancel */}
-                  <div className="flex items-center gap-3 pt-3 border-t border-slate-100">
-                    <button
-                      type="button"
-                      onClick={onClose}
-                      className="flex-1 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="flex-1 py-3 rounded-xl bg-[#123B5D] hover:bg-[#0e2f4a] text-white font-bold text-xs shadow-md shadow-blue-900/20 transition-all"
-                    >
-                      {isSubmitting ? 'Registering...' : 'Submit Complaint'}
-                    </button>
-                  </div>
-                </form>
-              </div>
+                  {/* Preview Gallery */}
+                  {photos.length > 0 && (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 pt-1.5">
+                      {photos.map((url, idx) => (
+                        <div
+                          key={idx}
+                          className="relative group rounded-xl overflow-hidden border border-slate-200 bg-slate-900 aspect-square shadow-2xs cursor-pointer"
+                          onClick={() => setPreviewMediaUrl(url)}
+                        >
+                          {isVideoUrl(url) ? (
+                            <div className="w-full h-full flex items-center justify-center bg-slate-950 text-white relative">
+                              <video src={url} className="w-full h-full object-cover opacity-80" />
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                                <Film className="w-5 h-5 text-white/90" />
+                              </div>
+                              <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/75 text-[9px] font-mono text-white">
+                                VIDEO
+                              </span>
+                            </div>
+                          ) : (
+                            <img
+                              src={url}
+                              alt={`Evidence ${idx + 1}`}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                            />
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemovePhoto(idx);
+                            }}
+                            title="Remove file"
+                            aria-label="Remove file"
+                            className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/75 hover:bg-red-600 text-white flex items-center justify-center text-xs transition-colors shadow-sm z-10 cursor-pointer active:scale-90"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+
+                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                            <Eye className="w-4 h-4 text-white drop-shadow-md" />
+                          </div>
+                        </div>
+                      ))}
+
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="rounded-xl border-2 border-dashed border-slate-300 hover:border-[#1976D2] hover:bg-blue-50/50 flex flex-col items-center justify-center aspect-square text-slate-500 hover:text-[#1976D2] transition-all cursor-pointer text-[10px] font-bold gap-1"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Add More</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* 
+                  FINAL ACTION BUTTONS: Cancel and Submit Complaint
+                  Thanks to the bottom padding on the scrollable container,
+                  these buttons scroll cleanly above the bottom navigation bar on all mobile screens!
+                */}
+                <div className="flex items-center gap-3 pt-4 border-t border-slate-200">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    disabled={isSubmitting}
+                    className="flex-1 min-h-[46px] py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer active:scale-98 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="flex-1 min-h-[46px] py-3 rounded-xl bg-[#123B5D] hover:bg-[#0e2f4a] text-white font-bold text-xs shadow-md shadow-blue-900/20 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-75 disabled:cursor-not-allowed"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                        <span>Registering Complaint...</span>
+                      </>
+                    ) : (
+                      <span>Submit Complaint</span>
+                    )}
+                  </button>
+                </div>
+              </form>
             )}
 
             {/* PAGE 6: EMERGENCY BREAKDOWN (VISUALLY DIFFERENT / RED THEME) */}
             {modalMode === 'emergency' && (
-              <div>
-                <div className="bg-gradient-to-b from-[#B71C1C] via-[#D32F2F] to-[#E53935] text-white p-6 text-center">
-                  <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center mx-auto mb-2 text-white shadow-inner">
-                    <AlertTriangle className="w-6 h-6 text-white" />
-                  </div>
-                  <h2 className="text-xl font-black tracking-tight">Emergency Breakdown</h2>
-                  <p className="text-xs text-red-100 mt-1 max-w-sm mx-auto leading-relaxed">
-                    Is your lift currently stopped or experiencing an emergency? Please provide the
-                    details below so our service team can respond quickly.
-                  </p>
-
-                  <div className="mt-3">
-                    <a
-                      href="tel:+919820155432"
-                      className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-white text-[#D32F2F] font-bold text-xs shadow-sm hover:bg-red-50 transition-all"
-                    >
-                      <PhoneCall className="w-3.5 h-3.5" />
-                      <span>24x7 Control Room: +91 98201 55432</span>
-                    </a>
-                  </div>
+              <form onSubmit={handleEmergencySubmit} className="space-y-4 text-xs">
+                {/* 1. Select Lift */}
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Select Lift</label>
+                  <select
+                    value={selectedLiftId}
+                    onChange={(e) => setSelectedLiftId(e.target.value)}
+                    className="w-full px-3.5 py-3 sm:py-2.5 rounded-xl border border-red-200 bg-red-50/40 text-slate-800 text-base sm:text-xs font-medium focus:bg-white focus:border-[#D32F2F] outline-none transition-colors"
+                  >
+                    {liftOptions.map((l) => {
+                      const isNamedLift = FOUR_NAMED_LIFTS.some((f) => f.id === l.id);
+                      return (
+                        <option key={l.id} value={l.id}>
+                          {isNamedLift
+                            ? l.liftNumber
+                            : `${l.liftNumber} — ${l.buildingName} (${l.locationDetails || 'Passenger Lift'})`}
+                        </option>
+                      );
+                    })}
+                  </select>
                 </div>
 
-                <form onSubmit={handleEmergencySubmit} className="p-5 space-y-4 text-xs">
-                  {/* Select Lift */}
-                  <div>
-                    <label className="block text-slate-700 font-bold mb-1">Select Lift</label>
-                    <select
-                      value={selectedLiftId}
-                      onChange={(e) => setSelectedLiftId(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-red-200 bg-red-50/40 text-slate-800 text-xs font-medium focus:bg-white focus:border-[#D32F2F] outline-none"
+                {/* 2. Building / Location */}
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Building / Location</label>
+                  <input
+                    type="text"
+                    value={emergencyBuilding || currentLift?.buildingName || 'ABC Residency, Pune'}
+                    onChange={(e) => setEmergencyBuilding(e.target.value)}
+                    placeholder="Enter Building & Location"
+                    className="w-full px-3.5 py-3 sm:py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-base sm:text-xs focus:bg-white focus:border-[#D32F2F] outline-none transition-colors"
+                  />
+                </div>
+
+                {/* 3. Contact Number */}
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">
+                    Contact Number <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    value={emergencyContact}
+                    onChange={(e) => setEmergencyContact(e.target.value)}
+                    placeholder="Enter caller contact phone"
+                    className="w-full px-3.5 py-3 sm:py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-base sm:text-xs font-mono focus:bg-white focus:border-[#D32F2F] outline-none transition-colors"
+                  />
+                </div>
+
+                {/* 4. Problem Description */}
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">
+                    Problem Description <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={emergencyDesc}
+                    onChange={(e) => setEmergencyDesc(e.target.value)}
+                    onFocus={(e) => {
+                      setTimeout(() => {
+                        e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }, 150);
+                    }}
+                    placeholder="Describe what happened (e.g. Lift halted between 3rd & 4th floor)..."
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-base sm:text-xs focus:bg-white focus:border-[#D32F2F] outline-none transition-colors"
+                  />
+                </div>
+
+                {/* 5. Upload Photo / Video (Emergency) */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-slate-700 font-bold">Upload Photo / Video</label>
+                    <span className="text-[10px] text-red-500 font-medium">Visual proof of breakdown</span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploadingMedia || isSubmitting}
+                      className="px-4 py-2.5 rounded-xl bg-red-50 hover:bg-red-100 border border-red-200 text-[#D32F2F] font-bold text-xs flex items-center gap-2 transition-all cursor-pointer active:scale-95 shadow-2xs touch-manipulation disabled:opacity-50"
                     >
-                      {liftOptions.map((l) => {
-                        const isNamedLift = FOUR_NAMED_LIFTS.some((f) => f.id === l.id);
-                        return (
-                          <option key={l.id} value={l.id}>
-                            {isNamedLift
-                              ? l.liftNumber
-                              : `${l.liftNumber} — ${l.buildingName} (${l.locationDetails || 'Passenger Lift'})`}
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </div>
+                      <UploadCloud className="w-4 h-4" />
+                      <span>{isUploadingMedia ? 'Uploading...' : 'Upload Photo / Video'}</span>
+                    </button>
 
-                  {/* Building / Location */}
-                  <div>
-                    <label className="block text-slate-700 font-bold mb-1">
-                      Building / Location
-                    </label>
-                    <input
-                      type="text"
-                      value={emergencyBuilding || currentLift?.buildingName || 'ABC Residency, Pune'}
-                      onChange={(e) => setEmergencyBuilding(e.target.value)}
-                      placeholder="Enter Building & Location"
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-xs focus:bg-white focus:border-[#D32F2F] outline-none"
-                    />
-                  </div>
+                    <button
+                      type="button"
+                      onClick={() => cameraInputRef.current?.click()}
+                      disabled={isUploadingMedia || isSubmitting}
+                      className="px-3.5 py-2.5 rounded-xl bg-red-100 hover:bg-red-200 border border-red-300 text-red-900 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 touch-manipulation disabled:opacity-50"
+                      title="Capture Photo with Device Camera"
+                    >
+                      <Camera className="w-4 h-4" />
+                      <span>Capture Now</span>
+                    </button>
 
-                  {/* Contact Number */}
-                  <div>
-                    <label className="block text-slate-700 font-bold mb-1">Contact Number</label>
-                    <input
-                      type="text"
-                      required
-                      value={emergencyContact}
-                      onChange={(e) => setEmergencyContact(e.target.value)}
-                      placeholder="Enter caller contact phone"
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-xs font-mono focus:bg-white focus:border-[#D32F2F] outline-none"
-                    />
-                  </div>
-
-                  {/* Problem Description */}
-                  <div>
-                    <label className="block text-slate-700 font-bold mb-1">
-                      Problem Description
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={emergencyDesc}
-                      onChange={(e) => setEmergencyDesc(e.target.value)}
-                      placeholder="Describe what happened (e.g. Lift halted between 3rd & 4th floor)..."
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-xs focus:bg-white focus:border-[#D32F2F] outline-none"
-                    />
-                  </div>
-
-                  {/* Upload Photo / Video (Emergency) */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="block text-slate-700 font-bold">
-                        Upload Photo / Video
-                      </label>
-                      <span className="text-[10px] text-red-500 font-medium">Visual proof of breakdown</span>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isUploadingMedia}
-                        className="px-4 py-2.5 rounded-xl bg-red-50 hover:bg-red-100 border border-red-200 text-[#D32F2F] font-bold text-xs flex items-center gap-2 transition-all cursor-pointer active:scale-95 shadow-2xs"
-                      >
-                        <UploadCloud className="w-4 h-4" />
-                        <span>{isUploadingMedia ? 'Uploading...' : 'Upload Photo / Video'}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => cameraInputRef.current?.click()}
-                        disabled={isUploadingMedia}
-                        className="px-3.5 py-2.5 rounded-xl bg-red-100 hover:bg-red-200 border border-red-300 text-red-900 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
-                        title="Capture Photo with Device Camera"
-                      >
-                        <Camera className="w-4 h-4" />
-                        <span>Capture Now</span>
-                      </button>
-
-                      {emergencyPhotos.length > 0 && (
-                        <span className="text-xs text-red-700 font-semibold flex items-center gap-1 ml-auto">
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>{emergencyPhotos.length} file{emergencyPhotos.length > 1 ? 's' : ''} attached</span>
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Preview Gallery */}
                     {emergencyPhotos.length > 0 && (
-                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 pt-1.5">
-                        {emergencyPhotos.map((url, idx) => (
-                          <div
-                            key={idx}
-                            className="relative group rounded-xl overflow-hidden border border-red-200 bg-slate-900 aspect-square shadow-2xs cursor-pointer"
-                            onClick={() => setPreviewMediaUrl(url)}
-                          >
-                            {isVideoUrl(url) ? (
-                              <div className="w-full h-full flex items-center justify-center bg-slate-950 text-white relative">
-                                <video src={url} className="w-full h-full object-cover opacity-80" />
-                                <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                                  <Film className="w-5 h-5 text-white/90" />
-                                </div>
-                                <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/75 text-[9px] font-mono text-white">
-                                  VIDEO
-                                </span>
-                              </div>
-                            ) : (
-                              <img
-                                src={url}
-                                alt={`Emergency Evidence ${idx + 1}`}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                              />
-                            )}
-
-                            {/* Remove button */}
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleRemovePhoto(idx);
-                              }}
-                              title="Remove file"
-                              aria-label="Remove file"
-                              className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/75 hover:bg-red-600 text-white flex items-center justify-center text-xs transition-colors shadow-sm z-10 cursor-pointer active:scale-90"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-
-                            {/* Eye icon overlay on hover */}
-                            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-                              <Eye className="w-4 h-4 text-white drop-shadow-md" />
-                            </div>
-                          </div>
-                        ))}
-
-                        <button
-                          type="button"
-                          onClick={() => fileInputRef.current?.click()}
-                          className="rounded-xl border-2 border-dashed border-red-300 hover:border-red-500 hover:bg-red-50/50 flex flex-col items-center justify-center aspect-square text-red-500 hover:text-red-700 transition-all cursor-pointer text-[10px] font-bold gap-1"
-                        >
-                          <Plus className="w-4 h-4" />
-                          <span>Add More</span>
-                        </button>
-                      </div>
+                      <span className="text-xs text-red-700 font-semibold flex items-center gap-1 ml-auto">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>{emergencyPhotos.length} file{emergencyPhotos.length > 1 ? 's' : ''} attached</span>
+                      </span>
                     )}
                   </div>
 
-                  {/* Main Emergency Button */}
-                  <div className="pt-2">
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="w-full py-3.5 rounded-2xl bg-[#D32F2F] hover:bg-red-700 text-white font-bold text-sm shadow-lg shadow-red-500/25 transition-all flex items-center justify-center gap-2 uppercase tracking-wide"
-                    >
-                      <AlertTriangle className="w-5 h-5" />
-                      <span>
-                        {isSubmitting ? 'Dispatching Fast Response...' : '🚨 REQUEST EMERGENCY SERVICE'}
-                      </span>
-                    </button>
-                  </div>
-                </form>
-              </div>
+                  {/* Preview Gallery */}
+                  {emergencyPhotos.length > 0 && (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 pt-1.5">
+                      {emergencyPhotos.map((url, idx) => (
+                        <div
+                          key={idx}
+                          className="relative group rounded-xl overflow-hidden border border-red-200 bg-slate-900 aspect-square shadow-2xs cursor-pointer"
+                          onClick={() => setPreviewMediaUrl(url)}
+                        >
+                          {isVideoUrl(url) ? (
+                            <div className="w-full h-full flex items-center justify-center bg-slate-950 text-white relative">
+                              <video src={url} className="w-full h-full object-cover opacity-80" />
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                                <Film className="w-5 h-5 text-white/90" />
+                              </div>
+                              <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/75 text-[9px] font-mono text-white">
+                                VIDEO
+                              </span>
+                            </div>
+                          ) : (
+                            <img
+                              src={url}
+                              alt={`Emergency Evidence ${idx + 1}`}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                            />
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemovePhoto(idx);
+                            }}
+                            title="Remove file"
+                            aria-label="Remove file"
+                            className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/75 hover:bg-red-600 text-white flex items-center justify-center text-xs transition-colors shadow-sm z-10 cursor-pointer active:scale-90"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+
+                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                            <Eye className="w-4 h-4 text-white drop-shadow-md" />
+                          </div>
+                        </div>
+                      ))}
+
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="rounded-xl border-2 border-dashed border-red-300 hover:border-red-500 hover:bg-red-50/50 flex flex-col items-center justify-center aspect-square text-red-500 hover:text-red-700 transition-all cursor-pointer text-[10px] font-bold gap-1"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Add More</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Emergency Action Button */}
+                <div className="pt-3 border-t border-red-100 flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    disabled={isSubmitting}
+                    className="px-4 min-h-[48px] rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer active:scale-98 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="flex-1 min-h-[48px] py-3.5 rounded-2xl bg-[#D32F2F] hover:bg-red-700 text-white font-bold text-xs sm:text-sm shadow-lg shadow-red-500/25 transition-all flex items-center justify-center gap-2 uppercase tracking-wide cursor-pointer active:scale-98 disabled:opacity-75 disabled:cursor-not-allowed"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                        <span>Dispatching Fast Response...</span>
+                      </>
+                    ) : (
+                      <>
+                        <AlertTriangle className="w-4 h-4 shrink-0" />
+                        <span>🚨 REQUEST EMERGENCY SERVICE</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
             )}
           </div>
-        )}
+        </div>
+      </div>
 
-        {/* Media Lightbox Viewer Modal */}
-        {previewMediaUrl && (
-          <div
-            className="fixed inset-0 z-60 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in"
-            onClick={() => setPreviewMediaUrl(null)}
-          >
-            <div
-              className="relative max-w-2xl max-h-[85vh] w-full flex flex-col items-center justify-center"
-              onClick={(e) => e.stopPropagation()}
+      {/* 
+        Section 2: ATTRACTIVE COMPLAINT SUBMISSION SUCCESS POPUP 
+        Centered modal with clean white background, rounded-3xl corners, subtle shadow-2xl,
+        animated green success checkmark inside circular icon, dynamic Complaint ID, selected lift,
+        complaint type, priority badge, and two dedicated navigation buttons!
+      */}
+      {submittedTicket && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="success-modal-heading"
+          className="fixed inset-0 z-[60] bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-4 select-none animate-in fade-in duration-200"
+        >
+          <div className="bg-white border border-slate-100 rounded-3xl w-full max-w-md p-6 sm:p-8 text-center shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300">
+            {/* Top decorative corporate gradient line */}
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#123B5D] via-[#1976D2] to-emerald-500" />
+
+            {/* Close X at top-right of popup */}
+            <button
+              type="button"
+              onClick={handleBackToHome}
+              aria-label="Close popup"
+              className="absolute top-3.5 right-3.5 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
             >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Animated Green Success Checkmark */}
+            <div className="w-20 h-20 mx-auto mb-4 relative flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full bg-emerald-100 animate-ping opacity-35" />
+              <div className="w-20 h-20 rounded-full bg-emerald-50 border-2 border-emerald-300 flex items-center justify-center text-emerald-600 shadow-sm relative z-10">
+                <CheckCircle2 className="w-11 h-11 text-emerald-600 stroke-[2.5]" />
+              </div>
+            </div>
+
+            {/* Main Heading */}
+            <h2 id="success-modal-heading" className="text-xl sm:text-2xl font-black text-[#123B5D] tracking-tight">
+              Complaint Raised Successfully!
+            </h2>
+
+            {/* Subtext */}
+            <p className="text-xs sm:text-sm text-slate-600 mt-2 leading-relaxed max-w-xs mx-auto">
+              Your service complaint has been submitted successfully. Our team will review your request and take the necessary action.
+            </p>
+
+            {/* Dynamic Details Card */}
+            <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-4 mt-5 text-left text-xs space-y-2.5">
+              {/* Complaint ID / Ticket ID */}
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200/60">
+                <span className="text-slate-500 font-medium">Ticket / Complaint ID:</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-mono font-bold text-xs sm:text-sm text-[#1976D2] bg-blue-50 px-2.5 py-0.5 rounded-lg border border-blue-200">
+                    {submittedTicket.id}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleCopyTicketId}
+                    title="Copy Ticket ID"
+                    aria-label="Copy Ticket ID"
+                    className="p-1 rounded-md hover:bg-slate-200 text-slate-500 transition-colors"
+                  >
+                    {isCopiedId ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Selected Lift Name */}
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-medium">Selected Lift:</span>
+                <span className="font-bold text-slate-800 text-right truncate ml-2 max-w-[210px]">
+                  {submittedTicket.liftName}
+                </span>
+              </div>
+
+              {/* Complaint Type */}
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-medium">Complaint Type:</span>
+                <span className="font-bold text-slate-800 text-right">
+                  {submittedTicket.complaintType}
+                </span>
+              </div>
+
+              {/* Priority */}
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-medium">Priority:</span>
+                <span
+                  className={`font-mono text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full ${
+                    submittedTicket.priority === 'critical'
+                      ? 'bg-red-100 text-red-700 border border-red-200'
+                      : submittedTicket.priority === 'high'
+                      ? 'bg-amber-100 text-amber-700 border border-amber-200'
+                      : 'bg-blue-100 text-[#1976D2] border border-blue-200'
+                  }`}
+                >
+                  ● {submittedTicket.priority}
+                </span>
+              </div>
+
+              {/* Status */}
+              <div className="flex items-center justify-between pt-1.5 border-t border-slate-200/60">
+                <span className="text-slate-500 font-medium">Status:</span>
+                <span className="text-emerald-700 font-bold flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Registered & Under Review
+                </span>
+              </div>
+            </div>
+
+            {/* Popup Navigation Buttons */}
+            <div className="grid grid-cols-2 gap-3 mt-6">
+              {/* Button 1: View Complaint */}
               <button
                 type="button"
-                onClick={() => setPreviewMediaUrl(null)}
-                aria-label="Close preview"
-                className="absolute -top-12 right-0 w-10 h-10 rounded-full bg-white/20 hover:bg-white/40 text-white flex items-center justify-center text-sm transition-all cursor-pointer shadow-md"
+                onClick={handleViewComplaint}
+                className="py-3 px-3.5 rounded-xl bg-[#123B5D] hover:bg-[#0e2f4a] text-white font-bold text-xs shadow-md shadow-blue-900/15 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 touch-manipulation"
               >
-                <X className="w-5 h-5" />
+                <Eye className="w-4 h-4 shrink-0" />
+                <span className="truncate">View Complaint</span>
               </button>
-              {isVideoUrl(previewMediaUrl) ? (
-                <video
-                  src={previewMediaUrl}
-                  controls
-                  autoPlay
-                  className="max-h-[80vh] max-w-full rounded-2xl shadow-2xl border border-white/20 bg-black"
-                />
-              ) : (
-                <img
-                  src={previewMediaUrl}
-                  alt="Enlarged evidence"
-                  className="max-h-[80vh] max-w-full rounded-2xl object-contain shadow-2xl border border-white/20"
-                />
-              )}
+
+              {/* Button 2: Back to Home */}
+              <button
+                type="button"
+                onClick={handleBackToHome}
+                className="py-3 px-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs border border-slate-200/80 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 touch-manipulation"
+              >
+                <span className="truncate">Back to Home</span>
+              </button>
             </div>
           </div>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+
+      {/* Media Lightbox Viewer Modal */}
+      {previewMediaUrl && (
+        <div
+          className="fixed inset-0 z-70 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in"
+          onClick={() => setPreviewMediaUrl(null)}
+        >
+          <div
+            className="relative max-w-2xl max-h-[85vh] w-full flex flex-col items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setPreviewMediaUrl(null)}
+              aria-label="Close preview"
+              className="absolute -top-12 right-0 w-10 h-10 rounded-full bg-white/20 hover:bg-white/40 text-white flex items-center justify-center text-sm transition-all cursor-pointer shadow-md"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            {isVideoUrl(previewMediaUrl) ? (
+              <video
+                src={previewMediaUrl}
+                controls
+                autoPlay
+                className="max-h-[80vh] max-w-full rounded-2xl shadow-2xl border border-white/20 bg-black"
+              />
+            ) : (
+              <img
+                src={previewMediaUrl}
+                alt="Enlarged evidence"
+                className="max-h-[80vh] max-w-full rounded-2xl object-contain shadow-2xl border border-white/20"
+              />
+            )}
+          </div>
+        </div>
+      )}
+    </>
   );
 };

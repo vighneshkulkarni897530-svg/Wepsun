@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   AlertTriangle,
   Clock,
@@ -45,6 +45,29 @@ export const ClientComplaintsView: React.FC<ClientComplaintsViewProps> = ({
 
   // Ratings state by complaint ID
   const [ratings, setRatings] = useState<Record<string, { rating: number; feedback: string; submitted: boolean }>>({});
+
+  // Auto-expand and scroll to highlighted ticket from Success Popup navigation
+  useEffect(() => {
+    try {
+      const highlightTicket = sessionStorage.getItem('wepsun_highlight_ticket');
+      if (highlightTicket && complaints.length > 0) {
+        const target = complaints.find(
+          (c) => c.ticketNumber === highlightTicket || c.id === highlightTicket
+        );
+        if (target) {
+          sessionStorage.removeItem('wepsun_highlight_ticket');
+          setExpandedComplaintId(target.id);
+          setStatusFilter('all');
+          setTimeout(() => {
+            const el = document.getElementById(`complaint-card-${target.id}`);
+            if (el) {
+              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }, 150);
+        }
+      }
+    } catch {}
+  }, [complaints]);
 
   const stages: { key: ComplaintStatus; label: string; icon: React.ReactNode; desc: string }[] = [
     { key: 'pending', label: 'Ticket Logged', icon: <Clock className="w-4 h-4" />, desc: 'Service dispatch reviewing' },
@@ -201,6 +224,7 @@ export const ClientComplaintsView: React.FC<ClientComplaintsViewProps> = ({
             return (
               <div
                 key={complaint.id}
+                id={`complaint-card-${complaint.id}`}
                 className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-xs hover:border-slate-300 transition-all"
               >
                 {/* Header Summary Row */}

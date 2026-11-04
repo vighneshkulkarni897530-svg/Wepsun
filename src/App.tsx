@@ -953,6 +953,21 @@ export const AppContent: React.FC = () => {
         {/* Emergency Breakdown Modal */}
         <RaiseComplaintModal
           isOpen={isEmergencyModalOpen}
+          onNavigateTab={(tab, ticketNumber) => {
+            setIsEmergencyModalOpen(false);
+            if (tab === 'complaints') {
+              if (ticketNumber) {
+                try {
+                  sessionStorage.setItem('wepsun_highlight_ticket', ticketNumber);
+                } catch {}
+              }
+              setActiveTab('complaints');
+              window.location.hash = 'complaints';
+            } else {
+              setActiveTab('home');
+              window.location.hash = 'home';
+            }
+          }}
           initialMode="emergency"
           onClose={() => {
             setIsEmergencyModalOpen(false);

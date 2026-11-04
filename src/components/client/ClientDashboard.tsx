@@ -913,6 +913,20 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
       {/* Global Modals */}
       <RaiseComplaintModal
         isOpen={isRaiseModalOpen || isEmergencyModalOpen}
+        onNavigateTab={(tab, ticketNumber) => {
+          setIsRaiseModalOpen(false);
+          setIsEmergencyModalOpen(false);
+          if (tab === 'complaints') {
+            if (ticketNumber) {
+              try {
+                sessionStorage.setItem('wepsun_highlight_ticket', ticketNumber);
+              } catch {}
+            }
+            switchTab('complaints');
+          } else {
+            switchTab('home');
+          }
+        }}
         initialMode={isEmergencyModalOpen ? 'emergency' : 'normal'}
         onClose={() => {
           setIsRaiseModalOpen(false);
