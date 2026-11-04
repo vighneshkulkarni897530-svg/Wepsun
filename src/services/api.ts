@@ -46,14 +46,24 @@ export function isNativeApp(): boolean {
   return false;
 }
 
-// Background pre-warm Render cloud backend immediately upon app launch
+// Background pre-warm & periodic keep-alive for Render cloud backend
 if (typeof window !== 'undefined') {
-  setTimeout(() => {
+  const pingHealth = () => {
     fetch(`${DEFAULT_CLOUD_API_URL}/health`, {
       method: 'GET',
       headers: { Accept: 'application/json' },
     }).catch(() => {});
-  }, 100);
+  };
+
+  // 1. Initial pre-warm on launch
+  setTimeout(pingHealth, 100);
+
+  // 2. Periodic keep-alive every 4 minutes while app is running in foreground
+  setInterval(() => {
+    if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+      pingHealth();
+    }
+  }, 4 * 60 * 1000);
 }
 
 /**

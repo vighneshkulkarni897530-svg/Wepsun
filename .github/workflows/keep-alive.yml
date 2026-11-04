@@ -1,0 +1,23 @@
+name: WEPSUN Backend Keep-Alive
+
+on:
+  schedule:
+    # Run every 10 minutes (cron format: minute hour day month day-of-week)
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub Actions UI
+
+jobs:
+  keep-alive:
+    name: Ping WEPSUN Cloud API
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Backend Health Endpoint
+        run: |
+          echo "Pinging https://wepsun.onrender.com/api/health to keep Render awake..."
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 45 https://wepsun.onrender.com/api/health || echo "FAILED")
+          echo "Response HTTP Status: $HTTP_STATUS"
+          if [ "$HTTP_STATUS" = "200" ]; then
+            echo "SUCCESS: WEPSUN Backend is awake and healthy (HTTP 200)."
+          else
+            echo "WARNING: Backend returned status $HTTP_STATUS (or waking up)."
+          fi

@@ -535,6 +535,11 @@ export async function buildGoogleOAuthUrl(options: GoogleOAuthOptions = {}): Pro
  * Open official Google Account Chooser in native In-App Chrome Custom Tab on Android/iOS
  */
 export async function openNativeGoogleOAuth(options?: GoogleOAuthOptions | string): Promise<void> {
+  // Fire immediate background ping to ensure Render cloud gateway is awake
+  try {
+    fetch('https://wepsun.onrender.com/api/health').catch(() => {});
+  } catch {}
+
   const { Browser } = await import('@capacitor/browser');
   const opts: GoogleOAuthOptions = typeof options === 'string' ? { customRedirectUri: options } : options || {};
   const googleAuthUrl = await buildGoogleOAuthUrl({
