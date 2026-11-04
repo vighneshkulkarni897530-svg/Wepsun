@@ -168,6 +168,8 @@ export interface ApiResponse<T = any> {
   code?: string;
   status?: number;
   latencyMs?: number;
+  requiresSignup?: boolean;
+  googleProfile?: any;
 }
 
 /**
@@ -346,6 +348,9 @@ export async function apiFetch<T = any>(
         code: errJson.code,
         status: response.status,
         latencyMs,
+        requiresSignup: Boolean(errJson.requiresSignup || errJson.code === 'USER_NOT_REGISTERED'),
+        googleProfile: errJson.googleProfile || errJson.data?.googleProfile,
+        data: errJson.data,
       };
     }
 
@@ -406,6 +411,7 @@ export const apiService = {
     role?: string;
     companyId?: string;
     googleId?: string;
+    mode?: 'signin' | 'signup' | string;
   }) =>
     apiFetch('/auth/google', { method: 'POST', body: JSON.stringify(payload), skipAuth: true }),
   refreshSession: (refreshToken: string) =>

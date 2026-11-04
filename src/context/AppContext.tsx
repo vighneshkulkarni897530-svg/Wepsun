@@ -1401,11 +1401,41 @@ function mapServerServiceReport(sr: any): ServiceReport {
         const res = await handleGoogleAuthCallback(queryOrUrl, 'client');
         if (!isSubscribed) return;
 
+        // 1. Existing Account: Log in and navigate directly to dashboard
         if (res.success && res.user) {
           loginAsUserRef.current(res.user);
-          window.location.hash = 'home';
+          const targetTab =
+            res.user.role === 'client'
+              ? 'home'
+              : res.user.role === 'technician'
+              ? 'jobs'
+              : 'dashboard';
+          window.location.hash = targetTab;
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('wepsun_auth_success', { detail: res.user }));
+          }
           showToast('success', 'Google Sign-In Successful', `Welcome, ${res.user.name || 'valued user'}!`);
-        } else if (res.error) {
+          return;
+        }
+
+        // 2. Unregistered Account: Redirect back to Signup page
+        if (res.requiresSignup || res.code === 'USER_NOT_REGISTERED' || (res as any)?.data?.requiresSignup) {
+          const profile = res.googleProfile || (res as any)?.data?.googleProfile;
+          if (profile?.email) {
+            localStorage.setItem('wepsun_google_signup_email', profile.email);
+            if (profile.name) {
+              localStorage.setItem('wepsun_google_signup_name', profile.name);
+            }
+          }
+          window.location.hash = 'signup';
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('wepsun_switch_to_signup', { detail: profile }));
+          }
+          showToast('info', 'Account Not Found', 'No account exists for this Google email. Please complete registration below.');
+          return;
+        }
+
+        if (res.error) {
           showToast('error', 'Google Sign-In Failed', res.error);
         }
       } catch (err: any) {

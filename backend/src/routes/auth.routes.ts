@@ -524,6 +524,28 @@ router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Respo
         }
       }
 
+      const authMode = mode || (req.query?.mode as string) || 'signin';
+
+      // If user is attempting to Sign In and has no prelinked or existing account, return requiresSignup
+      if (!resolvedCompanyId && authMode === 'signin') {
+        res.status(404).json({
+          success: false,
+          code: 'USER_NOT_REGISTERED',
+          requiresSignup: true,
+          message: 'No account found with this Google email. Please sign up to create your account.',
+          data: {
+            requiresSignup: true,
+            googleProfile: {
+              email: cleanEmail,
+              name: displayName,
+              picture: googleAvatar,
+              googleId: googleSub,
+            },
+          },
+        });
+        return;
+      }
+
       // If no administrator pre-registered this email, provision a dedicated isolated tenant company.
       // Uninvited self-signups must NEVER share a company with existing tenants.
       if (!resolvedCompanyId) {

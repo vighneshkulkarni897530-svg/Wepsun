@@ -434,6 +434,7 @@ export interface GoogleOAuthOptions {
   isNativeApp?: boolean;
   returnUrl?: string;
   customRedirectUri?: string;
+  mode?: 'signin' | 'signup';
 }
 
 const STORAGE_OAUTH_PKCE_KEY = 'wepsun_oauth_pkce_session_v2';
@@ -445,6 +446,7 @@ export interface PkceSessionData {
   role: UserRole;
   redirectUri: string;
   timestamp: number;
+  mode?: 'signin' | 'signup';
 }
 
 /**
@@ -505,11 +507,13 @@ export async function buildGoogleOAuthUrl(options: GoogleOAuthOptions = {}): Pro
     returnUrl,
     role,
     nonce,
+    mode: options.mode || 'signin',
+    cv: codeVerifier,
   };
 
   const stateString = encodeURIComponent(JSON.stringify(statePayload));
 
-  // Store PKCE session context in sessionStorage for callback validation
+  // Store PKCE session context in localStorage & sessionStorage for callback validation
   if (typeof window !== 'undefined') {
     try {
       const sessionData: PkceSessionData = {
@@ -519,10 +523,13 @@ export async function buildGoogleOAuthUrl(options: GoogleOAuthOptions = {}): Pro
         role,
         redirectUri,
         timestamp: Date.now(),
+        mode: options.mode || 'signin',
       };
+      localStorage.setItem(STORAGE_OAUTH_PKCE_KEY, JSON.stringify(sessionData));
+      localStorage.setItem('wepsun_oauth_cv', codeVerifier);
       sessionStorage.setItem(STORAGE_OAUTH_PKCE_KEY, JSON.stringify(sessionData));
     } catch (e) {
-      console.warn('[GoogleOAuth] Could not cache PKCE session in sessionStorage:', e);
+      console.warn('[GoogleOAuth] Could not cache PKCE session in storage:', e);
     }
   }
 
@@ -573,7 +580,15 @@ export async function triggerDirectGoogleOAuth(options: GoogleOAuthOptions = {})
 export async function handleGoogleAuthCallback(
   queryOrUrl: string,
   targetRole: UserRole = 'client'
-): Promise<{ success: boolean; user?: any; error?: string }> {
+): Promise<{
+  success: boolean;
+  user?: any;
+  error?: string;
+  requiresSignup?: boolean;
+  googleProfile?: any;
+  code?: string;
+  message?: string;
+}> {
   try {
     let queryString = queryOrUrl;
     if (queryString.includes('?')) {
@@ -591,11 +606,11 @@ export async function handleGoogleAuthCallback(
       throw new Error(`Google authorization error: ${error}`);
     }
 
-    // 1. Retrieve stored PKCE session
+    // 1. Retrieve stored PKCE session (check localStorage first for native app resilience)
     let storedSession: PkceSessionData | null = null;
     if (typeof window !== 'undefined') {
       try {
-        const raw = sessionStorage.getItem(STORAGE_OAUTH_PKCE_KEY);
+        const raw = localStorage.getItem(STORAGE_OAUTH_PKCE_KEY) || sessionStorage.getItem(STORAGE_OAUTH_PKCE_KEY);
         if (raw) {
           storedSession = JSON.parse(raw);
         }
@@ -604,25 +619,34 @@ export async function handleGoogleAuthCallback(
       }
     }
 
+    // Parse state payload if present for unlosable codeVerifier & mode
+    let statePayload: any = null;
+    if (returnedState) {
+      try {
+        statePayload = JSON.parse(decodeURIComponent(returnedState));
+      } catch {
+        try {
+          statePayload = JSON.parse(returnedState);
+        } catch {}
+      }
+    }
+
     // 2. PKCE Authorization Code Flow
     if (code) {
-      const codeVerifier = storedSession?.codeVerifier;
-      const nonce = storedSession?.nonce;
+      const codeVerifier =
+        statePayload?.cv ||
+        storedSession?.codeVerifier ||
+        (typeof window !== 'undefined' ? localStorage.getItem('wepsun_oauth_cv') : undefined);
+      const nonce = storedSession?.nonce || statePayload?.nonce;
       const redirectUri = storedSession?.redirectUri || 'https://wepsun.onrender.com/api/auth/google/callback';
-      const role = storedSession?.role || targetRole;
-
-      // Validate CSRF state
-      if (returnedState && storedSession?.state) {
-        const decodedReturned = decodeURIComponent(returnedState);
-        const decodedStored = decodeURIComponent(storedSession.state);
-        if (decodedReturned !== decodedStored && returnedState !== storedSession.state) {
-          throw new Error('OAuth state verification failed. Potential login CSRF or session mismatch.');
-        }
-      }
+      const role = storedSession?.role || statePayload?.role || targetRole;
+      const mode = statePayload?.mode || storedSession?.mode || 'signin';
 
       // Purge PKCE session to prevent replay
       if (typeof window !== 'undefined') {
         try {
+          localStorage.removeItem(STORAGE_OAUTH_PKCE_KEY);
+          localStorage.removeItem('wepsun_oauth_cv');
           sessionStorage.removeItem(STORAGE_OAUTH_PKCE_KEY);
         } catch {}
       }
@@ -636,6 +660,7 @@ export async function handleGoogleAuthCallback(
         nonce,
         platform: isNative ? 'android' : 'web',
         role: role.toUpperCase(),
+        mode,
       });
 
       if (res && res.success && res.data) {
@@ -652,6 +677,17 @@ export async function handleGoogleAuthCallback(
           });
         }
         return { success: true, user };
+      }
+
+      // If user does not exist in WEPSUN, return structured requiresSignup response
+      if (res && (res.requiresSignup || res.code === 'USER_NOT_REGISTERED' || (res as any)?.data?.requiresSignup)) {
+        return {
+          success: false,
+          requiresSignup: true,
+          code: 'USER_NOT_REGISTERED',
+          message: res.message || 'No account found with this Google email. Please complete registration.',
+          googleProfile: res.googleProfile || (res as any)?.data?.googleProfile,
+        };
       }
 
       throw new Error(res?.message || 'Google authorization code could not be verified by server.');

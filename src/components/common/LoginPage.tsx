@@ -216,6 +216,49 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     loadGoogleGisScript().catch(() => {});
   }, []);
 
+  // Listen for Google OAuth callback events (Success -> Dashboard, Unregistered -> Signup)
+  useEffect(() => {
+    const handleAuthSuccess = () => {
+      localStorage.removeItem('wepsun_google_signup_email');
+      localStorage.removeItem('wepsun_google_signup_name');
+      if (onClose) onClose();
+    };
+
+    const handleSwitchToSignup = (e: any) => {
+      setView('signup');
+      window.location.hash = 'signup';
+      const email = e.detail?.email || localStorage.getItem('wepsun_google_signup_email');
+      const name = e.detail?.name || localStorage.getItem('wepsun_google_signup_name');
+      if (email) {
+        setRegEmail(email);
+        setVerifiedEmailAddress(email);
+        setIsEmailVerified(true);
+      }
+      if (name) {
+        setRegFullName(name);
+      }
+      showToast('info', 'Account Registration', 'No account exists for ' + (email || 'this Google email') + '. Please complete your signup below.');
+    };
+
+    window.addEventListener('wepsun_auth_success', handleAuthSuccess);
+    window.addEventListener('wepsun_switch_to_signup', handleSwitchToSignup);
+
+    // Check if opened with prefilled Google signup info
+    const storedEmail = localStorage.getItem('wepsun_google_signup_email');
+    const storedName = localStorage.getItem('wepsun_google_signup_name');
+    if (storedEmail) {
+      setRegEmail(storedEmail);
+      setVerifiedEmailAddress(storedEmail);
+      setIsEmailVerified(true);
+      if (storedName) setRegFullName(storedName);
+    }
+
+    return () => {
+      window.removeEventListener('wepsun_auth_success', handleAuthSuccess);
+      window.removeEventListener('wepsun_switch_to_signup', handleSwitchToSignup);
+    };
+  }, [onClose, showToast]);
+
   // Role Tab Change: Client | Technician
   const handleRoleChange = (role: 'client' | 'technician') => {
     setSelectedRole(role);
@@ -885,7 +928,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       setIsGoogleSubmitting(true);
       try {
         // Open native Chrome Custom Tab to avoid Google's 403 disallowed_useragent block in WebViews
-        await openNativeGoogleOAuth({ role: selectedRole || 'client' });
+        await openNativeGoogleOAuth({
+          role: selectedRole || 'client',
+          mode: view === 'signup' ? 'signup' : 'signin',
+        });
       } catch (err: any) {
         console.warn('[GoogleAuthApp] Chrome Custom Tab open notice:', err?.message);
         // Fallback to in-app Google Account Chooser immediately
@@ -900,7 +946,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     // Mobile browsers proactively block window.open popups. Full-page redirect provides a 100% reliable flow without pop-up blocking dialogs.
     const isMobileBrowser = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     if (isMobileBrowser) {
-      await triggerDirectGoogleOAuth({ role: selectedRole || 'client' });
+      await triggerDirectGoogleOAuth({
+        role: selectedRole || 'client',
+        mode: view === 'signup' ? 'signup' : 'signin',
+      });
       return;
     }
 
