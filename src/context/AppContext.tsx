@@ -1404,17 +1404,17 @@ function mapServerServiceReport(sr: any): ServiceReport {
         // 1. Existing Account: Log in and navigate directly to dashboard
         if (res.success && res.user) {
           loginAsUserRef.current(res.user);
+          const userRoleLower = String(res.user.role || 'client').toLowerCase();
           const targetTab =
-            res.user.role === 'client'
+            userRoleLower === 'client'
               ? 'home'
-              : res.user.role === 'technician'
+              : userRoleLower === 'technician'
               ? 'jobs'
               : 'dashboard';
           window.location.hash = targetTab;
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('wepsun_auth_success', { detail: res.user }));
           }
-          showToast('success', 'Google Sign-In Successful', `Welcome, ${res.user.name || 'valued user'}!`);
           return;
         }
 
@@ -1431,16 +1431,31 @@ function mapServerServiceReport(sr: any): ServiceReport {
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('wepsun_switch_to_signup', { detail: profile }));
           }
-          showToast('info', 'Account Not Found', 'No account exists for this Google email. Please complete registration below.');
+          openModal({
+            type: 'info',
+            title: 'Complete Registration',
+            message: `No account exists for ${profile?.email || 'this Google email'}. Please complete your registration below.`,
+          });
           return;
         }
 
         if (res.error) {
-          showToast('error', 'Google Sign-In Failed', res.error);
+          window.location.hash = 'login';
+          openModal({
+            type: 'error',
+            title: 'Google Sign-In Error',
+            message: res.error,
+          });
+          return;
         }
       } catch (err: any) {
         if (!isSubscribed) return;
-        showToast('error', 'Google Sign-In Error', err?.message || 'Could not complete Google authentication.');
+        window.location.hash = 'login';
+        openModal({
+          type: 'error',
+          title: 'Google Sign-In Error',
+          message: err?.message || 'Could not complete Google authentication.',
+        });
       }
     };
 
@@ -1452,30 +1467,34 @@ function mapServerServiceReport(sr: any): ServiceReport {
     };
     window.addEventListener('message', handleMessage);
 
-    // 2. Web URL check on load (if redirected with tokens in query or hash)
+    // 2. Web URL check on load (if redirected with tokens or authorization code in query or hash)
     if (typeof window !== 'undefined') {
       const urlHash = window.location.hash || '';
       const urlSearch = window.location.search || '';
       if (
-        (urlHash.includes('access_token=') || urlHash.includes('id_token=') || urlHash.includes('auth-callback')) ||
-        (urlSearch.includes('access_token=') || urlSearch.includes('id_token=') || urlSearch.includes('auth-callback'))
+        urlHash.includes('code=') ||
+        urlHash.includes('access_token=') ||
+        urlHash.includes('id_token=') ||
+        urlHash.includes('auth-callback') ||
+        urlSearch.includes('code=') ||
+        urlSearch.includes('access_token=') ||
+        urlSearch.includes('id_token=') ||
+        urlSearch.includes('auth-callback')
       ) {
         processAuthToken(urlHash || urlSearch);
-        try {
-          window.history.replaceState(null, '', window.location.pathname);
-        } catch {}
       }
     }
 
     // 3. Native App Deep Link Handler (Capacitor App plugin)
     let unsubAppUrl: (() => void) | undefined;
     try {
-      if (Capacitor.isNativePlatform()) {
+      const isNative = Capacitor.isNativePlatform() || Boolean((window as any).Capacitor?.isNativePlatform?.());
+      if (isNative) {
         import('@capacitor/app').then(async ({ App }) => {
           // Cold-start launch URL
           try {
             const launchUrl = await App.getLaunchUrl();
-            if (launchUrl?.url && (launchUrl.url.includes('auth-callback') || launchUrl.url.includes('wepsun://'))) {
+            if (launchUrl?.url && (launchUrl.url.includes('auth-callback') || launchUrl.url.includes('wepsun://') || launchUrl.url.includes('code='))) {
               import('@capacitor/browser').then(({ Browser }) => Browser.close().catch(() => {})).catch(() => {});
               processAuthToken(launchUrl.url);
             }
@@ -1484,7 +1503,7 @@ function mapServerServiceReport(sr: any): ServiceReport {
           // Active app deep link listener
           try {
             const handle = await App.addListener('appUrlOpen', async (data) => {
-              if (data?.url && (data.url.includes('auth-callback') || data.url.includes('wepsun://'))) {
+              if (data?.url && (data.url.includes('auth-callback') || data.url.includes('wepsun://') || data.url.includes('code='))) {
                 import('@capacitor/browser').then(({ Browser }) => Browser.close().catch(() => {})).catch(() => {});
                 processAuthToken(data.url);
               }

@@ -982,6 +982,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               role: 'CLIENT',
               companyId: 'comp-1',
               googleId: profile?.sub,
+              mode: view === 'signup' ? 'signup' : 'signin',
             });
 
             if (res.success && res.data) {
@@ -1043,6 +1044,23 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   if (onClose) onClose();
                 },
               });
+            } else if (res.requiresSignup || res.code === 'USER_NOT_REGISTERED' || (res as any)?.data?.requiresSignup) {
+              closePopup();
+              const googleProf = res.googleProfile || (res as any)?.data?.googleProfile || profile;
+              if (googleProf?.email) {
+                localStorage.setItem('wepsun_google_signup_email', googleProf.email);
+                setRegEmail(googleProf.email);
+                setVerifiedEmailAddress(googleProf.email);
+                setIsEmailVerified(true);
+              }
+              if (googleProf?.name) {
+                localStorage.setItem('wepsun_google_signup_name', googleProf.name);
+                setRegFullName(googleProf.name);
+              }
+              setView('signup');
+              window.location.hash = 'signup';
+              showToast('info', 'Account Registration', `No account exists for ${googleProf?.email || 'this Google email'}. Please complete registration below.`);
+              return;
             } else {
               closePopup();
               const errorMsg = (res as any)?.message || 'Google sign-in could not be completed.';

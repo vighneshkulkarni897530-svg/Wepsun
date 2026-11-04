@@ -296,6 +296,7 @@ router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Respo
     platform,
     companyId: requestedCompanyId,
     companyCode: requestedCompanyCode,
+    mode,
   } = req.body;
   const effectiveCredential = credential || idToken;
   const userAgent = req.headers['user-agent'];
@@ -943,13 +944,24 @@ router.get('/google/callback', (req: AuthenticatedRequest, res: Response): void 
 
       if (query) {
         var deepLink = 'wepsun://auth-callback?' + query;
+        var intentUrl = 'intent://auth-callback?' + query + '#Intent;scheme=wepsun;package=com.wepsun.engineering;end';
         var isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
         var btn = document.getElementById('deepLinkBtn');
         var webBtn = document.getElementById('webReturnBtn');
         var container = document.getElementById('btn-container');
 
         if (container) container.style.display = 'block';
-        if (btn) btn.href = deepLink;
+        if (btn) {
+          btn.href = intentUrl;
+          btn.onclick = function(e) {
+            try {
+              window.location.href = intentUrl;
+              setTimeout(function() { window.location.href = deepLink; }, 250);
+            } catch(err) {
+              window.location.href = deepLink;
+            }
+          };
+        }
 
         if (webBtn) {
           webBtn.href = '/#' + query;
@@ -961,8 +973,13 @@ router.get('/google/callback', (req: AuthenticatedRequest, res: Response): void 
         // 1. Deep link to native Android app
         if (isMobile) {
           try {
-            window.location.href = deepLink;
-          } catch (e) {}
+            window.location.href = intentUrl;
+            setTimeout(function() {
+              try { window.location.href = deepLink; } catch (e) {}
+            }, 200);
+          } catch (e) {
+            try { window.location.href = deepLink; } catch (e2) {}
+          }
         }
 
         // 2. Broadcast for web popup windows

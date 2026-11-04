@@ -299,7 +299,10 @@ export async function exchangeGooglePkceCode(
   }
 
   // Production Google OAuth2 Token Exchange
-  const clientId = process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_WEB_CLIENT_ID || '';
+  const clientId =
+    process.env.GOOGLE_CLIENT_ID ||
+    process.env.GOOGLE_WEB_CLIENT_ID ||
+    '168301316891-6e6br98qti8u58frtj02l2k09m8r2sfe.apps.googleusercontent.com';
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET || '';
 
   const bodyParams = new URLSearchParams({

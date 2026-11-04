@@ -248,9 +248,20 @@ const sendOAuthCallbackHtml = (req: express.Request, res: express.Response) => {
       var isNative = Boolean(stateObj && stateObj.isNativeApp === true);
       var returnUrl = (stateObj && stateObj.returnUrl) ? stateObj.returnUrl.replace(/\/+$/, '') : '';
       var deepLink = 'wepsun://auth-callback' + (query ? '?' + query : '');
+      var intentUrl = 'intent://auth-callback?' + query + '#Intent;scheme=wepsun;package=com.wepsun.engineering;end';
 
       var btn = document.getElementById('deepLinkBtn');
-      if (btn) btn.href = deepLink;
+      if (btn) {
+        btn.href = intentUrl;
+        btn.onclick = function(e) {
+          try {
+            window.location.href = intentUrl;
+            setTimeout(function() { window.location.href = deepLink; }, 250);
+          } catch(err) {
+            window.location.href = deepLink;
+          }
+        };
+      }
 
       var webBtn = document.getElementById('webReturnBtn');
       if (webBtn) {
@@ -264,8 +275,13 @@ const sendOAuthCallbackHtml = (req: express.Request, res: express.Response) => {
       // 1. Android Native App (In-App Custom Tab via Capacitor)
       if (isNative) {
         try {
-          window.location.href = deepLink;
-        } catch (e) {}
+          window.location.href = intentUrl;
+          setTimeout(function() {
+            try { window.location.href = deepLink; } catch (e) {}
+          }, 200);
+        } catch (e) {
+          try { window.location.href = deepLink; } catch (e2) {}
+        }
         return;
       }
 
