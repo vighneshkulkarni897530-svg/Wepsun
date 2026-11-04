@@ -242,15 +242,15 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
     }
   }, [isOpen, initialMode, initialLiftId, preselectedLift, liftOptions, selectedLiftId]);
 
-  if (!isOpen) return null;
-
-  const currentLift = liftOptions.find((l) => l.id === selectedLiftId) || liftOptions[0];
-
   // Media upload & preview states
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
   const [previewMediaUrl, setPreviewMediaUrl] = useState<string | null>(null);
+
+  const currentLift = liftOptions.find((l) => l.id === selectedLiftId) || liftOptions[0];
+
+  if (!isOpen) return null;
 
   const isVideoUrl = (url: string) => {
     return url.startsWith('data:video') || /\.(mp4|webm|ogg|mov|m4v)($|\?)/i.test(url);
