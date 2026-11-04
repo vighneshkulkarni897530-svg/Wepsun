@@ -34,15 +34,16 @@ assert(modalSource.includes('Registering Complaint...'), 'Must show loading feed
 console.log('✓ Test 3 Passed: Validation and backend submission sequence verified.');
 
 console.log('Test 4: Attractive Complaint Submission Success Popup...');
-assert(modalSource.includes('Complaint Raised Successfully!'), 'Heading "Complaint Raised Successfully!" must be present');
-assert(modalSource.includes('Your service complaint has been submitted successfully. Our team will review your request and take the necessary action.'), 'Required success message must be present');
+assert(modalSource.includes('Complaint Submitted Successfully!'), 'Heading "Complaint Submitted Successfully!" must be present');
+assert(modalSource.includes('Your complaint has been successfully submitted. Our service team has been notified and will review your request shortly.'), 'Required success message must be present');
 assert(modalSource.includes('animate-ping'), 'Animated pulse/ring effect must be present for checkmark');
 assert(modalSource.includes('CheckCircle2'), 'Green checkmark icon must be present');
-assert(modalSource.includes('Ticket / Complaint ID:'), 'Ticket / Complaint ID label must be present');
-assert(modalSource.includes('Selected Lift:'), 'Selected lift display must be present');
+assert(modalSource.includes('Complaint ID:'), 'Complaint ID label must be present');
+assert(modalSource.includes('Lift Name:'), 'Lift Name display must be present');
 assert(modalSource.includes('Complaint Type:'), 'Complaint type display must be present');
 assert(modalSource.includes('Priority:'), 'Priority display must be present');
-assert(modalSource.includes('View Complaint'), 'View Complaint button must be present');
+assert(modalSource.includes('Submitted Date & Time:'), 'Submitted Date & Time display must be present');
+assert(modalSource.includes('Track Complaint'), 'Track Complaint button must be present');
 assert(modalSource.includes('Back to Home'), 'Back to Home button must be present');
 console.log('✓ Test 4 Passed: Success popup design and elements verified.');
 

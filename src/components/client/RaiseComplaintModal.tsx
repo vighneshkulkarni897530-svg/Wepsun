@@ -248,6 +248,23 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
   const [submittedTicket, setSubmittedTicket] = useState<SubmittedTicketDetails | null>(null);
   const [isCopiedId, setIsCopiedId] = useState(false);
 
+  const formattedSubmittedAt = useMemo(() => {
+    if (!submittedTicket?.reportedAt) return '';
+    try {
+      const d = new Date(submittedTicket.reportedAt);
+      return `${d.toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      })}, ${d.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      })}`;
+    } catch {
+      return new Date().toLocaleString();
+    }
+  }, [submittedTicket?.reportedAt]);
+
   // Scroll Container Ref for mobile adjustment & virtual keyboard support
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1184,19 +1201,19 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
 
       {/* 
         Section 2: ATTRACTIVE COMPLAINT SUBMISSION SUCCESS POPUP 
-        Centered modal with clean white background, rounded-3xl corners, subtle shadow-2xl,
+        Centered modal with clean white background, premium rounded corners, soft shadow and subtle blue glow,
         animated green success checkmark inside circular icon, dynamic Complaint ID, selected lift,
-        complaint type, priority badge, and two dedicated navigation buttons!
+        complaint type, priority badge, submitted date & time, and two dedicated navigation buttons!
       */}
       {submittedTicket && (
         <div
           role="dialog"
           aria-modal="true"
           aria-labelledby="success-modal-heading"
-          className="fixed inset-0 z-[60] bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-4 select-none animate-in fade-in duration-200"
+          className="fixed inset-0 z-[70] bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 select-none animate-in fade-in duration-200"
         >
-          <div className="bg-white border border-slate-100 rounded-3xl w-full max-w-md p-6 sm:p-8 text-center shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300">
-            {/* Top decorative corporate gradient line */}
+          <div className="bg-white border border-slate-100 rounded-3xl w-full max-w-md max-h-[92dvh] overflow-y-auto p-6 sm:p-8 text-center shadow-2xl shadow-blue-950/20 ring-1 ring-blue-500/15 relative animate-in zoom-in-95 duration-300">
+            {/* Top decorative corporate gradient line with subtle blue glow */}
             <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#123B5D] via-[#1976D2] to-emerald-500" />
 
             {/* Close X at top-right of popup */}
@@ -1209,7 +1226,7 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
               <X className="w-4 h-4" />
             </button>
 
-            {/* Animated Green Success Checkmark */}
+            {/* Animated Green Circular Success Icon with Checkmark */}
             <div className="w-20 h-20 mx-auto mb-4 relative flex items-center justify-center">
               <div className="absolute inset-0 rounded-full bg-emerald-100 animate-ping opacity-35" />
               <div className="w-20 h-20 rounded-full bg-emerald-50 border-2 border-emerald-300 flex items-center justify-center text-emerald-600 shadow-sm relative z-10">
@@ -1219,19 +1236,19 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
 
             {/* Main Heading */}
             <h2 id="success-modal-heading" className="text-xl sm:text-2xl font-black text-[#123B5D] tracking-tight">
-              Complaint Raised Successfully!
+              Complaint Submitted Successfully!
             </h2>
 
-            {/* Subtext */}
-            <p className="text-xs sm:text-sm text-slate-600 mt-2 leading-relaxed max-w-xs mx-auto">
-              Your service complaint has been submitted successfully. Our team will review your request and take the necessary action.
+            {/* Description */}
+            <p className="text-xs sm:text-sm text-slate-600 mt-2 leading-relaxed max-w-sm mx-auto">
+              Your complaint has been successfully submitted. Our service team has been notified and will review your request shortly.
             </p>
 
             {/* Dynamic Details Card */}
-            <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-4 mt-5 text-left text-xs space-y-2.5">
-              {/* Complaint ID / Ticket ID */}
+            <div className="bg-slate-50/90 border border-slate-200/90 rounded-2xl p-4 sm:p-5 mt-5 text-left text-xs space-y-2.5">
+              {/* Complaint ID */}
               <div className="flex items-center justify-between pb-2 border-b border-slate-200/60">
-                <span className="text-slate-500 font-medium">Ticket / Complaint ID:</span>
+                <span className="text-slate-500 font-medium">Complaint ID:</span>
                 <div className="flex items-center gap-1.5">
                   <span className="font-mono font-bold text-xs sm:text-sm text-[#1976D2] bg-blue-50 px-2.5 py-0.5 rounded-lg border border-blue-200">
                     {submittedTicket.id}
@@ -1239,8 +1256,8 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
                   <button
                     type="button"
                     onClick={handleCopyTicketId}
-                    title="Copy Ticket ID"
-                    aria-label="Copy Ticket ID"
+                    title="Copy Complaint ID"
+                    aria-label="Copy Complaint ID"
                     className="p-1 rounded-md hover:bg-slate-200 text-slate-500 transition-colors"
                   >
                     {isCopiedId ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
@@ -1248,9 +1265,9 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
                 </div>
               </div>
 
-              {/* Selected Lift Name */}
+              {/* Lift Name */}
               <div className="flex items-center justify-between">
-                <span className="text-slate-500 font-medium">Selected Lift:</span>
+                <span className="text-slate-500 font-medium">Lift Name:</span>
                 <span className="font-bold text-slate-800 text-right truncate ml-2 max-w-[210px]">
                   {submittedTicket.liftName}
                 </span>
@@ -1280,7 +1297,15 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
                 </span>
               </div>
 
-              {/* Status */}
+              {/* Submitted Date & Time */}
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-medium">Submitted Date & Time:</span>
+                <span className="font-mono font-medium text-slate-700 text-right text-[11px]">
+                  {formattedSubmittedAt}
+                </span>
+              </div>
+
+              {/* Current Status */}
               <div className="flex items-center justify-between pt-1.5 border-t border-slate-200/60">
                 <span className="text-slate-500 font-medium">Status:</span>
                 <span className="text-emerald-700 font-bold flex items-center gap-1.5">
@@ -1292,21 +1317,21 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
 
             {/* Popup Navigation Buttons */}
             <div className="grid grid-cols-2 gap-3 mt-6">
-              {/* Button 1: View Complaint */}
+              {/* Button 1: Track Complaint */}
               <button
                 type="button"
                 onClick={handleViewComplaint}
-                className="py-3 px-3.5 rounded-xl bg-[#123B5D] hover:bg-[#0e2f4a] text-white font-bold text-xs shadow-md shadow-blue-900/15 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 touch-manipulation"
+                className="min-h-[46px] py-3 px-3.5 rounded-xl bg-[#123B5D] hover:bg-[#0e2f4a] text-white font-bold text-xs shadow-md shadow-blue-900/15 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 touch-manipulation"
               >
                 <Eye className="w-4 h-4 shrink-0" />
-                <span className="truncate">View Complaint</span>
+                <span className="truncate">Track Complaint</span>
               </button>
 
               {/* Button 2: Back to Home */}
               <button
                 type="button"
                 onClick={handleBackToHome}
-                className="py-3 px-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs border border-slate-200/80 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 touch-manipulation"
+                className="min-h-[46px] py-3 px-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs border border-slate-200/80 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 touch-manipulation"
               >
                 <span className="truncate">Back to Home</span>
               </button>
