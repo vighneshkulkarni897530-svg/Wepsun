@@ -98,23 +98,19 @@ export function getApiBaseUrl(): string {
       return DEFAULT_CLOUD_API_URL;
     }
 
-    // For Web Browser on localhost with local dev port (e.g. 5173 or 3000):
-    const isLocalDevBrowser =
-      (window.location.hostname === 'localhost' ||
-       window.location.hostname === '127.0.0.1' ||
-       window.location.hostname.startsWith('192.168.')) &&
-      Boolean(window.location.port && window.location.port !== '80' && window.location.port !== '443');
-
-    if (isLocalDevBrowser) {
+    // If explicitly configured to use a local backend (e.g. VITE_USE_LOCAL_BACKEND=true)
+    const useLocal = (import.meta as any).env?.VITE_USE_LOCAL_BACKEND === 'true';
+    if (useLocal) {
       return '/api';
     }
   }
 
-  const envUrl = import.meta.env.VITE_API_URL;
-  if (envUrl && envUrl.trim().startsWith('https://') && !envUrl.includes('localhost')) {
+  const envUrl = (import.meta as any).env?.VITE_API_URL;
+  if (envUrl && typeof envUrl === 'string' && envUrl.trim().startsWith('http') && !envUrl.includes('localhost')) {
     return envUrl.trim().replace(/\/+$/, '');
   }
 
+  // Guarantee cross-device synchronization: both Web and Native App connect to the same central cloud backend
   return DEFAULT_CLOUD_API_URL;
 }
 

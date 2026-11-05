@@ -68,6 +68,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
     tenantBuildings,
     users,
     showSuccessModal,
+    refreshComplaints,
   } = useApp();
 
   // Pending Technician Onboarding Requests
@@ -91,7 +92,12 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
 
   React.useEffect(() => {
     fetchPendingTechnicians();
-  }, [fetchPendingTechnicians]);
+    refreshComplaints?.();
+    const timer = setInterval(() => {
+      refreshComplaints?.();
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [fetchPendingTechnicians, refreshComplaints]);
 
   const handleApproveTechnician = async (techId: string, name: string) => {
     setTechActionLoadingId(techId);

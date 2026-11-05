@@ -183,6 +183,7 @@ interface AppContextType {
   toggleSound: () => void;
   createComplaint: (complaintData: Partial<Complaint>) => Complaint;
   createComplaintAsync: (complaintData: Partial<Complaint>) => Promise<Complaint>;
+  refreshComplaints: () => Promise<Complaint[]>;
   assignTechnician: (ticketId: string, technicianId: string, eta?: string) => void;
   updateComplaintStatus: (ticketId: string, status: ComplaintStatus, extra?: Partial<Complaint>) => void;
   checkInJob: (ticketId: string, gpsData?: { lat: number; lng: number; address: string; accuracy?: number }) => void;
@@ -1471,6 +1472,17 @@ function mapServerServiceReport(sr: any): ServiceReport {
     };
     window.addEventListener('storage', handleStorage);
 
+        const handleComplaintCreatedLocal = (e: any) => {
+      const newComp = e.detail;
+      if (newComp) {
+        setComplaints((prev) => {
+          if (prev.some((c) => c.id === newComp.id || c.ticketNumber === newComp.ticketNumber)) return prev;
+          return [newComp, ...prev];
+        });
+      }
+    };
+    window.addEventListener('wepsun_complaint_created', handleComplaintCreatedLocal);
+
     const unsubscribeSSE = apiService.subscribeComplaintStream((event: any) => {
       try {
         if (event.type === 'COMPLAINT_CREATED' && event.data) {
@@ -1505,6 +1517,7 @@ function mapServerServiceReport(sr: any): ServiceReport {
         complaintSyncChannel.removeEventListener('message', handleBroadcast);
       }
       window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('wepsun_complaint_created', handleComplaintCreatedLocal);
       unsubscribeSSE?.();
     };
   }, [currentRole, showToast]);
@@ -1923,13 +1936,14 @@ function mapServerServiceReport(sr: any): ServiceReport {
   // Tenant-Scoped Data Selectors
   const isSuperAdmin = currentRole === 'super_admin';
   const filterByTenant = useCallback(<T extends { companyId?: string; branchId?: string }>(items: T[]): T[] => {
-    if (isSuperAdmin && activeCompanyId === 'all') return items;
+    const isAdminRole = ['company_admin', 'master_admin', 'super_admin', 'service_manager'].includes(currentRole);
+    if ((isSuperAdmin || isAdminRole) && (activeCompanyId === 'all' || !activeCompanyId)) return items;
     return items.filter((item) => {
-      const matchCompany = !item.companyId || item.companyId === activeCompanyId;
-      const matchBranch = activeBranchId === 'all' || !item.branchId || item.branchId === activeBranchId;
+      const matchCompany = !item.companyId || !activeCompanyId || activeCompanyId === 'all' || item.companyId === activeCompanyId;
+      const matchBranch = (isAdminRole && activeBranchId === 'all') || activeBranchId === 'all' || !activeBranchId || !item.branchId || item.branchId === activeBranchId;
       return matchCompany && matchBranch;
     });
-  }, [isSuperAdmin, activeCompanyId, activeBranchId]);
+  }, [isSuperAdmin, activeCompanyId, activeBranchId, currentRole]);
 
   const tenantBuildings = useMemo(() => filterByTenant(buildings), [filterByTenant, buildings]);
   const tenantLifts = useMemo(() => filterByTenant(lifts), [filterByTenant, lifts]);
@@ -2839,6 +2853,9 @@ function mapServerServiceReport(sr: any): ServiceReport {
       type: 'COMPLAINT_CREATED',
       data: savedComplaint,
     });
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('wepsun_complaint_created', { detail: savedComplaint }));
+    }
 
     if (complaintData.liftId) {
       setLifts((prev) =>
@@ -2849,6 +2866,8 @@ function mapServerServiceReport(sr: any): ServiceReport {
         )
       );
     }
+
+
 
     addAuditLog({
       companyId,
@@ -2877,6 +2896,34 @@ function mapServerServiceReport(sr: any): ServiceReport {
 
     return savedComplaint;
   };
+
+  const refreshComplaints = useCallback(async (): Promise<Complaint[]> => {
+    try {
+      const res = await apiService.getComplaints({
+        companyId: activeCompanyId,
+        userRole: currentRole,
+      });
+      if (res && res.success && Array.isArray(res.data)) {
+        const mapped = res.data.map(mapServerComplaint);
+        setComplaints((prev) => {
+          const serverMap = new Map(mapped.map((c: any) => [c.id, c]));
+          const localOnly = prev.filter(
+            (p) => !serverMap.has(p.id) && !mapped.some((m: any) => m.ticketNumber === p.ticketNumber)
+          );
+          const combined = [...mapped, ...localOnly];
+          try {
+            localStorage.setItem(STORAGE_PREFIX + 'complaints', JSON.stringify(combined));
+          } catch {}
+          return combined;
+        });
+        return mapped;
+      }
+    } catch (err) {
+      console.warn('[AppContext] Failed to refresh complaints:', err);
+    }
+    return complaints;
+  }, [activeCompanyId, currentRole, complaints]);
+
 
   const assignTechnician = (ticketId: string, technicianId: string, eta = '45 mins') => {
     const tech = technicians.find((t) => t.id === technicianId);
@@ -4266,6 +4313,7 @@ function mapServerServiceReport(sr: any): ServiceReport {
         toggleSound,
         createComplaint,
         createComplaintAsync,
+        refreshComplaints,
         assignTechnician,
         updateComplaintStatus,
         checkInJob,

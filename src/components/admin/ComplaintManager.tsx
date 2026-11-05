@@ -53,13 +53,14 @@ export const ComplaintManager: React.FC = () => {
     showToast,
     addAuditLog,
     currentUser,
+    refreshComplaints,
   } = useApp();
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<string>('All');
   const [statusFilter, setStatusFilter] = useState<string>('All');
-  const [activeQueueTab, setActiveQueueTab] = useState<'emergency' | 'routine'>('emergency');
+  const [activeQueueTab, setActiveQueueTab] = useState<'all' | 'emergency' | 'routine'>('all');
   const [emergencyFilter, setEmergencyFilter] = useState<string>('all');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<Date>(new Date());
@@ -79,7 +80,7 @@ export const ComplaintManager: React.FC = () => {
   const fetchFreshComplaints = useCallback(async (manual = false) => {
     if (manual) setIsRefreshing(true);
     try {
-      const res = await apiService.getComplaints();
+      await refreshComplaints();
       setLastSyncTime(new Date());
       if (manual) {
         showToast('success', 'Complaints Synchronized', 'Real-time database feed updated.');
@@ -89,7 +90,7 @@ export const ComplaintManager: React.FC = () => {
     } finally {
       if (manual) setIsRefreshing(false);
     }
-  }, [showToast]);
+  }, [refreshComplaints, showToast]);
 
   useEffect(() => {
     // Initial fetch on mount
@@ -98,7 +99,7 @@ export const ComplaintManager: React.FC = () => {
     // 4-second background heartbeat
     const pollTimer = setInterval(() => {
       fetchFreshComplaints(false);
-    }, 4000);
+    }, 3000);
 
     return () => clearInterval(pollTimer);
   }, [fetchFreshComplaints]);
@@ -218,6 +219,11 @@ export const ComplaintManager: React.FC = () => {
           c.title.toLowerCase().includes(query) ||
           (c.description && c.description.toLowerCase().includes(query));
 
+        // Routine Queue filter
+        if (activeQueueTab === 'routine' && (c.isEmergency || c.priority === 'critical')) {
+          return false;
+        }
+
         // Priority Filter
         const matchPriority = priorityFilter === 'All' || c.priority === priorityFilter;
 
@@ -251,7 +257,7 @@ export const ComplaintManager: React.FC = () => {
         const timeB = new Date(b.reportedAt || 0).getTime();
         return timeB - timeA;
       });
-  }, [complaints, searchQuery, priorityFilter, statusFilter]);
+  }, [complaints, searchQuery, priorityFilter, statusFilter, activeQueueTab]);
 
   // Quick Copy Helper
   const handleCopy = (text: string, id: string) => {
@@ -371,6 +377,26 @@ export const ComplaintManager: React.FC = () => {
         <div className="flex items-center gap-2 flex-wrap">
           <button
             type="button"
+            onClick={() => setActiveQueueTab('all')}
+            className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-2 cursor-pointer ${
+              activeQueueTab === 'all'
+                ? 'bg-[#123B5D] text-white shadow-md shadow-blue-900/30 ring-2 ring-blue-400'
+                : 'bg-white hover:bg-slate-200 text-slate-700 border border-slate-200'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>🗂️ All Complaints</span>
+            <span
+              className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                activeQueueTab === 'all' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+              }`}
+            >
+              {stats.total}
+            </span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveQueueTab('emergency')}
             className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-2 cursor-pointer ${
               activeQueueTab === 'emergency'
@@ -379,7 +405,7 @@ export const ComplaintManager: React.FC = () => {
             }`}
           >
             <span className="w-2 h-2 rounded-full bg-red-400 animate-ping" />
-            <span>🚨 Real-Time Emergency Breakdown Queue</span>
+            <span>🚨 Emergency Queue</span>
             <span
               className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
                 activeQueueTab === 'emergency' ? 'bg-white/20 text-white' : 'bg-red-100 text-red-700'
@@ -394,11 +420,11 @@ export const ComplaintManager: React.FC = () => {
             onClick={() => setActiveQueueTab('routine')}
             className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-2 cursor-pointer ${
               activeQueueTab === 'routine'
-                ? 'bg-[#123B5D] text-white shadow-md shadow-blue-900/30'
+                ? 'bg-blue-700 text-white shadow-md shadow-blue-700/30 ring-2 ring-blue-300'
                 : 'bg-white hover:bg-slate-200 text-slate-700 border border-slate-200'
             }`}
           >
-            <span>📋 Routine Service Complaints</span>
+            <span>📋 Routine Complaints</span>
             <span
               className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
                 activeQueueTab === 'routine' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
@@ -510,8 +536,20 @@ export const ComplaintManager: React.FC = () => {
               <ShieldCheck className="w-12 h-12 text-emerald-500 mx-auto" />
               <h3 className="font-bold text-slate-900 text-sm">No Emergency Breakdowns Active</h3>
               <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                All client elevators are operating normally without any critical breakdown or passenger entrapment reports.
+                No active passenger entrapments or critical emergency breakdowns at this moment.
               </p>
+              {(stats.total - stats.activeEmergenciesCount) > 0 && (
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveQueueTab('all')}
+                    className="px-4 py-2 rounded-xl bg-[#123B5D] text-white font-bold text-xs hover:bg-[#0e2f4a] transition-all shadow-xs inline-flex items-center gap-2 cursor-pointer active:scale-95"
+                  >
+                    <span>View All Service Complaints ({stats.total})</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
