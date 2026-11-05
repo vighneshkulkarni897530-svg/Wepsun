@@ -4,7 +4,7 @@ import { AmcContract, ServiceReport, Invoice, Quotation, Lift, Company } from '.
 const DEFAULT_COMPANY: Partial<Company> = {
   name: 'WEPSUN Engineering Solution Pvt. Ltd.',
   address: 'Unit 402, Quantum Towers, SV Road, Malad West, Mumbai 400064',
-  contactPhone: '+91 98201 55432 / +91 98202 88765',
+  contactPhone: '+91 85959 40077 / +91 98202 88765',
   contactEmail: 'service@wepsun.com',
   gstNumber: '27AABCW1234F1Z8',
 };
@@ -55,7 +55,7 @@ function addBrandedFooter(doc: jsPDF, pageNumber = 1, totalPages = 1) {
   doc.setFontSize(7.5);
   doc.setTextColor(100, 116, 139);
   doc.text(
-    'Head Office: Mumbai | 24x7 Control Room: +91 98201 55432 | Email: support@wepsun.com | Web: www.wepsun.com',
+    'Head Office: Mumbai | 24x7 Control Room: +91 85959 40077 | Email: support@wepsun.com | Web: www.wepsun.com',
     14,
     pageHeight - 9
   );
@@ -107,7 +107,7 @@ export function downloadAmcAgreementPdf(contract: AmcContract, company: Partial<
   doc.text(company.name || 'WEPSUN Engineering Solution Pvt. Ltd.', 18, y + 11);
   doc.text(company.address || 'Quantum Towers, SV Road, Malad West, Mumbai', 18, y + 16);
   doc.text(`GSTIN: ${company.gstNumber || '27AABCW1234F1Z8'}`, 18, y + 21);
-  doc.text(`Emergency Helpline: ${company.contactPhone || '+91 98201 55432'}`, 18, y + 26);
+  doc.text(`Emergency Helpline: ${company.contactPhone || '+91 85959 40077'}`, 18, y + 26);
 
   doc.setFont('helvetica', 'bold');
   doc.text('CLIENT / SOCIETY (SECOND PARTY):', 112, y + 6);

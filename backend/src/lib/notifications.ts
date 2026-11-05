@@ -59,7 +59,7 @@ export function formatWhatsAppMessage(
         `🕒 *Reported At:* ${params.reportedAt || new Date().toLocaleString('en-IN')}\n` +
         `👷 *Assigned Engineer:* ${params.technicianName || 'Standby Tech'}\n` +
         `⏱️ *ETA:* ${params.eta || 'Within 45 mins'}\n\n` +
-        `📞 *24x7 Emergency Helpline:* +91 98201 55432\n` +
+        `📞 *24x7 Emergency Helpline:* +91 85959 40077\n` +
         `_Reliable Service. Safer Tomorrow._`
       );
 
@@ -94,7 +94,7 @@ export function formatWhatsAppMessage(
         `The monthly 4-Zone preventive maintenance for *Lift ${params.liftNumber}* (${params.buildingName}) is scheduled for *${params.pmDate || 'Tomorrow at 11:00 AM'}*.\n\n` +
         `🔍 *Scope:* Machine room inspection, car leveling, safety gear & ARD battery diagnostics.\n` +
         `👷 *Lead Engineer:* ${params.technicianName || 'WEPSUN PM Team'}\n\n` +
-        `_For any scheduling changes, reply to this message or call +91 98201 55432._`
+        `_For any scheduling changes, reply to this message or call +91 85959 40077._`
       );
 
     case 'amc_renewal_invoice':
@@ -118,7 +118,7 @@ export function formatWhatsAppMessage(
         `🛗 *Lifts Protected:* ${params.liftCount || '2'} Elevators\n` +
         `💰 *Renewed Contract Quote:* Rs. ${params.renewalAmount} (incl. 18% GST)\n\n` +
         `⚡ *1-Click Instant Renewal & Digital E-Sign:* ${params.renewalLink || 'https://wepsun.com/#amc-renewal'}\n` +
-        `📞 *AMC Helpdesk & Queries:* +91 98201 55432\n` +
+        `📞 *AMC Helpdesk & Queries:* +91 85959 40077\n` +
         `_Ensure uninterrupted 24/7 breakdown coverage and statutory compliance._`
       );
 

@@ -107,7 +107,7 @@ export const ServiceReportModal: React.FC<ServiceReportModalProps> = ({
                   Elevator & Escalator Maintenance, Modernization & AMC Services
                 </p>
                 <p className="text-[11px] text-slate-500 mt-0.5">
-                  Head Office: Sector 19, Vashi, Navi Mumbai | 24x7 Helpdesk: +91 98201 55432
+                  Head Office: Sector 19, Vashi, Navi Mumbai | 24x7 Helpdesk: +91 85959 40077
                 </p>
               </div>
             </div>

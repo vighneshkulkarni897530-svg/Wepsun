@@ -194,7 +194,7 @@ export const ServiceReportView: React.FC<ServiceReportViewProps> = ({
             <WepsunLogo size="sm" />
             <p className="text-[10px] text-slate-500 leading-tight">
               Unit 402, Quantum Towers, SV Road, Malad West, Mumbai 400064<br />
-              24x7 Control Room: +91 98201 55432 • GSTIN: 27AABCW1234F1Z8
+              24x7 Control Room: +91 85959 40077 • GSTIN: 27AABCW1234F1Z8
             </p>
           </div>
 

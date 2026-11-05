@@ -374,8 +374,8 @@ export const TodaysJobsView: React.FC<TodaysJobsViewProps> = ({
                           `Technician *Rohan Patil* is attending *${job.liftNumber}* at *${job.buildingName}*.\n` +
                           `Current Status: *${job.jobStatus}*\n` +
                           `Issue: *${job.complaintReported}*\n\n` +
-                          `📞 *24x7 Control Room:* +91 98201 55432`;
-                        apiService.openWhatsAppDirect('+919820155432', msg);
+                          `📞 *24x7 Control Room:* +91 85959 40077`;
+                        apiService.openWhatsAppDirect('+918595940077', msg);
                       }}
                       className="p-2 rounded-xl text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors shadow-xs flex items-center gap-1 text-xs font-bold"
                       title="Send WhatsApp Update / ETA to Client"

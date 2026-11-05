@@ -75,7 +75,7 @@ export const AdminProfileSettingsView: React.FC = () => {
   // Profile Information Fields synced from currentUser & master metadata
   const [name, setName] = useState(() => savedProfile?.name || currentUser.name || masterDef?.name || 'WEPSUN Administrator');
   const [email, setEmail] = useState(() => savedProfile?.email || currentUser.email || masterDef?.email || 'admin@wepsun.com');
-  const [phone, setPhone] = useState(() => savedProfile?.phone || currentUser.phone || masterDef?.phone || '+91 98201 55432');
+  const [phone, setPhone] = useState(() => savedProfile?.phone || currentUser.phone || masterDef?.phone || '+91 85959 40077');
   const [masterId] = useState(() => masterDef?.masterId || 'WEP-MASTER');
   const [designation, setDesignation] = useState(() => savedProfile?.designation || currentUser.designation || masterDef?.designation || 'Managing Director & CEO');
   const [department, setDepartment] = useState(() => savedProfile?.department || masterDef?.department || 'Executive Directorate');

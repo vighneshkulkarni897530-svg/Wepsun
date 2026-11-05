@@ -43,7 +43,7 @@ export const FOUR_NAMED_LIFTS: Lift[] = [
     buildingName: 'ABC Residency, Pune',
     clientId: 'client-1',
     clientName: 'ABC Residency Co-op Housing Society',
-    clientPhone: '+91 98201 55432',
+    clientPhone: '+91 85959 40077',
     brand: 'WEPSUN Traction',
     model: 'TR-5000 Eco',
     type: 'Passenger',
@@ -78,7 +78,7 @@ export const FOUR_NAMED_LIFTS: Lift[] = [
     buildingName: 'ABC Residency, Pune',
     clientId: 'client-1',
     clientName: 'ABC Residency Co-op Housing Society',
-    clientPhone: '+91 98201 55432',
+    clientPhone: '+91 85959 40077',
     brand: 'WEPSUN MR Series',
     model: 'MR-Classic 400',
     type: 'Passenger',
@@ -113,7 +113,7 @@ export const FOUR_NAMED_LIFTS: Lift[] = [
     buildingName: 'ABC Residency, Pune',
     clientId: 'client-1',
     clientName: 'ABC Residency Co-op Housing Society',
-    clientPhone: '+91 98201 55432',
+    clientPhone: '+91 85959 40077',
     brand: 'WEPSUN MRL Eco',
     model: 'MRL-SpaceSaver',
     type: 'Passenger',
@@ -148,7 +148,7 @@ export const FOUR_NAMED_LIFTS: Lift[] = [
     buildingName: 'ABC Residency, Pune',
     clientId: 'client-1',
     clientName: 'ABC Residency Co-op Housing Society',
-    clientPhone: '+91 98201 55432',
+    clientPhone: '+91 85959 40077',
     brand: 'WEPSUN HeavyDuty',
     model: 'GL-Freight 2000',
     type: 'Freight / Goods',
@@ -236,7 +236,7 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
 
   // Emergency mode fields (Page 6)
   const [emergencyBuilding, setEmergencyBuilding] = useState('');
-  const [emergencyContact, setEmergencyContact] = useState('+91 98201 55432');
+  const [emergencyContact, setEmergencyContact] = useState('+91 85959 40077');
   const [emergencyDesc, setEmergencyDesc] = useState('Lift stopped abruptly between floors. Passenger trapped inside.');
   const [emergencyPhotos, setEmergencyPhotos] = useState<string[]>([
     'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=500&auto=format&fit=crop&q=80',
@@ -440,7 +440,7 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
           buildingName: currentLift.buildingName,
           clientId: currentLift.clientId,
           clientName: currentLift.clientName,
-          clientPhone: currentLift.clientPhone || '+91 98201 55432',
+          clientPhone: currentLift.clientPhone || '+91 85959 40077',
           issueType: mappedIssueType,
           title: `${complaintType}: ${currentLift.liftNumber}`,
           description: trimmedDesc,
@@ -457,7 +457,7 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
           buildingName: currentLift.buildingName,
           clientId: currentLift.clientId,
           clientName: currentLift.clientName,
-          clientPhone: currentLift.clientPhone || '+91 98201 55432',
+          clientPhone: currentLift.clientPhone || '+91 85959 40077',
           issueType: mappedIssueType,
           title: `${complaintType}: ${currentLift.liftNumber}`,
           description: trimmedDesc,
@@ -732,11 +732,11 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
                 </p>
                 <div className="mt-2">
                   <a
-                    href="tel:+919820155432"
+                    href="tel:+918595940077"
                     className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-lg bg-white/95 text-[#D32F2F] font-bold text-[11px] shadow-sm hover:bg-white transition-all"
                   >
                     <PhoneCall className="w-3 h-3" />
-                    <span>24x7 Control Room: +91 98201 55432</span>
+                    <span>24x7 Control Room: +91 85959 40077</span>
                   </a>
                 </div>
               </div>

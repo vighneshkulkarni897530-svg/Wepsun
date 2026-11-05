@@ -105,7 +105,7 @@ export const ClientProfileView: React.FC<ClientProfileViewProps> = ({ onLogout }
       '+91 98000 00000',
       '+91 98201 99928',
       '+91 98201 92025',
-      '+91 98201 55432',
+      '+91 85959 40077',
       '+91 98334 55662',
       '+91 98202 88765',
       '+91 98205 33441',
@@ -527,7 +527,7 @@ export const ClientProfileView: React.FC<ClientProfileViewProps> = ({ onLogout }
             </p>
             <div className="p-3 bg-blue-50 rounded-2xl border border-blue-200 text-xs space-y-1 font-mono">
               <span className="text-slate-600 block text-[11px]">24x7 Control Room:</span>
-              <strong className="text-[#1976D2] text-sm block">+91 98201 55432</strong>
+              <strong className="text-[#1976D2] text-sm block">+91 85959 40077</strong>
               <span className="text-slate-500 block text-[10px] mt-1">support@wepsun.com</span>
             </div>
           </div>

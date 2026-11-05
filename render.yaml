@@ -53,7 +53,7 @@ services:
       - key: MASTER_EMAIL_1
         value: "jaiswalsumit2812@gmail.com"
       - key: MASTER_PHONE_1
-        value: "+919820155432"
+        value: "+918595940077"
       - key: MASTER_PASSWORD_1
         sync: false
       - key: MASTER_ID_2

@@ -368,7 +368,7 @@ export const TechnicianProfileView: React.FC<TechnicianProfileViewProps> = ({
                 <span className="text-[10px] uppercase font-bold text-slate-400 block">
                   Field Support Emergency Control Room
                 </span>
-                <p className="font-mono font-black text-sm text-amber-400">+91 98201 55432</p>
+                <p className="font-mono font-black text-sm text-amber-400">+91 85959 40077</p>
                 <span className="text-[10px] text-slate-400 block">24x7 Direct Dispatch Desk</span>
               </div>
             </div>

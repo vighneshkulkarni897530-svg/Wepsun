@@ -207,7 +207,7 @@ export const SystemFlowchartViewer: React.FC = () => {
       badge: '24/7 Control',
       color: 'border-emerald-500 bg-emerald-50 text-emerald-700',
       steps: [
-        'Direct 24/7 Hotline Connection (+91 98201 55432)',
+        'Direct 24/7 Hotline Connection (+91 85959 40077)',
         'One-Tap Emergency Breakdown / SOS Call Trigger',
         'Immediate Field Engineer Emergency Dispatch',
         'Rapid Passenger Rescue & Control Room Escalation',

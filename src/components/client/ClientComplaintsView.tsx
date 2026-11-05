@@ -421,11 +421,11 @@ export const ClientComplaintsView: React.FC<ClientComplaintsViewProps> = ({
                         </div>
 
                         <a
-                          href={`tel:${complaint.technicianPhone || '+919820155432'}`}
+                          href={`tel:${complaint.technicianPhone || '+91 85959 40077'}`}
                           className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#123B5D] hover:bg-[#0e2f4a] text-white font-bold text-xs transition-colors shadow-xs"
                         >
                           <PhoneCall className="w-3.5 h-3.5 text-sky-300" />
-                          <span>Call Technician ({complaint.technicianPhone || '+91 98201 55432'})</span>
+                          <span>Call Technician ({complaint.technicianPhone || '+91 85959 40077'})</span>
                         </a>
                       </div>
                     )}

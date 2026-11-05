@@ -102,7 +102,7 @@ export const LiftDigitalPassportModal: React.FC<LiftDigitalPassportModalProps> =
             <div class="instructions">
               📱 Scan with Smartphone Camera or WEPSUN App to inspect lift passport or report breakdown
             </div>
-            <div class="emergency">🚨 24x7 Control Room Emergency: +91 98201 55432</div>
+            <div class="emergency">🚨 24x7 Control Room Emergency: +91 85959 40077</div>
           </div>
           <script>
             window.onload = function() { window.print(); window.close(); }

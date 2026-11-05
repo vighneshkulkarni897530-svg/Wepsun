@@ -58,10 +58,10 @@ export const ComplaintManager: React.FC = () => {
       `👷 *Assigned Engineer:* ${ticket.assignedTechnicianName || 'WEPSUN Emergency Team'}\n` +
       `⏱️ *ETA:* ${ticket.technicianEta || 'Within 45 mins'}\n` +
       `⚠️ *Issue:* ${ticket.title}\n\n` +
-      `📞 *24x7 Control Room:* +91 98201 55432\n` +
+      `📞 *24x7 Control Room:* +91 85959 40077\n` +
       `_Reliable Service. Safer Tomorrow._`;
 
-    apiService.openWhatsAppDirect(ticket.clientPhone || '+919820155432', msg);
+    apiService.openWhatsAppDirect(ticket.clientPhone || '+918595940077', msg);
   };
 
   return (

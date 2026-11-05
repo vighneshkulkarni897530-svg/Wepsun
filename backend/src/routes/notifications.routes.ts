@@ -215,7 +215,7 @@ router.post('/dispatch-emergency', requireAuth, async (req: AuthRequest, res: Re
     // 2. High-priority SMS to Client
     const smsClient = await sendSmsAlert({
       toPhone: clientPhone || '+919822011223',
-      message: `[WEPSUN ALERT] Breakdown Ticket #${ticketNumber || 'TKT'} for Lift ${liftNumber} has been dispatched. Tech: ${technicianName}. Control Room: +919820155432`,
+      message: `[WEPSUN ALERT] Breakdown Ticket #${ticketNumber || 'TKT'} for Lift ${liftNumber} has been dispatched. Tech: ${technicianName}. Control Room: +91 85959 40077`,
     });
 
     res.json({

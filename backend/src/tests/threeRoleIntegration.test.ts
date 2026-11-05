@@ -55,7 +55,7 @@ async function runThreeRoleIntegrationTests() {
       name: 'WEPSUN Engineering Solution Pvt. Ltd.',
       code: 'WEP-INT',
       contactEmail: 'integration@wepsun.com',
-      contactPhone: '+919820155432',
+      contactPhone: '+91 85959 40077',
       address: 'Navi Mumbai Hub',
       city: 'Navi Mumbai',
       state: 'Maharashtra',
@@ -74,7 +74,7 @@ async function runThreeRoleIntegrationTests() {
       city: 'Mumbai',
       state: 'Maharashtra',
       address: 'Sector 19 Vashi',
-      contactPhone: '+919820155432',
+      contactPhone: '+91 85959 40077',
       contactEmail: 'mumbai@wepsun.com',
     },
   });

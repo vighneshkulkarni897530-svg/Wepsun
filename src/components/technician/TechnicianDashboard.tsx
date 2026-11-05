@@ -228,7 +228,7 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
         clientName: c.clientName || 'Client Society',
         clientId: c.clientId || '',
         contactPerson: c.clientName || 'Site Representative',
-        clientPhone: c.clientPhone || '+91 98201 55432',
+        clientPhone: c.clientPhone || '+91 85959 40077',
         clientEmail: c.clientEmail || '',
         serviceAddress: c.buildingName || 'Building Complex',
         buildingName: c.buildingName || 'Building Complex',
