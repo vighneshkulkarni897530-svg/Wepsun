@@ -14,14 +14,16 @@ const router = Router();
 router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = req.user!;
-    const companyId = user.companyId;
-    if (!companyId) {
-      res.status(403).json({ success: false, message: 'Tenant company context required', code: 'TENANT_REQUIRED' });
-      return;
-    }
     const userRole = (user.role || '').toUpperCase();
     const isClient = userRole === 'CLIENT';
     const isTech = userRole === 'TECHNICIAN';
+    const isMasterOrSuper = userRole === 'MASTER_ADMIN' || userRole === 'SUPER_ADMIN';
+    const isAdmin = ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MASTER_ADMIN', 'SERVICE_MANAGER'].includes(userRole);
+    const companyId = user.companyId;
+    if (!companyId && !isAdmin) {
+      res.status(403).json({ success: false, message: 'Tenant company context required', code: 'TENANT_REQUIRED' });
+      return;
+    }
     const currentUserId = user.userId || user.sub;
 
     // Strict client isolation: If client has no clientId, return empty list
@@ -36,7 +38,10 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response) =>
       return;
     }
 
-    const isAdmin = ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MASTER_ADMIN', 'SERVICE_MANAGER'].includes(userRole);
+    const queryCompanyId = req.query.companyId as string | undefined;
+    const companyFilter = isMasterOrSuper
+      ? (queryCompanyId && queryCompanyId !== 'all' ? queryCompanyId : undefined)
+      : (queryCompanyId && queryCompanyId !== 'all' ? queryCompanyId : companyId);
     const branchFilter = req.query.branchId && req.query.branchId !== 'all' ? (req.query.branchId as string) : (isAdmin ? undefined : req.branchId);
 
     let list: any[] = [];
@@ -44,7 +49,7 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response) =>
     try {
       list = await prisma.complaint.findMany({
         where: {
-          companyId,
+          ...(companyFilter ? { companyId: companyFilter } : {}),
           ...(branchFilter ? { branchId: branchFilter } : {}),
           ...(req.query.status ? { status: req.query.status as any } : {}),
           ...(req.query.liftId ? { liftId: req.query.liftId as string } : {}),
@@ -74,7 +79,7 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response) =>
         orderBy: { reportedAt: 'desc' },
       });
     } catch {
-      list = db.complaints.filter((c) => c.companyId === companyId);
+      list = companyFilter ? db.complaints.filter((c) => c.companyId === companyFilter) : [...db.complaints];
       if (branchFilter) {
         list = list.filter((c) => c.branchId === branchFilter);
       }
@@ -151,13 +156,14 @@ router.get('/:id', requireAuth, async (req: AuthenticatedRequest, res: Response)
     }
     const id = req.params.id as string;
     const userRole = (user.role || '').toUpperCase();
+    const isMasterOrSuper = userRole === 'MASTER_ADMIN' || userRole === 'SUPER_ADMIN';
     const currentUserId = user.userId || user.sub;
 
     let complaint: any = null;
 
     try {
       complaint = await prisma.complaint.findFirst({
-        where: { id, companyId },
+        where: isMasterOrSuper ? { id } : { id, companyId },
         include: {
           lift: {
             include: {
@@ -172,7 +178,7 @@ router.get('/:id', requireAuth, async (req: AuthenticatedRequest, res: Response)
         },
       });
     } catch {
-      complaint = db.complaints.find((c) => c.id === id && c.companyId === companyId);
+      complaint = db.complaints.find((c) => c.id === id && (isMasterOrSuper || c.companyId === companyId));
     }
 
     if (!complaint) {
@@ -558,13 +564,15 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): 
 router.patch('/:id', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const user = req.user!;
+    const userRole = (user.role || '').toUpperCase();
+    const isMasterOrSuper = userRole === 'MASTER_ADMIN' || userRole === 'SUPER_ADMIN';
+    const isAdmin = ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MASTER_ADMIN', 'SERVICE_MANAGER'].includes(userRole);
     const companyId = user.companyId;
-    if (!companyId) {
+    if (!companyId && !isAdmin) {
       res.status(403).json({ success: false, message: 'Tenant company context required', code: 'TENANT_REQUIRED' });
       return;
     }
     const id = req.params.id as string;
-    const userRole = (user.role || '').toUpperCase();
     const currentUserId = user.userId || user.sub;
     const { status, assignedTechnicianId, priority, diagnosisRemarks, actionTaken, clientRating, clientFeedback, clientSignature } = req.body;
     const validPrioritiesPatch: Record<string, string> = { critical: 'CRITICAL', high: 'HIGH', normal: 'NORMAL', medium: 'NORMAL', low: 'LOW' };
@@ -574,7 +582,10 @@ router.patch('/:id', requireAuth, async (req: AuthenticatedRequest, res: Respons
       new: 'NEW',
       pending: 'NEW',
       assigned: 'ASSIGNED',
+      accepted: 'ASSIGNED',
       technician_on_way: 'TECHNICIAN_ON_WAY',
+      en_route: 'TECHNICIAN_ON_WAY',
+      arrived: 'IN_PROGRESS',
       in_progress: 'IN_PROGRESS',
       inspection_repair: 'INSPECTION_REPAIR',
       waiting_for_parts: 'WAITING_FOR_PARTS',
@@ -582,17 +593,18 @@ router.patch('/:id', requireAuth, async (req: AuthenticatedRequest, res: Respons
       client_confirmation: 'CLIENT_CONFIRMATION',
       closed: 'CLOSED',
       cancelled: 'CANCELLED',
+      archived: 'ARCHIVED',
     };
     const normalizedStatus = status ? (validStatuses[String(status).toLowerCase()] || String(status).toUpperCase()) as any : undefined;
 
     let existing: any = null;
     try {
       existing = await prisma.complaint.findFirst({
-        where: { id, companyId },
+        where: isMasterOrSuper ? { id } : { id, companyId },
         include: { lift: true },
       });
     } catch {
-      existing = db.complaints.find((c) => c.id === id && c.companyId === companyId);
+      existing = db.complaints.find((c) => c.id === id && (isMasterOrSuper || c.companyId === companyId));
     }
 
     if (!existing) {
@@ -644,7 +656,7 @@ router.patch('/:id', requireAuth, async (req: AuthenticatedRequest, res: Respons
     try {
       await prisma.$transaction(async (tx) => {
         await tx.complaint.updateMany({
-          where: { id, companyId },
+          where: isMasterOrSuper ? { id } : { id, companyId },
           data: {
             ...(normalizedStatus ? { status: normalizedStatus } : {}),
             ...(normalizedPriorityPatch ? { priority: normalizedPriorityPatch } : {}),
@@ -653,7 +665,7 @@ router.patch('/:id', requireAuth, async (req: AuthenticatedRequest, res: Respons
             ...(actionTaken ? { actionTaken } : {}),
             ...(clientRating ? { clientRating: Number(clientRating) } : {}),
             ...(clientFeedback ? { clientFeedback } : {}),
-            ...(normalizedStatus === 'CLOSED' || normalizedStatus === 'RESOLVED' ? { closedAt: new Date() } : {}),
+            ...(normalizedStatus === 'CLOSED' || normalizedStatus === 'RESOLVED' || normalizedStatus === 'ARCHIVED' ? { closedAt: new Date() } : {}),
           },
         });
 
@@ -762,6 +774,9 @@ router.patch('/:id', requireAuth, async (req: AuthenticatedRequest, res: Respons
       });
 
       if (freshRecord) {
+        serverCache.del('sync_');
+        serverCache.del('complaints_');
+        complaintEvents.emit('complaint_updated', freshRecord);
         res.json({ success: true, data: freshRecord });
         return;
       }
@@ -769,7 +784,7 @@ router.patch('/:id', requireAuth, async (req: AuthenticatedRequest, res: Respons
       // Fallback
     }
 
-    const idx = db.complaints.findIndex((c) => (c.id === id || c.ticketNumber === id) && c.companyId === companyId);
+    const idx = db.complaints.findIndex((c) => (c.id === id || c.ticketNumber === id) && (isMasterOrSuper || c.companyId === companyId));
     if (idx !== -1) {
       const existingRecord = db.complaints[idx];
       const normalizedStatusStr = normalizedStatus ? String(normalizedStatus).toLowerCase() : (req.body.status ? String(req.body.status).toLowerCase() : existingRecord.status);

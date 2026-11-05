@@ -87,6 +87,7 @@ enum ComplaintStatus {
   CLIENT_CONFIRMATION
   CLOSED
   CANCELLED
+  ARCHIVED
 }
 
 enum IssueType {

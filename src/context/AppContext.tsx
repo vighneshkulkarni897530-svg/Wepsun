@@ -562,12 +562,18 @@ function mapServerComplaint(sc: any): Complaint {
     NEW: 'pending',
     PENDING: 'pending',
     ASSIGNED: 'assigned',
+    ACCEPTED: 'assigned',
     TECHNICIAN_ON_WAY: 'technician_on_way',
+    EN_ROUTE: 'technician_on_way',
+    ARRIVED: 'inspection_repair',
     IN_PROGRESS: 'inspection_repair',
     INSPECTION_REPAIR: 'inspection_repair',
+    WAITING_FOR_PARTS: 'inspection_repair',
     RESOLVED: 'resolved',
+    CLIENT_CONFIRMATION: 'resolved',
     CLOSED: 'closed',
     CANCELLED: 'closed',
+    ARCHIVED: 'archived',
   };
 
   const priorityMap: Record<string, ComplaintPriority> = {
@@ -610,6 +616,11 @@ function mapServerComplaint(sc: any): Complaint {
     assignedTechnicianId: sc.assignedTechnicianId || sc.assignedTechnician?.id,
     assignedTechnicianName: sc.assignedTechnician?.name || sc.assignedTechnicianName || '',
     technicianPhone: sc.assignedTechnician?.phone || sc.technicianPhone || '',
+    technicianPhoto: sc.assignedTechnician?.avatar || sc.technicianPhoto || '',
+    technicianEta: sc.technicianEta || sc.eta || '',
+    isEmergency: Boolean(sc.isEmergency || rawPriority === 'CRITICAL'),
+    isArchived: Boolean(sc.isArchived || rawStatus === 'ARCHIVED'),
+    archivedAt: sc.archivedAt,
     status,
     priority,
     issueType,
@@ -2910,7 +2921,23 @@ function mapServerServiceReport(sr: any): ServiceReport {
           const localOnly = prev.filter(
             (p) => !serverMap.has(p.id) && !mapped.some((m: any) => m.ticketNumber === p.ticketNumber)
           );
-          const combined = [...mapped, ...localOnly];
+          const mergedServer = mapped.map((serverComp: Complaint) => {
+            const existing = prev.find((p) => p.id === serverComp.id || p.ticketNumber === serverComp.ticketNumber);
+            if (!existing) return serverComp;
+            return {
+              ...existing,
+              ...serverComp,
+              assignedTechnicianId: serverComp.assignedTechnicianId || existing.assignedTechnicianId,
+              assignedTechnicianName: serverComp.assignedTechnicianName || existing.assignedTechnicianName,
+              technicianPhone: serverComp.technicianPhone || existing.technicianPhone,
+              technicianPhoto: serverComp.technicianPhoto || existing.technicianPhoto,
+              technicianEta: serverComp.technicianEta || existing.technicianEta,
+              timeline: (serverComp.timeline && serverComp.timeline.length >= (existing.timeline?.length || 0))
+                ? serverComp.timeline
+                : existing.timeline,
+            };
+          });
+          const combined = [...mergedServer, ...localOnly];
           try {
             localStorage.setItem(STORAGE_PREFIX + 'complaints', JSON.stringify(combined));
           } catch {}
@@ -2921,8 +2948,8 @@ function mapServerServiceReport(sr: any): ServiceReport {
     } catch (err) {
       console.warn('[AppContext] Failed to refresh complaints:', err);
     }
-    return complaints;
-  }, [activeCompanyId, currentRole, complaints]);
+    return [];
+  }, [activeCompanyId, currentRole]);
 
 
   const assignTechnician = (ticketId: string, technicianId: string, eta = '45 mins') => {

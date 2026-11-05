@@ -162,12 +162,18 @@ export interface Lift {
 
 export type ComplaintPriority = 'critical' | 'high' | 'normal';
 export type ComplaintStatus =
+  | 'new'
   | 'pending'
   | 'assigned'
+  | 'accepted'
   | 'technician_on_way'
+  | 'en_route'
+  | 'arrived'
   | 'inspection_repair'
+  | 'in_progress'
   | 'resolved'
-  | 'closed';
+  | 'closed'
+  | 'archived';
 
 export type IssueType =
   | 'stuck_passengers'
@@ -250,6 +256,8 @@ export interface Complaint {
   clientFeedback?: string;
   serviceReportId?: string;
   closedAt?: string;
+  isArchived?: boolean;
+  archivedAt?: string;
   timeline?: ComplaintTimelineEntry[];
   createdAt?: string;
 }

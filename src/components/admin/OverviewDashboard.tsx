@@ -57,6 +57,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
 }) => {
   const {
     currentUser,
+    complaints,
     tenantComplaints,
     tenantAmcContracts,
     tenantLifts,
@@ -233,10 +234,13 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
     return Math.max(1, clientIds.size);
   }, [users, tenantBuildings, tenantLifts]);
 
+  const isMasterOrSuper = currentUser.role === 'master_admin' || currentUser.role === 'super_admin';
+  const effectiveComplaints = isMasterOrSuper ? complaints : tenantComplaints;
+
   const totalBuildings = tenantBuildings.length;
   const totalLifts = tenantLifts.length;
-  const openComplaintsCount = tenantComplaints.filter(
-    (c) => c.status === 'pending' || c.status === 'assigned' || c.status === 'technician_on_way' || c.status === 'inspection_repair'
+  const openComplaintsCount = effectiveComplaints.filter(
+    (c) => c.status === 'pending' || c.status === 'new' || c.status === 'assigned' || c.status === 'technician_on_way' || c.status === 'inspection_repair'
   ).length;
   const amcExpiringCount = tenantAmcContracts.filter(
     (a) =>
@@ -247,18 +251,18 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
   ).length;
 
   // Complaints Overview Donut
-  const totalComplaints = tenantComplaints.length;
-  const openCount = tenantComplaints.filter((c) => c.status === 'pending' || c.status === 'assigned').length;
-  const inProgressCount = tenantComplaints.filter(
-    (c) => c.status === 'technician_on_way' || c.status === 'inspection_repair'
+  const totalComplaints = effectiveComplaints.length;
+  const openCount = effectiveComplaints.filter((c) => c.status === 'pending' || c.status === 'new' || c.status === 'assigned' || c.status === 'accepted').length;
+  const inProgressCount = effectiveComplaints.filter(
+    (c) => c.status === 'technician_on_way' || c.status === 'inspection_repair' || c.status === 'in_progress' || c.status === 'arrived'
   ).length;
-  const resolvedCount = tenantComplaints.filter((c) => c.status === 'resolved' || c.status === 'closed').length;
+  const resolvedCount = effectiveComplaints.filter((c) => c.status === 'resolved' || c.status === 'closed').length;
 
   const activeEmergencies = useMemo(() => {
-    return tenantComplaints.filter(
-      (c) => (c.isEmergency || c.priority === 'critical') && c.status !== 'resolved' && c.status !== 'closed'
+    return effectiveComplaints.filter(
+      (c) => (c.isEmergency || c.priority === 'critical') && c.status !== 'resolved' && c.status !== 'closed' && c.status !== 'archived'
     );
-  }, [tenantComplaints]);
+  }, [effectiveComplaints]);
 
   const trappedPassengersTotal = useMemo(() => {
     return activeEmergencies.reduce((acc, c) => acc + (c.trappedPassengerCount || 0), 0);
@@ -351,7 +355,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
       timestamp: number;
     }> = [];
 
-    tenantComplaints.forEach((c) => {
+    effectiveComplaints.forEach((c) => {
       const dt = new Date(c.createdAt || Date.now());
       list.push({
         id: `c-${c.id}`,
@@ -422,7 +426,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
     });
 
     return list.sort((a, b) => b.timestamp - a.timestamp).slice(0, 5);
-  }, [tenantComplaints, tenantInvoices, tenantAmcContracts, serviceReports, tenantQuotations]);
+  }, [effectiveComplaints, tenantInvoices, tenantAmcContracts, serviceReports, tenantQuotations]);
 
   return (
     <div className="w-full space-y-6 text-slate-800">
@@ -1024,14 +1028,14 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-slate-700">
-                    {tenantComplaints.length === 0 ? (
+                    {effectiveComplaints.length === 0 ? (
                       <tr>
                         <td colSpan={7} className="py-6 text-center text-slate-400 italic">
                           No complaints recorded yet.
                         </td>
                       </tr>
                     ) : (
-                      tenantComplaints.slice(0, 5).map((c) => (
+                      effectiveComplaints.slice(0, 5).map((c) => (
                         <tr key={c.id} className="hover:bg-slate-50/70">
                           <td className="py-3 pr-3 font-mono font-bold text-[#1976D2]">{c.ticketNumber || c.id}</td>
                           <td className="py-3 px-3 font-semibold text-slate-900">{c.clientName || 'Client'}</td>
