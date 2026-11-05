@@ -219,6 +219,16 @@ interface AppContextType {
   addNewLift: (liftData: Partial<Lift>) => Lift;
   updateLift: (liftId: string, liftData: Partial<Lift>) => void;
   addNewBuilding: (buildingData: Partial<Building>) => Building;
+  addNewClient: (clientData: {
+    name: string;
+    contactPerson?: string;
+    email?: string;
+    phone?: string;
+    societyName?: string;
+    address?: string;
+    initialLiftsCount?: number;
+    amcTier?: string;
+  }) => Promise<{ client: ClientProfile; user: User; building: Building }>;
   updateBuilding: (buildingId: string, buildingData: Partial<Building>) => void;
   createAmcContract: (contractData: Partial<AmcContract>) => AmcContract;
   renewAmcContract: (contractId: string, newEndDate: string) => void;
@@ -352,7 +362,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const uRole = cached.user.role || cached.role;
       const adminRoles: UserRole[] = ['company_admin', 'master_admin', 'super_admin', 'service_manager', 'accounts', 'sales'];
       if (adminRoles.includes(uRole) && !isMasterAdminSessionValid()) {
-        return 'usr-client-priya';
+        return 'usr-client-1791564102599';
       }
       return cached.user.id;
     }
@@ -360,9 +370,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const savedRole = localStorage.getItem(STORAGE_PREFIX + 'role') as UserRole;
     const adminRoles: UserRole[] = ['company_admin', 'master_admin', 'super_admin', 'service_manager', 'accounts', 'sales'];
     if (savedUserId && savedRole && adminRoles.includes(savedRole) && !isMasterAdminSessionValid()) {
-      return 'usr-client-priya';
+      return 'usr-client-1791564102599';
     }
-    return savedUserId || 'usr-client-priya';
+    return savedUserId || 'usr-client-1791564102599';
   });
 
   const [activeClientId, setActiveClientId] = useState<string>(() => {
@@ -378,7 +388,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   });
   const [users, setUsers] = useState<User[]>(() => {
     const raw = safeStorageParse<User[]>(STORAGE_PREFIX + 'users', INITIAL_USERS);
-    const demoUserIds = new Set(['usr-tech-1', 'usr-tech-2', 'usr-tech-rohan', 'usr-inactive-1']);
+    const demoUserIds = new Set(['usr-tech-1', 'usr-tech-2', 'usr-tech-rohan', 'usr-inactive-1', 'usr-client-priya', 'usr-client-1', 'usr-client-2', 'usr-admin-2']);
     const filtered = (raw || []).filter(
       (u) => !demoUserIds.has(u.id) && !u.email?.toLowerCase().includes('tech1@wepsun.com') && !u.email?.toLowerCase().includes('inactive@wepsun.com')
     );
@@ -2004,78 +2014,30 @@ function mapServerServiceReport(sr: any): ServiceReport {
   }, [appNotifications]);
 
   const [clientProfiles, setClientProfiles] = useState<Record<string, ClientProfile>>(() => {
-    return safeStorageParse<Record<string, ClientProfile>>(STORAGE_PREFIX + 'clientProfiles', {
-      'client-1': {
-        clientId: 'client-1',
-        companyName: 'Greenwood Heights Co-op Housing Society Ltd.',
-        contactPerson: 'Sanjay Deshmukh (Secretary) / Arvind Mehta',
-        phone: '+91 98220 11223',
-        email: 'client@greenwood.com',
-        address: 'Plot 42, Sector 19, Palm Beach Road, Vashi',
+    const raw = safeStorageParse<Record<string, ClientProfile>>(STORAGE_PREFIX + 'clientProfiles', {});
+    const demoClientIds = new Set(['client-1', 'client-2', 'client-priya', 'client-3', 'client-4']);
+    const filtered: Record<string, ClientProfile> = {};
+    for (const [k, v] of Object.entries(raw || {})) {
+      if (!demoClientIds.has(k) && !v.email?.includes('greenwood.com') && !v.email?.includes('techparkinfinity.com')) {
+        filtered[k] = v;
+      }
+    }
+    if (!filtered['client-1791564102599']) {
+      filtered['client-1791564102599'] = {
+        clientId: 'client-1791564102599',
+        companyName: 'Vighnesh Kulkarni Property',
+        contactPerson: 'Vighnesh Kulkarni',
+        phone: '7391010883',
+        email: 'vighneshkulkarni897530@gmail.com',
+        address: 'Palm Beach Road, Sector 19, Vashi',
         city: 'Navi Mumbai',
         pincode: '400703',
-        gstin: '27AABCG9812L1Z4',
-        logo: 'https://images.unsplash.com/photo-1541888946425-d0fbb18086f6?w=150&auto=format&fit=crop&q=80',
-        registeredBuildings: ['Greenwood Heights CHS - Wing A & B'],
-        totalLifts: 4,
-      },
-      'client-2': {
-        clientId: 'client-2',
-        companyName: 'Apex Infrastructure & Tech Real Estate Ltd.',
-        contactPerson: 'Meera Nambiar (Facility Head)',
-        phone: '+91 98450 33445',
-        email: 'facility@techparkinfinity.com',
-        address: 'Tower B, MIDC Industrial Area, Airoli Knowledge Park',
-        city: 'Navi Mumbai',
-        pincode: '400708',
-        gstin: '27AAACA9876E1ZT',
-        logo: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=150&auto=format&fit=crop&q=80',
-        registeredBuildings: ['Apex Infotech Business Park'],
-        totalLifts: 6,
-      },
-      'client-priya': {
-        clientId: 'client-priya',
-        companyName: 'Sunrise Towers Housing Society',
-        contactPerson: 'Priya Sharma (Society Representative)',
-        phone: '+91 98200 12345',
-        email: 'priya.sharma@towers.com',
-        address: 'Sunrise Towers, Main Road, Andheri West',
-        city: 'Mumbai',
-        pincode: '400053',
-        gstin: '27AABCS5542K1Z9',
-        logo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-        registeredBuildings: ['Sunrise Towers - Wing A & B'],
+        gstin: '',
+        registeredBuildings: ['Vighnesh Kulkarni Heights'],
         totalLifts: 2,
-      },
-      'client-3': {
-        clientId: 'client-3',
-        companyName: 'CityCare Health Services Pvt. Ltd.',
-        contactPerson: 'Dr. Neha Joshi (Admin Director)',
-        phone: '+91 98205 33441',
-        email: 'admin@citycarehospital.in',
-        address: 'Hospital Complex, Near Teen Hath Naka, Thane West',
-        city: 'Thane',
-        pincode: '400602',
-        gstin: '27AABCC3321D1ZQ',
-        logo: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=150&auto=format&fit=crop&q=80',
-        registeredBuildings: ['CityCare Multispeciality Hospital Complex'],
-        totalLifts: 3,
-      },
-      'client-4': {
-        clientId: 'client-4',
-        companyName: 'Royal Palms Welfare Association',
-        contactPerson: 'Sunil Nair (Society Manager)',
-        phone: '+91 98190 22449',
-        email: 'manager@royalpalmsmumbai.org',
-        address: 'Aarey Milk Colony, Goregaon East',
-        city: 'Mumbai',
-        pincode: '400065',
-        gstin: '27AABCR9944M1Z2',
-        logo: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=150&auto=format&fit=crop&q=80',
-        registeredBuildings: ['Royal Palms Luxury Residency'],
-        totalLifts: 2,
-      },
-    });
+      };
+    }
+    return filtered;
   });
 
   useEffect(() => {
@@ -3986,6 +3948,115 @@ function mapServerServiceReport(sr: any): ServiceReport {
     return newBuilding;
   };
 
+  const addNewClient = async (clientData: {
+    name: string;
+    contactPerson?: string;
+    email?: string;
+    phone?: string;
+    societyName?: string;
+    address?: string;
+    initialLiftsCount?: number;
+    amcTier?: string;
+  }): Promise<{ client: ClientProfile; user: User; building: Building }> => {
+    const clientId = 'client-' + Date.now();
+    const userId = 'usr-client-' + Date.now();
+    const clientName = clientData.societyName || clientData.name;
+    const contactPerson = clientData.contactPerson || clientData.name;
+    const phone = clientData.phone || '+91 85959 40077';
+    const email = clientData.email || `client_${Date.now()}@wepsun.in`;
+    const initialLifts = Math.max(1, Number(clientData.initialLiftsCount) || 1);
+
+    // 1. Create client profile
+    const newProfile: ClientProfile = {
+      clientId,
+      companyName: clientName,
+      contactPerson,
+      phone,
+      email,
+      address: clientData.address || 'Site Address, Mumbai',
+      city: 'Mumbai',
+      pincode: '400001',
+      gstin: '',
+      registeredBuildings: [clientName],
+      totalLifts: initialLifts,
+    };
+
+    setClientProfiles((prev) => ({
+      ...prev,
+      [clientId]: newProfile,
+    }));
+
+    // 2. Create user with role 'client'
+    const newUser: User = {
+      id: userId,
+      companyId: activeCompanyId,
+      branchId: activeBranchId !== 'all' ? activeBranchId : 'br-mum-1',
+      name: contactPerson,
+      email,
+      phone,
+      role: 'client',
+      clientId,
+      companyName: clientName,
+      address: clientData.address || 'Site Address, Mumbai',
+      city: 'Mumbai',
+      pincode: '400001',
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+      isActive: true,
+    };
+
+    setUsers((prev) => {
+      const exists = prev.some((u) => (u.email && u.email.toLowerCase() === newUser.email.toLowerCase()) || u.id === newUser.id);
+      return exists ? prev : [newUser, ...prev];
+    });
+
+    // 3. Create associated building
+    const newBuilding = addNewBuilding({
+      clientId,
+      clientName,
+      name: clientName,
+      address: clientData.address || 'Site Address, Mumbai',
+      contactPerson,
+      contactPhone: phone,
+      totalLifts: initialLifts,
+    });
+
+    // 4. Create initial lifts
+    for (let i = 1; i <= initialLifts; i++) {
+      addNewLift({
+        clientId,
+        clientName,
+        buildingId: newBuilding.id,
+        buildingName: newBuilding.name,
+        liftNumber: `WPS-${clientId.slice(-4).toUpperCase()}-0${i}`,
+        locationDetails: `Wing ${String.fromCharCode(64 + i)} - Passenger Elevator`,
+      });
+    }
+
+    // 5. Cloud database persistence
+    apiService.createClient({
+      name: clientData.name,
+      contactPerson,
+      email,
+      phone,
+      societyName: clientName,
+      address: clientData.address,
+      initialLiftsCount: initialLifts,
+      amcTier: clientData.amcTier,
+    }).catch((err) => console.warn('[AppContext] Background createClient API sync:', err));
+
+    addAuditLog({
+      companyId: activeCompanyId,
+      entityType: 'Building',
+      entityId: clientId,
+      action: 'ADD_NEW_CLIENT',
+      performedBy: currentUser.name,
+      userRole: currentRole,
+      details: `Added new client "${clientName}" (${contactPerson}, ${phone}) with ${initialLifts} lift(s).`,
+    });
+
+    return { client: newProfile, user: newUser, building: newBuilding };
+  };
+
   const updateBuilding = (buildingId: string, buildingData: Partial<Building>) => {
     setBuildings((prev) =>
       prev.map((b) => (b.id === buildingId ? { ...b, ...buildingData } : b))
@@ -4361,6 +4432,7 @@ function mapServerServiceReport(sr: any): ServiceReport {
         addNewLift,
         updateLift,
         addNewBuilding,
+        addNewClient,
         updateBuilding,
         createAmcContract,
         renewAmcContract,

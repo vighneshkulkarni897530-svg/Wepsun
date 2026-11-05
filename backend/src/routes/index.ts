@@ -19,6 +19,7 @@ import auditRoutes from './audit.routes.js';
 import telemetryRoutes from './telemetry.routes.js';
 import webhooksRoutes from './webhooks.routes.js';
 import syncRoutes from './sync.routes.js';
+import clientsRoutes from './clients.routes.js';
 import { requireAuth, requireRole, AuthenticatedRequest } from '../middleware/auth.js';
 import { getEmailServiceHealth } from '../lib/emailOtpService.js';
 
@@ -48,6 +49,7 @@ router.use('/pm', pmRoutes);
 router.use('/payments', paymentsRoutes);
 router.use('/audit', auditRoutes);
 router.use('/telemetry', telemetryRoutes);
+router.use('/clients', clientsRoutes);
 
 // Admin Health & System Diagnostics (Protected RBAC)
 router.get('/admin/email/health', requireAuth, requireRole('SUPER_ADMIN', 'COMPANY_ADMIN', 'MASTER_ADMIN'), async (_req: AuthenticatedRequest, res: Response): Promise<void> => {

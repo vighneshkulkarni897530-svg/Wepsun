@@ -519,6 +519,14 @@ export const apiService = {
   getBranches: (options?: ApiRequestOptions) => apiFetch('/companies/branches', options),
   getBuildings: (options?: ApiRequestOptions) => apiFetch('/companies/buildings', options),
 
+  // Clients Management
+  getClients: (options?: ApiRequestOptions) => apiFetch('/clients', options),
+  getClientById: (id: string, options?: ApiRequestOptions) => apiFetch(`/clients/${id}`, options),
+  createClient: (payload: any, options?: ApiRequestOptions) =>
+    apiFetch('/clients', { method: 'POST', body: JSON.stringify(payload), ...options }),
+  updateClient: (id: string, payload: any, options?: ApiRequestOptions) =>
+    apiFetch(`/clients/${id}`, { method: 'PUT', body: JSON.stringify(payload), ...options }),
+
   // Lifts & Equipment Directory
   getLifts: (options?: ApiRequestOptions) => apiFetch('/lifts', options),
   getLiftById: (id: string, options?: ApiRequestOptions) => apiFetch(`/lifts/${id}`, options),

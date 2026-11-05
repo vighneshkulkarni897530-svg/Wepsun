@@ -57,93 +57,21 @@ export const AdminBuildingsView: React.FC<AdminBuildingsViewProps> = ({ onNaviga
 
   // Combined Live Buildings List
   const allBuildingsList = useMemo(() => {
-    const staticDefaults = [
-      {
-        id: 'bld-skyline',
-        name: 'Skyline Towers (Wing A & B)',
-        address: 'Plot 42, Sector 19, Vashi, Navi Mumbai, MH - 400703',
-        client: 'Skyline Heights CHS (Mr. Arvind Joshi)',
-        numberOfLifts: 4,
-        amcStatus: 'Comprehensive (Active 🟢)',
-        serviceStatus: 'All Operational',
-        zone: 'Navi Mumbai Zone',
-        lastInspection: '12 Sep 2026',
-        nextPM: '15 Oct 2026',
-      },
-      {
-        id: 'bld-sunrise',
-        name: 'Sunrise Apartments (Tower 1-3)',
-        address: 'Road No. 12, Baner, Pune, MH - 411045',
-        client: 'Sunrise Heights Society (Mrs. Sunita Rao)',
-        numberOfLifts: 6,
-        amcStatus: 'Semi-Comprehensive (Active 🟢)',
-        serviceStatus: '1 Lift in Inspection',
-        zone: 'Pune West Hub',
-        lastInspection: '08 Sep 2026',
-        nextPM: '20 Oct 2026',
-      },
-      {
-        id: 'bld-royal',
-        name: 'Royal Residency',
-        address: 'Hinjewadi Phase 1, Near Infosys Circle, Pune, MH - 411057',
-        client: 'Royal Residency Phase II (Dr. Rajesh Patil)',
-        numberOfLifts: 3,
-        amcStatus: 'Comprehensive (Active 🟢)',
-        serviceStatus: 'All Operational',
-        zone: 'Pune Tech Zone',
-        lastInspection: '14 Sep 2026',
-        nextPM: '28 Oct 2026',
-      },
-      {
-        id: 'bld-galaxy',
-        name: 'Galaxy Heights Commercial Complex',
-        address: 'S.V. Road, Near Andheri Station, Mumbai, MH - 400058',
-        client: 'Galaxy Commercial Complex (Mr. Deepak Mehta)',
-        numberOfLifts: 5,
-        amcStatus: 'Non-Comprehensive (Expiring Soon 🟡)',
-        serviceStatus: 'All Operational',
-        zone: 'Mumbai Western Suburbs',
-        lastInspection: '01 Sep 2026',
-        nextPM: '18 Oct 2026',
-      },
-      {
-        id: 'bld-greenvalley',
-        name: 'Green Valley Towers',
-        address: 'Near ITPL, Whitefield, Bengaluru, KA - 560066',
-        client: 'Green Valley Cooperative Housing (Mr. Vikram Singhania)',
-        numberOfLifts: 2,
-        amcStatus: 'Comprehensive (Active 🟢)',
-        serviceStatus: 'All Operational',
-        zone: 'Bengaluru East',
-        lastInspection: '10 Sep 2026',
-        nextPM: '12 Nov 2026',
-      },
-    ];
-
-    const dynamicMapped = (tenantBuildings || buildings || []).map((b) => {
+    return (tenantBuildings || buildings || []).map((b) => {
       const bLifts = lifts.filter((l) => l.buildingId === b.id);
       return {
         id: b.id,
         name: b.name,
-        address: b.address + (b.city ? `, ${b.city}` : ''),
+        address: b.address + (b.city ? ', ' + b.city : ''),
         client: b.clientName || b.contactPerson || 'Registered Client',
         numberOfLifts: bLifts.length || b.totalLifts || 1,
         amcStatus: 'Comprehensive (Active 🟢)',
         serviceStatus: 'All Operational',
-        zone: b.city ? `${b.city} Operations Hub` : 'Regional Operations Hub',
+        zone: b.city ? b.city + ' Operations Hub' : 'Regional Operations Hub',
         lastInspection: '14 Sep 2026',
         nextPM: '15 Oct 2026',
       };
     });
-
-    const combined = [...dynamicMapped];
-    staticDefaults.forEach((s) => {
-      if (!combined.some((c) => c.name.toLowerCase() === s.name.toLowerCase() || c.id === s.id)) {
-        combined.push(s);
-      }
-    });
-
-    return combined;
   }, [buildings, tenantBuildings, lifts]);
 
   const filteredBuildings = allBuildingsList.filter(

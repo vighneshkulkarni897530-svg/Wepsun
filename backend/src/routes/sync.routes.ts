@@ -78,6 +78,7 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response): P
       feedbackResult,
       auditResult,
       notificationsResult,
+      clientsResult,
     ] = await Promise.allSettled([
       // Buildings
       prisma.building.findMany({
@@ -238,6 +239,20 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response): P
         orderBy: { createdAt: 'desc' },
         take: 30,
       }).catch(() => db.notifications || []),
+
+      // Clients (Admin & Service Managers)
+      isAdmin
+        ? prisma.client.findMany({
+            where: { companyId },
+            include: {
+              users: { select: { id: true, name: true, email: true, phone: true, role: true, avatarUrl: true } },
+              buildings: { include: { lifts: true } },
+              lifts: true,
+              amcContracts: true,
+            },
+            orderBy: { createdAt: 'desc' },
+          }).catch(() => (db as any).clients || [])
+        : Promise.resolve([]),
     ]);
 
     const durationMs = Date.now() - startTime;
@@ -259,6 +274,7 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response): P
       feedbacks: feedbackResult.status === 'fulfilled' ? feedbackResult.value : [],
       auditLogs: auditResult.status === 'fulfilled' ? auditResult.value : [],
       notifications: notificationsResult.status === 'fulfilled' ? notificationsResult.value : [],
+      clients: clientsResult.status === 'fulfilled' ? clientsResult.value : [],
     };
 
     serverCache.set(cacheKey, payloadData, 10000);
