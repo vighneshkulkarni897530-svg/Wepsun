@@ -280,6 +280,10 @@ if (typeof window !== 'undefined') {
 
 const STORAGE_PREFIX = 'wepsun_lift_saas_v2_';
 
+const complaintSyncChannel = typeof window !== 'undefined' && typeof BroadcastChannel !== 'undefined'
+  ? new BroadcastChannel('wepsun_complaint_realtime_channel')
+  : null;
+
 function safeStorageParse<T>(key: string, fallback: T): T {
   try {
     const saved = localStorage.getItem(key);
@@ -810,6 +814,8 @@ function mapServerServiceReport(sr: any): ServiceReport {
       setSyncStatus('error');
     }
   }, [activeCompanyId, activeBranchId, currentRole]);
+
+
 
   // Real-time network change listener & automatic sync on reconnect, focus, visibility & interval
   useEffect(() => {
@@ -1410,6 +1416,91 @@ function mapServerServiceReport(sr: any): ServiceReport {
   const removeToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
+
+  // Real-time Complaint Multi-Channel Synchronization (BroadcastChannel, Storage Events & SSE Stream)
+  useEffect(() => {
+    const handleBroadcast = (ev: MessageEvent) => {
+      try {
+        const { type, data } = ev.data || {};
+        if (type === 'COMPLAINT_CREATED' && data) {
+          setComplaints((prev) => {
+            if (prev.some((c) => c.id === data.id || c.ticketNumber === data.ticketNumber)) return prev;
+            return [data, ...prev];
+          });
+          const adminRoles = ['company_admin', 'master_admin', 'super_admin', 'service_manager'];
+          if (adminRoles.includes(currentRole)) {
+            if (data.isEmergency || data.priority === 'critical') {
+              playNotificationSound('urgent');
+              triggerHaptic('heavy');
+              showToast('emergency', '🚨 Emergency SOS Dispatched!', `Ticket #${data.ticketNumber} at ${data.buildingName}`);
+            } else {
+              playNotificationSound('standard');
+              triggerHaptic('light');
+              showToast('info', 'New Breakdown Ticket Logged', `Ticket #${data.ticketNumber} from ${data.clientName}`);
+            }
+          }
+        } else if (type === 'COMPLAINT_UPDATED' && data) {
+          setComplaints((prev) =>
+            prev.map((c) => (c.id === data.id || c.ticketNumber === data.ticketNumber ? { ...c, ...data } : c))
+          );
+        }
+      } catch {}
+    };
+
+    if (complaintSyncChannel) {
+      complaintSyncChannel.addEventListener('message', handleBroadcast);
+    }
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === STORAGE_PREFIX + 'complaints' && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (Array.isArray(parsed)) {
+            setComplaints(parsed);
+          }
+        } catch {}
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+
+    const unsubscribeSSE = apiService.subscribeComplaintStream((event: any) => {
+      try {
+        if (event.type === 'COMPLAINT_CREATED' && event.data) {
+          const mapped = mapServerComplaint(event.data);
+          setComplaints((prev) => {
+            if (prev.some((c) => c.id === mapped.id || c.ticketNumber === mapped.ticketNumber)) return prev;
+            return [mapped, ...prev];
+          });
+          const adminRoles = ['company_admin', 'master_admin', 'super_admin', 'service_manager'];
+          if (adminRoles.includes(currentRole)) {
+            if (mapped.isEmergency || mapped.priority === 'critical') {
+              playNotificationSound('urgent');
+              triggerHaptic('heavy');
+              showToast('emergency', '🚨 Emergency SOS Dispatched!', `Ticket #${mapped.ticketNumber} at ${mapped.buildingName}`);
+            } else {
+              playNotificationSound('standard');
+              triggerHaptic('light');
+              showToast('info', 'New Breakdown Ticket Logged', `Ticket #${mapped.ticketNumber} from ${mapped.clientName}`);
+            }
+          }
+        } else if (event.type === 'COMPLAINT_UPDATED' && event.data) {
+          const mapped = mapServerComplaint(event.data);
+          setComplaints((prev) =>
+            prev.map((c) => (c.id === mapped.id || c.ticketNumber === mapped.ticketNumber ? { ...c, ...mapped } : c))
+          );
+        }
+      } catch {}
+    });
+
+    return () => {
+      if (complaintSyncChannel) {
+        complaintSyncChannel.removeEventListener('message', handleBroadcast);
+      }
+      window.removeEventListener('storage', handleStorage);
+      unsubscribeSSE?.();
+    };
+  }, [currentRole, showToast]);
+
 
   // Google OAuth Deep Link & Web postMessage Listener
   const loginAsUserRef = useRef(loginAsUser);
@@ -2644,6 +2735,9 @@ function mapServerServiceReport(sr: any): ServiceReport {
 
     const payload = {
       liftId: complaintData.liftId,
+      liftNumber,
+      buildingId,
+      buildingName,
       branchId,
       issueType,
       title,
@@ -2651,6 +2745,9 @@ function mapServerServiceReport(sr: any): ServiceReport {
       priority,
       isEmergency,
       clientId,
+      clientName,
+      clientPhone,
+      clientEmail,
       beforePhotos: Array.isArray(complaintData.beforePhotos) ? complaintData.beforePhotos : [],
       afterPhotos: [],
     };
@@ -2722,6 +2819,11 @@ function mapServerServiceReport(sr: any): ServiceReport {
       ...prev.filter((c) => c.id !== savedComplaint.id && c.ticketNumber !== savedComplaint.ticketNumber),
     ]);
 
+    complaintSyncChannel?.postMessage({
+      type: 'COMPLAINT_CREATED',
+      data: savedComplaint,
+    });
+
     if (complaintData.liftId) {
       setLifts((prev) =>
         prev.map((lift) =>
@@ -2779,9 +2881,9 @@ function mapServerServiceReport(sr: any): ServiceReport {
               actorRole: currentRole,
             },
           ];
-          return {
+          const updatedComp = {
             ...c,
-            status: 'assigned',
+            status: 'assigned' as ComplaintStatus,
             assignedTechnicianId: tech.id,
             assignedTechnicianName: tech.name,
             technicianPhone: tech.phone,
@@ -2790,6 +2892,11 @@ function mapServerServiceReport(sr: any): ServiceReport {
             assignedAt: new Date().toISOString(),
             timeline: updatedTimeline,
           };
+          complaintSyncChannel?.postMessage({
+            type: 'COMPLAINT_UPDATED',
+            data: updatedComp,
+          });
+          return updatedComp;
         }
         return c;
       })
@@ -2854,7 +2961,12 @@ function mapServerServiceReport(sr: any): ServiceReport {
               actorRole: currentRole,
             },
           ];
-          return { ...c, status, ...extra, timeline: updatedTimeline };
+          const updatedComp = { ...c, status, ...extra, timeline: updatedTimeline };
+          complaintSyncChannel?.postMessage({
+            type: 'COMPLAINT_UPDATED',
+            data: updatedComp,
+          });
+          return updatedComp;
         }
         return c;
       })

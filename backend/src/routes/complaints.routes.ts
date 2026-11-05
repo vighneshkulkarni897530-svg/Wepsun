@@ -2,6 +2,11 @@ import { Router, Response } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { db } from '../data/mockDb.js';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
+import { serverCache } from '../lib/cache.js';
+import { EventEmitter } from 'events';
+
+export const complaintEvents = new EventEmitter();
+complaintEvents.setMaxListeners(200);
 
 const router = Router();
 
@@ -31,13 +36,16 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response) =>
       return;
     }
 
+    const isAdmin = ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MASTER_ADMIN', 'SERVICE_MANAGER'].includes(userRole);
+    const branchFilter = req.query.branchId && req.query.branchId !== 'all' ? (req.query.branchId as string) : (isAdmin ? undefined : req.branchId);
+
     let list: any[] = [];
 
     try {
       list = await prisma.complaint.findMany({
         where: {
           companyId,
-          ...(req.branchId ? { branchId: req.branchId } : {}),
+          ...(branchFilter ? { branchId: branchFilter } : {}),
           ...(req.query.status ? { status: req.query.status as any } : {}),
           ...(req.query.liftId ? { liftId: req.query.liftId as string } : {}),
           ...(isClient
@@ -67,8 +75,8 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response) =>
       });
     } catch {
       list = db.complaints.filter((c) => c.companyId === companyId);
-      if (req.branchId) {
-        list = list.filter((c) => c.branchId === req.branchId);
+      if (branchFilter) {
+        list = list.filter((c) => c.branchId === branchFilter);
       }
       if (isClient) {
         const clientLiftIds = new Set(
@@ -90,6 +98,46 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response) =>
   } catch (err: any) {
     res.status(500).json({ success: false, message: err?.message || 'Failed to fetch complaints', code: 'DB_ERROR' });
   }
+});
+
+
+// GET /api/complaints/stream — Real-time Server-Sent Events (SSE) stream for instant synchronization
+router.get('/stream', (req: any, res: Response) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.flushHeaders?.();
+
+  res.write(`data: ${JSON.stringify({ type: 'CONNECTED', timestamp: Date.now() })}\n\n`);
+
+  const onCreated = (comp: any) => {
+    try {
+      res.write(`data: ${JSON.stringify({ type: 'COMPLAINT_CREATED', data: comp })}\n\n`);
+    } catch {}
+  };
+
+  const onUpdated = (comp: any) => {
+    try {
+      res.write(`data: ${JSON.stringify({ type: 'COMPLAINT_UPDATED', data: comp })}\n\n`);
+    } catch {}
+  };
+
+  complaintEvents.on('complaint_created', onCreated);
+  complaintEvents.on('complaint_updated', onUpdated);
+
+  const heartbeat = setInterval(() => {
+    try {
+      res.write(': keep-alive\n\n');
+    } catch {}
+  }, 20000);
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    complaintEvents.off('complaint_created', onCreated);
+    complaintEvents.off('complaint_updated', onUpdated);
+    res.end();
+  });
 });
 
 // GET /api/complaints/:id — Get complaint by ID with strict ownership verification
@@ -178,12 +226,20 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): 
     const currentUserId = user.userId || user.sub;
     let {
       liftId,
+      liftNumber,
+      buildingId,
+      buildingName,
       branchId,
+      clientId,
+      clientName,
+      clientPhone,
+      clientEmail,
       issueType,
       title,
       description,
       priority,
       isEmergency,
+      beforePhotos,
       assignedTechnicianId,
     } = req.body;
 
@@ -436,6 +492,9 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): 
           }
         }
 
+        serverCache.del('sync_');
+        serverCache.del('complaints_');
+        complaintEvents.emit('complaint_created', comp);
         return comp;
       });
     } catch {
@@ -445,7 +504,13 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): 
         companyId,
         branchId: effectiveBranchId,
         liftId,
+        liftNumber: liftNumber || ownedLift?.liftNumber || ownedLift?.permanentLiftId || 'LIFT-01',
+        buildingId: buildingId || ownedLift?.buildingId || '',
+        buildingName: buildingName || ownedLift?.buildingName || 'Building Complex',
         clientId: effectiveClientId,
+        clientName: clientName || (ownedLift as any)?.clientName || user.name || 'Valued Society',
+        clientPhone: clientPhone || (ownedLift as any)?.clientPhone || (user as any).phone || '+91 85959 40077',
+        clientEmail: clientEmail || user.email || '',
         createdById: currentUserId,
         ticketNumber,
         issueType: normalizedIssueType,
@@ -453,10 +518,26 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): 
         description,
         priority: normalizedPriority,
         isEmergency: Boolean(isEmergency),
+        beforePhotos: Array.isArray(beforePhotos) ? beforePhotos : [],
+        afterPhotos: [],
         status: effectiveTechId ? 'assigned' : 'pending',
         reportedAt: new Date().toISOString(),
+        timeline: [
+          {
+            id: `tl-${Date.now()}`,
+            status: effectiveTechId ? 'assigned' : 'pending',
+            title: isEmergency ? 'EMERGENCY SOS REGISTERED' : 'Complaint Registered',
+            description,
+            timestamp: new Date().toISOString(),
+            actorName: user.name || 'Client',
+            actorRole: user.role || 'client',
+          }
+        ]
       };
       db.complaints.unshift(created);
+      serverCache.del('sync_');
+      serverCache.del('complaints_');
+      complaintEvents.emit('complaint_created', created);
     }
 
     res.status(201).json({ success: true, data: created });
@@ -477,7 +558,9 @@ router.patch('/:id', requireAuth, async (req: AuthenticatedRequest, res: Respons
     const id = req.params.id as string;
     const userRole = (user.role || '').toUpperCase();
     const currentUserId = user.userId || user.sub;
-    const { status, assignedTechnicianId, diagnosisRemarks, actionTaken, clientRating, clientFeedback, clientSignature } = req.body;
+    const { status, assignedTechnicianId, priority, diagnosisRemarks, actionTaken, clientRating, clientFeedback, clientSignature } = req.body;
+    const validPrioritiesPatch: Record<string, string> = { critical: 'CRITICAL', high: 'HIGH', normal: 'NORMAL', medium: 'NORMAL', low: 'LOW' };
+    const normalizedPriorityPatch = priority ? (validPrioritiesPatch[String(priority).toLowerCase()] || String(priority).toUpperCase()) as any : undefined;
 
     const validStatuses: Record<string, string> = {
       new: 'NEW',
@@ -556,6 +639,7 @@ router.patch('/:id', requireAuth, async (req: AuthenticatedRequest, res: Respons
           where: { id, companyId },
           data: {
             ...(normalizedStatus ? { status: normalizedStatus } : {}),
+            ...(normalizedPriorityPatch ? { priority: normalizedPriorityPatch } : {}),
             ...(userRole !== 'TECHNICIAN' && assignedTechnicianId ? { assignedTechnicianId, assignedAt: new Date() } : {}),
             ...(diagnosisRemarks ? { diagnosisRemarks } : {}),
             ...(actionTaken ? { actionTaken } : {}),

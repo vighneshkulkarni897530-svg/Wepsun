@@ -540,6 +540,23 @@ export const apiService = {
     apiFetch(`/complaints/${id}`, { method: 'PATCH', body: JSON.stringify(payload), ...options }),
   assignTechnician: (id: string, assignedTechnicianId: string, options?: ApiRequestOptions) =>
     apiFetch(`/complaints/${id}`, { method: 'PATCH', body: JSON.stringify({ assignedTechnicianId, status: 'ASSIGNED' }), ...options }),
+  subscribeComplaintStream: (onEvent: (event: any) => void) => {
+    if (typeof window === 'undefined' || typeof EventSource === 'undefined') return () => {};
+    try {
+      const baseUrl = getApiBaseUrl();
+      const streamUrl = baseUrl.endsWith('/api') ? `${baseUrl}/complaints/stream` : `${baseUrl}/api/complaints/stream`;
+      const es = new EventSource(streamUrl);
+      es.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          onEvent(data);
+        } catch {}
+      };
+      return () => es.close();
+    } catch {
+      return () => {};
+    }
+  },
 
   // Work Orders
   getWorkOrders: (options?: ApiRequestOptions) => apiFetch('/work-orders', options),
