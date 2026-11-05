@@ -932,10 +932,14 @@ export const AppContent: React.FC = () => {
                 </div>
               </div>
               <div className="flex items-center gap-3 sm:gap-4 text-[11px] font-mono flex-wrap justify-center sm:justify-end">
-                <span className="flex items-center gap-1.5 text-slate-600">
+                <a
+                  href="tel:+918595940077"
+                  className="flex items-center gap-1.5 text-slate-600 hover:text-[#1976D2] font-bold transition-colors cursor-pointer"
+                  title="Direct 24x7 Control Room Hotline"
+                >
                   <PhoneCall className="w-3.5 h-3.5 text-[#1976D2]" />
-                  24x7 Control Room: +91 85959 40077
-                </span>
+                  <span>24x7 Control Room: +91 85959 40077</span>
+                </a>
                 <span className="text-slate-300 hidden sm:inline">•</span>
                 <span className="capitalize">{currentRole.replace('_', ' ')} Dashboard</span>
               </div>
