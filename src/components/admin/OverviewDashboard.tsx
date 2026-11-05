@@ -248,6 +248,16 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
   ).length;
   const resolvedCount = tenantComplaints.filter((c) => c.status === 'resolved' || c.status === 'closed').length;
 
+  const activeEmergencies = useMemo(() => {
+    return tenantComplaints.filter(
+      (c) => (c.isEmergency || c.priority === 'critical') && c.status !== 'resolved' && c.status !== 'closed'
+    );
+  }, [tenantComplaints]);
+
+  const trappedPassengersTotal = useMemo(() => {
+    return activeEmergencies.reduce((acc, c) => acc + (c.trappedPassengerCount || 0), 0);
+  }, [activeEmergencies]);
+
   const openPct = totalComplaints > 0 ? Math.round((openCount / totalComplaints) * 100) : 0;
   const inProgressPct = totalComplaints > 0 ? Math.round((inProgressCount / totalComplaints) * 100) : 0;
   const resolvedPct = totalComplaints > 0 ? Math.max(0, 100 - openPct - inProgressPct) : 0;
@@ -410,6 +420,43 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
 
   return (
     <div className="w-full space-y-6 text-slate-800">
+      {/* CRITICAL ACTIVE EMERGENCY BREAKDOWN ALERT BANNER (Section 3 & 5) */}
+      {activeEmergencies.length > 0 && (
+        <div className="bg-red-50 border-2 border-red-500 rounded-3xl p-4 sm:p-5 shadow-lg shadow-red-500/10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-in slide-in-from-top-3 duration-300">
+          <div className="flex items-start sm:items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-red-600/30">
+              <AlertTriangle className="w-6 h-6 animate-bounce" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-black text-sm sm:text-base text-red-950 flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-ping" />
+                  🚨 CRITICAL EMERGENCY BREAKDOWN ACTIVE ({activeEmergencies.length} Active Ticket{activeEmergencies.length > 1 ? 's' : ''})
+                </span>
+                {trappedPassengersTotal > 0 && (
+                  <span className="font-mono font-bold text-xs bg-red-600 text-white px-2.5 py-0.5 rounded-full animate-pulse">
+                    ⚠️ {trappedPassengersTotal} PASSENGER(S) TRAPPED
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-red-800 mt-1">
+                Latest: <strong>{activeEmergencies[0]?.title}</strong> at {activeEmergencies[0]?.buildingName} ({activeEmergencies[0]?.liftNumber})
+                • Status: <span className="uppercase font-bold">{activeEmergencies[0]?.status.replace('_', ' ')}</span>
+                {activeEmergencies[0]?.assignedTechnicianName ? ` • Tech: ${activeEmergencies[0].assignedTechnicianName}` : ' • ⚠️ Unassigned'}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => onNavigateTab('complaints')}
+            className="w-full md:w-auto px-5 py-3 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-black text-xs sm:text-sm shadow-md shadow-red-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 shrink-0"
+          >
+            <span>Open Emergency Queue Now</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
       {/* 2-COLUMN GRID (Left 8 Cols, Right 4 Cols) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* LEFT MAIN COLUMN (8 Cols) */}

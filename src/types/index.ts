@@ -235,6 +235,14 @@ export interface Complaint {
   partsReplaced: PartReplaced[];
   beforePhotos: string[];
   afterPhotos: string[];
+  emergencyType?: string;
+  trappedPassengerCount?: number;
+  currentLocation?: string;
+  arrivedAt?: string;
+  resolvedAt?: string;
+  resolutionReport?: string;
+  passengerRescueConfirmed?: boolean;
+  safetyNoticeAcknowledged?: boolean;
   clientSignature?: string;
   technicianSignature?: string;
   clientOtp?: string;

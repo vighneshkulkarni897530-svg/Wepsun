@@ -241,6 +241,10 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): 
       isEmergency,
       beforePhotos,
       assignedTechnicianId,
+      emergencyType,
+      trappedPassengerCount,
+      currentLocation,
+      safetyNoticeAcknowledged,
     } = req.body;
 
     if (!liftId || !title || !description) {
@@ -394,7 +398,7 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): 
       }
     }
 
-    const ticketNumber = `TKT-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+    const ticketNumber = req.body.ticketNumber || (isEmergency ? `EMG-2026-${Math.floor(1000 + Math.random() * 9000)}` : `TKT-2026-${Math.floor(1000 + Math.random() * 9000)}`);
     const effectiveBranchId = branchId || user.branchId || 'br-mum-1';
     const effectiveClientId = userRole === 'CLIENT' ? user.clientId : req.body.clientId || null;
     // Clients cannot self-assign technicians; only admins and managers can
@@ -518,6 +522,10 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): 
         description,
         priority: normalizedPriority,
         isEmergency: Boolean(isEmergency),
+        emergencyType: emergencyType || (isEmergency ? 'Emergency Breakdown' : undefined),
+        trappedPassengerCount: trappedPassengerCount !== undefined ? Number(trappedPassengerCount) : undefined,
+        currentLocation: currentLocation || '',
+        safetyNoticeAcknowledged: Boolean(safetyNoticeAcknowledged),
         beforePhotos: Array.isArray(beforePhotos) ? beforePhotos : [],
         afterPhotos: [],
         status: effectiveTechId ? 'assigned' : 'pending',
@@ -761,13 +769,51 @@ router.patch('/:id', requireAuth, async (req: AuthenticatedRequest, res: Respons
       // Fallback
     }
 
-    const idx = db.complaints.findIndex((c) => c.id === id && c.companyId === companyId);
+    const idx = db.complaints.findIndex((c) => (c.id === id || c.ticketNumber === id) && c.companyId === companyId);
     if (idx !== -1) {
-      db.complaints[idx] = { ...db.complaints[idx], ...req.body };
-      res.json({ success: true, data: db.complaints[idx] });
+      const existingRecord = db.complaints[idx];
+      const normalizedStatusStr = normalizedStatus ? String(normalizedStatus).toLowerCase() : (req.body.status ? String(req.body.status).toLowerCase() : existingRecord.status);
+      const updated = {
+        ...existingRecord,
+        ...req.body,
+        status: normalizedStatusStr,
+        priority: req.body.priority || existingRecord.priority,
+        assignedTechnicianId: req.body.assignedTechnicianId || existingRecord.assignedTechnicianId,
+        assignedTechnicianName: req.body.assignedTechnicianName || existingRecord.assignedTechnicianName,
+        technicianPhone: req.body.technicianPhone || existingRecord.technicianPhone,
+        technicianEta: req.body.technicianEta || existingRecord.technicianEta,
+        assignedAt: req.body.assignedAt || (req.body.assignedTechnicianId && !existingRecord.assignedAt ? new Date().toISOString() : existingRecord.assignedAt),
+        arrivedAt: req.body.arrivedAt || (normalizedStatusStr === 'inspection_repair' && !existingRecord.arrivedAt ? new Date().toISOString() : existingRecord.arrivedAt),
+        resolvedAt: req.body.resolvedAt || (normalizedStatusStr === 'resolved' && !existingRecord.resolvedAt ? new Date().toISOString() : existingRecord.resolvedAt),
+        closedAt: req.body.closedAt || (normalizedStatusStr === 'closed' && !existingRecord.closedAt ? new Date().toISOString() : existingRecord.closedAt),
+        diagnosisRemarks: req.body.diagnosisRemarks || existingRecord.diagnosisRemarks,
+        actionTaken: req.body.actionTaken || existingRecord.actionTaken,
+        resolutionReport: req.body.resolutionReport || existingRecord.resolutionReport,
+        passengerRescueConfirmed: req.body.passengerRescueConfirmed !== undefined ? req.body.passengerRescueConfirmed : existingRecord.passengerRescueConfirmed,
+      };
+
+      if (req.body.status && req.body.status !== existingRecord.status) {
+        updated.timeline = [
+          ...(existingRecord.timeline || []),
+          {
+            id: `tl-${Date.now()}`,
+            status: normalizedStatusStr,
+            title: `Status: ${normalizedStatusStr.toUpperCase()}`,
+            description: req.body.actionTaken || req.body.diagnosisRemarks || req.body.resolutionReport || `Status changed to ${normalizedStatusStr}`,
+            timestamp: new Date().toISOString(),
+            actorName: user.name || user.email || 'Service Desk',
+            actorRole: userRole.toLowerCase(),
+          }
+        ];
+      }
+
+      db.complaints[idx] = updated;
+      serverCache.del('sync_');
+      serverCache.del('complaints_');
+      complaintEvents.emit('complaint_updated', updated);
+      res.json({ success: true, data: updated });
       return;
     }
-
     res.json({ success: true, data: existing });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err?.message || 'Failed to update complaint', code: 'UPDATE_ERROR' });

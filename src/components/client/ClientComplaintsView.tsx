@@ -19,10 +19,14 @@ import {
   ExternalLink,
   ChevronRight,
   ShieldAlert,
+  FileDown,
+  Users,
+  LifeBuoy,
 } from 'lucide-react';
 import { Complaint, ComplaintStatus, ServiceReport } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { ServiceReportModal } from '../common/ServiceReportModal';
+import { downloadEmergencyServiceReportPdf } from '../../services/pdfGenerator';
 
 interface ClientComplaintsViewProps {
   complaints: Complaint[];
@@ -305,6 +309,52 @@ export const ClientComplaintsView: React.FC<ClientComplaintsViewProps> = ({
                 {/* Expanded Details Body */}
                 {isExpanded && (
                   <div className="p-5 sm:p-6 border-t border-slate-100 space-y-6 bg-slate-50/40">
+                    {/* Emergency Breakdown Priority Banner */}
+                    {(complaint.isEmergency || complaint.priority === 'critical') && (
+                      <div className="bg-red-50 border-2 border-red-500 rounded-2xl p-4 text-xs space-y-2.5 shadow-sm">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <ShieldAlert className="w-5 h-5 text-red-600 animate-pulse shrink-0" />
+                            <span className="font-black uppercase tracking-wider text-red-700 font-mono text-sm">
+                              🚨 PRIORITY EMERGENCY BREAKDOWN: {complaint.emergencyType || 'Lift Failure'}
+                            </span>
+                          </div>
+                          <a
+                            href="tel:+918595940077"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-xs transition-colors"
+                          >
+                            <LifeBuoy className="w-3.5 h-3.5 text-white" />
+                            <span>24x7 Control Room: +91 85959 40077</span>
+                          </a>
+                        </div>
+
+                        {Boolean(complaint.trappedPassengerCount && complaint.trappedPassengerCount > 0) && (
+                          <div className="flex items-center gap-2 bg-red-100/90 text-red-900 px-3 py-2 rounded-xl font-bold border border-red-300">
+                            <Users className="w-4 h-4 text-red-700 shrink-0" />
+                            <span>CRITICAL: {complaint.trappedPassengerCount} Passenger(s) Trapped Inside Lift Cabin</span>
+                          </div>
+                        )}
+
+                        {complaint.currentLocation && (
+                          <div className="text-[11px] text-slate-700">
+                            <strong>Specific Location / Floor:</strong> {complaint.currentLocation}
+                          </div>
+                        )}
+
+                        {(complaint.status === 'resolved' || complaint.status === 'closed') && (
+                          <div className="pt-2 border-t border-red-200 flex justify-end">
+                            <button
+                              onClick={() => downloadEmergencyServiceReportPdf(complaint)}
+                              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-red-700 hover:bg-red-800 text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
+                            >
+                              <FileDown className="w-3.5 h-3.5 text-red-200" />
+                              <span>Download Emergency Service Report (PDF)</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Problem Description & Details */}
                     <div className="bg-white border border-slate-200 rounded-2xl p-4 text-xs space-y-2">
                       <div className="flex items-center justify-between text-slate-500">

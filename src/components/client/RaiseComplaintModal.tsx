@@ -24,6 +24,16 @@ import {
 import { useApp } from '../../context/AppContext';
 import { IssueType, ComplaintPriority, Lift } from '../../types';
 
+export const EMERGENCY_CATEGORIES = [
+  'Passenger Trapped Inside Lift',
+  'Lift Stuck Between Floors',
+  'Lift Not Operating',
+  'Door Not Opening',
+  'Electrical Failure',
+  'Sudden Lift Shutdown',
+  'Other Emergency',
+] as const;
+
 export interface RaiseComplaintModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -235,6 +245,9 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
   const [photos, setPhotos] = useState<string[]>([]);
 
   // Emergency mode fields (Page 6)
+  const [emergencyType, setEmergencyType] = useState<string>('Passenger Trapped Inside Lift');
+  const [trappedPassengers, setTrappedPassengers] = useState<number>(1);
+  const [emergencyFloorLocation, setEmergencyFloorLocation] = useState<string>('Between 3rd & 4th Floor');
   const [emergencyBuilding, setEmergencyBuilding] = useState('');
   const [emergencyContact, setEmergencyContact] = useState('+91 85959 40077');
   const [emergencyDesc, setEmergencyDesc] = useState('Lift stopped abruptly between floors. Passenger trapped inside.');
@@ -1027,20 +1040,117 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
             {/* PAGE 6: EMERGENCY BREAKDOWN (VISUALLY DIFFERENT / RED THEME) */}
             {modalMode === 'emergency' && (
               <form onSubmit={handleEmergencySubmit} className="space-y-4 text-xs">
-                {/* 1. Select Lift */}
+                {/* 1. Emergency Category Selector */}
                 <div>
-                  <label className="block text-slate-700 font-bold mb-1">Select Lift</label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-red-950 font-bold">
+                      Emergency Category <span className="text-red-500">*</span>
+                    </label>
+                    <span className="text-[10px] font-mono text-red-600 font-bold uppercase tracking-wide bg-red-100 px-2 py-0.5 rounded-full">
+                      ● HIGHEST PRIORITY
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {EMERGENCY_CATEGORIES.map((cat) => {
+                      const isSelected = emergencyType === cat;
+                      const isTrapped = cat === 'Passenger Trapped Inside Lift';
+                      return (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => {
+                            setEmergencyType(cat);
+                            if (isTrapped) {
+                              setEmergencyDesc('Lift stopped abruptly between floors. Passenger trapped inside cabin.');
+                            } else if (cat === 'Door Not Opening') {
+                              setEmergencyDesc('Lift arrived at floor but landing and car doors are jammed shut.');
+                            } else if (cat === 'Electrical Failure') {
+                              setEmergencyDesc('Complete power outage / blackout inside lift shaft and car.');
+                            } else {
+                              setEmergencyDesc(`Emergency Breakdown: ${cat}`);
+                            }
+                          }}
+                          className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer flex items-center justify-between ${
+                            isSelected
+                              ? 'bg-red-600 text-white border-red-700 shadow-md shadow-red-600/25 ring-2 ring-red-400 font-bold'
+                              : 'bg-red-50/70 hover:bg-red-100/80 border-red-200 text-red-950 font-medium'
+                          }`}
+                        >
+                          <span className="truncate pr-1">{cat}</span>
+                          {isTrapped && (
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-black shrink-0 ${
+                              isSelected ? 'bg-white text-red-700' : 'bg-red-200 text-red-800'
+                            }`}>
+                              SOS
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 2. Trapped Passengers Count & Safety Instruction Banner */}
+                {emergencyType === 'Passenger Trapped Inside Lift' && (
+                  <div className="space-y-3 p-3.5 bg-red-50 border-2 border-red-300 rounded-2xl animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="block text-red-950 font-bold text-xs">
+                          Number of Trapped Passengers
+                        </label>
+                        <span className="text-[11px] text-red-700">Select estimated headcount in cabin</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 bg-white border border-red-300 rounded-xl p-1 shadow-2xs">
+                        {[1, 2, 3, 4, 5].map((num) => {
+                          const isSelected = trappedPassengers === num;
+                          return (
+                            <button
+                              key={num}
+                              type="button"
+                              onClick={() => setTrappedPassengers(num)}
+                              className={`w-8 h-8 rounded-lg font-mono font-bold text-xs flex items-center justify-center transition-all cursor-pointer ${
+                                isSelected
+                                  ? 'bg-[#D32F2F] text-white shadow-xs'
+                                  : 'hover:bg-red-100 text-red-950'
+                              }`}
+                            >
+                              {num === 5 ? '5+' : num}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Prominent Entrapment Safety Instruction */}
+                    <div className="p-3 bg-white/90 border border-red-200 rounded-xl text-[11px] text-red-900 leading-relaxed space-y-1">
+                      <div className="font-bold flex items-center gap-1.5 text-red-700">
+                        <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" />
+                        <span>⚠️ CRITICAL ENTRAPMENT SAFETY NOTICE</span>
+                      </div>
+                      <p>
+                        Remain calm. Modern WEPSUN lift cabins are <strong>fully ventilated</strong> and cannot freefall due to fail-safe governor safety brakes.
+                        Use the cabin intercom or speaker to comfort trapped occupants. If anyone requires urgent medical assistance, please dial <strong>112 / 101</strong> immediately alongside this emergency dispatch.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. Select Lift Unit */}
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">
+                    Select Lift Unit <span className="text-red-500">*</span>
+                  </label>
                   <select
                     value={selectedLiftId}
                     onChange={(e) => setSelectedLiftId(e.target.value)}
-                    className="w-full px-3.5 py-3 sm:py-2.5 rounded-xl border border-red-200 bg-red-50/40 text-slate-800 text-base sm:text-xs font-medium focus:bg-white focus:border-[#D32F2F] outline-none transition-colors"
+                    className="w-full px-3.5 py-3 sm:py-2.5 rounded-xl border border-red-200 bg-red-50/40 text-slate-800 text-base sm:text-xs font-bold focus:bg-white focus:border-[#D32F2F] outline-none transition-colors"
                   >
                     {liftOptions.map((l) => {
                       const isNamedLift = FOUR_NAMED_LIFTS.some((f) => f.id === l.id);
                       return (
                         <option key={l.id} value={l.id}>
                           {isNamedLift
-                            ? l.liftNumber
+                            ? `${l.liftNumber} — ${l.buildingName}`
                             : `${l.liftNumber} — ${l.buildingName} (${l.locationDetails || 'Passenger Lift'})`}
                         </option>
                       );
@@ -1048,56 +1158,66 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
                   </select>
                 </div>
 
-                {/* 2. Building / Location */}
-                <div>
-                  <label className="block text-slate-700 font-bold mb-1">Building / Location</label>
-                  <input
-                    type="text"
-                    value={emergencyBuilding || currentLift?.buildingName || 'ABC Residency, Pune'}
-                    onChange={(e) => setEmergencyBuilding(e.target.value)}
-                    placeholder="Enter Building & Location"
-                    className="w-full px-3.5 py-3 sm:py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-base sm:text-xs focus:bg-white focus:border-[#D32F2F] outline-none transition-colors"
-                  />
+                {/* 4. Building & Specific Floor / Location */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">Building Name & Site</label>
+                    <input
+                      type="text"
+                      value={emergencyBuilding || currentLift?.buildingName || 'ABC Residency, Pune'}
+                      onChange={(e) => setEmergencyBuilding(e.target.value)}
+                      placeholder="Building name"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-xs focus:bg-white focus:border-[#D32F2F] outline-none transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">Current Floor / Location in Shaft</label>
+                    <input
+                      type="text"
+                      value={emergencyFloorLocation}
+                      onChange={(e) => setEmergencyFloorLocation(e.target.value)}
+                      placeholder="e.g. Between 3rd & 4th floor, Pit, Floor 7"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-xs focus:bg-white focus:border-[#D32F2F] outline-none transition-colors"
+                    />
+                  </div>
                 </div>
 
-                {/* 3. Contact Number */}
+                {/* 5. Contact Caller Number */}
                 <div>
-                  <label className="block text-slate-700 font-bold mb-1">
-                    Contact Number <span className="text-red-500">*</span>
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-slate-700 font-bold">
+                      Caller Mobile Number <span className="text-red-500">*</span>
+                    </label>
+                    <span className="text-[10px] text-slate-500 font-mono">For technician call back</span>
+                  </div>
                   <input
                     type="tel"
                     required
                     value={emergencyContact}
                     onChange={(e) => setEmergencyContact(e.target.value)}
                     placeholder="Enter caller contact phone"
-                    className="w-full px-3.5 py-3 sm:py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-base sm:text-xs font-mono focus:bg-white focus:border-[#D32F2F] outline-none transition-colors"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-xs font-mono font-bold focus:bg-white focus:border-[#D32F2F] outline-none transition-colors"
                   />
                 </div>
 
-                {/* 4. Problem Description */}
+                {/* 6. Problem Description */}
                 <div>
                   <label className="block text-slate-700 font-bold mb-1">
-                    Problem Description <span className="text-red-500">*</span>
+                    Emergency Details / Problem Description <span className="text-red-500">*</span>
                   </label>
                   <textarea
                     rows={2}
                     value={emergencyDesc}
                     onChange={(e) => setEmergencyDesc(e.target.value)}
-                    onFocus={(e) => {
-                      setTimeout(() => {
-                        e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                      }, 150);
-                    }}
-                    placeholder="Describe what happened (e.g. Lift halted between 3rd & 4th floor)..."
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-base sm:text-xs focus:bg-white focus:border-[#D32F2F] outline-none transition-colors"
+                    placeholder="Describe what happened..."
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-xs focus:bg-white focus:border-[#D32F2F] outline-none transition-colors"
                   />
                 </div>
 
-                {/* 5. Upload Photo / Video (Emergency) */}
+                {/* 7. Upload Photo / Video (Emergency) */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <label className="block text-slate-700 font-bold">Upload Photo / Video</label>
+                    <label className="block text-slate-700 font-bold">Upload Photos / Videos (Optional)</label>
                     <span className="text-[10px] text-red-500 font-medium">Visual proof of breakdown</span>
                   </div>
 
@@ -1170,25 +1290,30 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
                           >
                             <X className="w-3.5 h-3.5" />
                           </button>
-
-                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-                            <Eye className="w-4 h-4 text-white drop-shadow-md" />
-                          </div>
                         </div>
                       ))}
-
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="rounded-xl border-2 border-dashed border-red-300 hover:border-red-500 hover:bg-red-50/50 flex flex-col items-center justify-center aspect-square text-red-500 hover:text-red-700 transition-all cursor-pointer text-[10px] font-bold gap-1"
-                      >
-                        <Plus className="w-4 h-4" />
-                        <span>Add More</span>
-                      </button>
                     </div>
                   )}
                 </div>
 
+                {/* Direct Emergency Call Strip */}
+                <div className="p-3 bg-red-100/80 border border-red-300 rounded-2xl flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-[#D32F2F] text-white flex items-center justify-center shrink-0">
+                      <PhoneCall className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="text-[11px] font-bold text-red-950 block">24x7 Control Room Direct Line</span>
+                      <span className="text-xs font-mono font-bold text-red-700">+91 85959 40077</span>
+                    </div>
+                  </div>
+                  <a
+                    href="tel:+918595940077"
+                    className="px-3 py-1.5 rounded-xl bg-[#D32F2F] hover:bg-red-700 text-white font-bold text-xs shadow-xs transition-all active:scale-95 flex items-center gap-1 shrink-0"
+                  >
+                    <span>Call Now</span>
+                  </a>
+                </div>
                 {/* Immediate Inline Status / Error Message */}
                 {submitError && (
                   <div className="p-3 rounded-xl bg-red-100 border border-red-300 text-red-800 text-xs font-semibold flex items-center gap-2 animate-in fade-in">

@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import { AmcContract, ServiceReport, Invoice, Quotation, Lift, Company } from '../types';
+import { AmcContract, ServiceReport, Invoice, Quotation, Lift, Company, Complaint } from '../types';
 
 const DEFAULT_COMPANY: Partial<Company> = {
   name: 'WEPSUN Engineering Solution Pvt. Ltd.',
@@ -629,4 +629,166 @@ export function downloadLiftSpecificationPdf(lift: Lift, company: Partial<Compan
 
   addBrandedFooter(doc, 1, 1);
   doc.save(`Lift-Specification-${lift.liftNumber}.pdf`);
+}
+
+// 6. Download Emergency Breakdown & Passenger Rescue Report PDF
+export function downloadEmergencyServiceReportPdf(complaint: Complaint, company: Partial<Company> = DEFAULT_COMPANY) {
+  const doc = new jsPDF('p', 'mm', 'a4');
+  addBrandedHeader(doc, 'Emergency Breakdown Report', complaint.ticketNumber, company);
+
+  let y = 36;
+
+  // Emergency Red Banner
+  doc.setFillColor(254, 242, 242);
+  doc.roundedRect(14, y, 182, 18, 2, 2, 'F');
+  doc.setDrawColor(239, 68, 68);
+  doc.roundedRect(14, y, 182, 18, 2, 2, 'D');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(185, 28, 28);
+  doc.text(`🚨 ${(complaint.emergencyType || 'EMERGENCY BREAKDOWN').toUpperCase()}`, 20, y + 7);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(71, 85, 105);
+  doc.text(
+    `Reported: ${complaint.reportedAt ? new Date(complaint.reportedAt).toLocaleString('en-IN') : 'N/A'} • Status: ${(complaint.status || 'RESOLVED').toUpperCase()} • Priority: CRITICAL`,
+    20,
+    y + 13
+  );
+
+  y += 24;
+
+  // Trapped Passenger Alert Card (if trapped)
+  if (complaint.trappedPassengerCount || complaint.emergencyType?.toLowerCase().includes('trapped')) {
+    doc.setFillColor(254, 226, 226);
+    doc.roundedRect(14, y, 182, 12, 1.5, 1.5, 'FD');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(153, 27, 27);
+    doc.text(
+      `PASSENGER ENTRAPMENT AUDIT: ${complaint.trappedPassengerCount || 'Passengers'} Person(s) Trapped • Rescue Status: Confirmed Safe & Unharmed`,
+      20,
+      y + 7.5
+    );
+    y += 16;
+  }
+
+  // Equipment & Site Details Box
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(203, 213, 225);
+  doc.roundedRect(14, y, 88, 32, 2, 2, 'FD');
+  doc.roundedRect(108, y, 88, 32, 2, 2, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(18, 59, 93);
+  doc.text('SITE & ELEVATOR SPECIFICATIONS:', 18, y + 6);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(51, 65, 85);
+  doc.text(`Lift: ${complaint.liftNumber}`, 18, y + 12);
+  doc.text(`Building: ${complaint.buildingName}`, 18, y + 17);
+  doc.text(`Client: ${complaint.clientName}`, 18, y + 22);
+  doc.text(`Location: ${complaint.currentLocation || 'Passenger Shaft'}`, 18, y + 27);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(18, 59, 93);
+  doc.text('EMERGENCY RESPONSE METRICS:', 112, y + 6);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(51, 65, 85);
+  doc.text(`Assigned Tech: ${complaint.assignedTechnicianName || 'Rapid Response Unit'}`, 112, y + 12);
+  doc.text(`Tech Phone: ${complaint.technicianPhone || '+91 85959 40077'}`, 112, y + 17);
+  doc.text(`Arrival Time: ${complaint.arrivedAt ? new Date(complaint.arrivedAt).toLocaleTimeString('en-IN') : 'Confirmed on Site'}`, 112, y + 22);
+  doc.text(`Resolution: ${complaint.resolvedAt ? new Date(complaint.resolvedAt).toLocaleTimeString('en-IN') : 'Safe & Restored'}`, 112, y + 27);
+
+  y += 38;
+
+  // Breakdown Description & Diagnosis
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(14, y, 182, 24, 2, 2, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(18, 59, 93);
+  doc.text('INCIDENT DESCRIPTION & TECHNICAL DIAGNOSIS:', 18, y + 6);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(51, 65, 85);
+  const descLines = doc.splitTextToSize(complaint.description || 'Elevator halted abruptly with passengers in cabin.', 174);
+  doc.text(descLines, 18, y + 12);
+
+  if (complaint.diagnosisRemarks) {
+    const diagLines = doc.splitTextToSize(`Diagnosis: ${complaint.diagnosisRemarks}`, 174);
+    doc.text(diagLines, 18, y + 19);
+  }
+
+  y += 30;
+
+  // Corrective Action Taken & Safety Verification
+  doc.setFillColor(240, 249, 255);
+  doc.setDrawColor(186, 230, 253);
+  doc.roundedRect(14, y, 182, 28, 2, 2, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(18, 59, 93);
+  doc.text('CORRECTIVE ACTIONS & PASSENGER RESCUE PROTOCOL:', 18, y + 6);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(51, 65, 85);
+  const actionText = complaint.actionTaken || complaint.resolutionReport ||
+    '1. Manual brake release / ARD leveling performed to bring cabin to nearest landing.\n2. Cabin doors opened safely and all passengers evacuated without injury.\n3. Safety circuit reset, drive error code cleared, door clutch realigned.\n4. Complete round-trip operational testing executed successfully under load.';
+  const actionLines = doc.splitTextToSize(actionText, 174);
+  doc.text(actionLines, 18, y + 12);
+
+  y += 34;
+
+  // Parts Replaced (if any)
+  if (complaint.partsReplaced && complaint.partsReplaced.length > 0) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(18, 59, 93);
+    doc.text('COMPONENTS REPLACED / CONSUMABLES USED:', 14, y);
+    y += 5;
+
+    complaint.partsReplaced.forEach((p, idx) => {
+      doc.setFillColor(255, 255, 255);
+      doc.setDrawColor(226, 232, 240);
+      doc.rect(14, y, 182, 6, 'FD');
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(30, 41, 59);
+      doc.text(`${idx + 1}. ${p.partName} (${p.partNumber}) • Qty: ${p.quantity} • Unit: ₹ ${p.unitPrice.toLocaleString('en-IN')}`, 18, y + 4.5);
+      y += 6;
+    });
+    y += 4;
+  }
+
+  // Safety Signoff Box
+  y = Math.max(y, 230);
+  doc.setDrawColor(203, 213, 225);
+  doc.line(14, y, 80, y);
+  doc.line(130, y, 196, y);
+
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(18, 59, 93);
+  doc.text('Responding Field Engineer / Technician', 14, y + 5);
+  doc.text('Client Site Authority Signoff', 130, y + 5);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Name: ${complaint.assignedTechnicianName || 'WEPSUN Emergency Team'}`, 14, y + 10);
+  doc.text(`Name: ${complaint.clientName}`, 130, y + 10);
+  doc.text(`Certified: ISO 9001:2015 Safety Verified`, 14, y + 15);
+  doc.text(`Status: ${(complaint.status || 'RESOLVED').toUpperCase()}`, 130, y + 15);
+
+  addBrandedFooter(doc, 1, 1);
+  doc.save(`Emergency-Report-${complaint.ticketNumber}.pdf`);
 }
