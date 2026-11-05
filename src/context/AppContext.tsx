@@ -1984,8 +1984,13 @@ function mapServerServiceReport(sr: any): ServiceReport {
 
   const clientScopedComplaints = useMemo(() => {
     const clientLiftIds = new Set(clientScopedLifts.map((l) => l.id));
-    return complaints.filter((c) => c.clientId === effectiveClientId || clientLiftIds.has(c.liftId));
-  }, [complaints, clientScopedLifts, effectiveClientId]);
+    return complaints.filter(
+      (c) =>
+        c.clientId === effectiveClientId ||
+        clientLiftIds.has(c.liftId) ||
+        (c.createdById && c.createdById === activeUserId)
+    );
+  }, [complaints, clientScopedLifts, effectiveClientId, activeUserId]);
 
   const clientScopedAmcContracts = useMemo(() => {
     const clientLiftIds = new Set(clientScopedLifts.map((l) => l.id));

@@ -147,6 +147,38 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): 
         },
         include: { items: true, client: true, lift: true },
       });
+
+      if (req.user?.role === 'TECHNICIAN') {
+        await prisma.notification.create({
+          data: {
+            companyId,
+            userId: null,
+            title: `Field Quotation Submitted: ${createdQuote.quoteNumber}`,
+            message: `Technician submitted repair quotation ${createdQuote.quoteNumber} for ₹${Number(createdQuote.totalAmount || 0).toLocaleString('en-IN')}.`,
+            type: 'QUOTATION',
+            entityType: 'Quotation',
+            entityId: createdQuote.id,
+          },
+        }).catch(() => {});
+      } else if (clientId) {
+        const clientUsers = await prisma.user.findMany({
+          where: { clientId, companyId },
+          select: { id: true },
+        });
+        for (const cu of clientUsers) {
+          await prisma.notification.create({
+            data: {
+              companyId,
+              userId: cu.id,
+              title: `New Repair Quotation: ${createdQuote.quoteNumber}`,
+              message: `A quotation of ₹${Number(createdQuote.totalAmount || 0).toLocaleString('en-IN')} is awaiting your review and approval.`,
+              type: 'QUOTATION',
+              entityType: 'Quotation',
+              entityId: createdQuote.id,
+            },
+          }).catch(() => {});
+        }
+      }
     } catch {
       createdQuote = {
         id: `qt-${Date.now()}`,
@@ -272,6 +304,45 @@ router.post('/:id/convert', requireAuth, async (req: AuthenticatedRequest, res: 
           },
         });
 
+        if (technicianId) {
+          const techUser = await tx.user.findFirst({
+            where: { technicianId, companyId },
+          });
+          if (techUser) {
+            await tx.notification.create({
+              data: {
+                companyId,
+                userId: techUser.id,
+                title: `New Work Order Assigned: ${wo.workOrderNumber}`,
+                message: `Work Order ${wo.workOrderNumber} generated from approved quotation ${quote.quoteNumber}.`,
+                type: 'WORK_ORDER',
+                entityType: 'WorkOrder',
+                entityId: wo.id,
+              },
+            });
+          }
+        }
+
+        if (quote.clientId) {
+          const clientUsers = await tx.user.findMany({
+            where: { clientId: quote.clientId, companyId },
+            select: { id: true },
+          });
+          for (const cu of clientUsers) {
+            await tx.notification.create({
+              data: {
+                companyId,
+                userId: cu.id,
+                title: `Work Order Scheduled: ${wo.workOrderNumber}`,
+                message: `Execution has been scheduled for your approved quotation #${quote.quoteNumber}.`,
+                type: 'WORK_ORDER',
+                entityType: 'WorkOrder',
+                entityId: wo.id,
+              },
+            });
+          }
+        }
+
         return { quote, workOrder: wo, invoice: inv };
       });
     } catch {
@@ -293,7 +364,7 @@ router.post('/:id/convert', requireAuth, async (req: AuthenticatedRequest, res: 
           clientName: quote.clientName || 'Client',
           technicianId: technicianId || null,
           title: quote.subject,
-          description: `Execution for Quotation ${quote.quoteNumber || quote.quotationNumber}`,
+          description: `Execution for Quotation ${quote.quoteNumber || quote.quoteNumber}`,
           priority: 'high',
           status: technicianId ? 'assigned' : 'scheduled',
           scheduledDate: new Date().toISOString(),
@@ -370,6 +441,47 @@ router.patch('/:id', requireAuth, async (req: AuthenticatedRequest, res: Respons
     if (!updated) {
       res.status(404).json({ success: false, message: 'Quotation not found', code: 'NOT_FOUND' });
       return;
+    }
+
+    if (status) {
+      const normStatus = String(status).toUpperCase();
+      if (normStatus === 'APPROVED') {
+        await prisma.notification.create({
+          data: {
+            companyId,
+            userId: null,
+            title: `Quotation Approved: ${updated.quoteNumber}`,
+            message: `Client approved quotation ${updated.quoteNumber} for ₹${Number(((updated as any).grandTotal ?? (updated as any).totalAmount) || 0).toLocaleString('en-IN')}. Ready to convert to Work Order.`,
+            type: 'QUOTATION',
+            entityType: 'Quotation',
+            entityId: id,
+          },
+        }).catch(() => {});
+      } else if (normStatus === 'REJECTED') {
+        await prisma.notification.create({
+          data: {
+            companyId,
+            userId: null,
+            title: `Quotation Declined: ${updated.quoteNumber}`,
+            message: `Quotation #${updated.quoteNumber} was declined by the society.`,
+            type: 'QUOTATION',
+            entityType: 'Quotation',
+            entityId: id,
+          },
+        }).catch(() => {});
+      } else if (normStatus === 'CLARIFICATION_REQUESTED') {
+        await prisma.notification.create({
+          data: {
+            companyId,
+            userId: null,
+            title: `Quotation Clarification: ${updated.quoteNumber}`,
+            message: `Customer requested clarification on quotation #${updated.quoteNumber}.`,
+            type: 'QUOTATION',
+            entityType: 'Quotation',
+            entityId: id,
+          },
+        }).catch(() => {});
+      }
     }
 
     res.json({ success: true, data: updated, message: 'Quotation updated successfully' });

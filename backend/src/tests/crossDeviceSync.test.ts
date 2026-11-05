@@ -311,6 +311,7 @@ async function runCrossDeviceSyncTests() {
       name: 'Ramesh Sawant',
       phone: '+91 98201 11222',
       email: 'ramesh.sawant@wepsun.com',
+      employeeCode: 'WEP-TECH-9901',
       currentStatus: 'AVAILABLE',
     },
   });

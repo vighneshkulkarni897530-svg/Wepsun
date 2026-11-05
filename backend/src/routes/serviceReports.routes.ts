@@ -253,6 +253,40 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): 
           },
         });
 
+        // 5. Notify Client of signed Service Report
+        if (targetClientId) {
+          const clientUsers = await tx.user.findMany({
+            where: { clientId: targetClientId, companyId },
+            select: { id: true },
+          });
+          for (const cu of clientUsers) {
+            await tx.notification.create({
+              data: {
+                companyId,
+                userId: cu.id,
+                title: `📑 Service Report Available: ${reportNumber}`,
+                message: `Work completed and signed off. View or download your official digital service report.`,
+                type: 'SERVICE_REPORT',
+                entityType: 'ServiceReport',
+                entityId: rep.id,
+              },
+            });
+          }
+        }
+
+        // 6. Notify Admin of filed Service Report
+        await tx.notification.create({
+          data: {
+            companyId,
+            userId: null,
+            title: `✅ Service Report Filed: ${reportNumber}`,
+            message: `Technician signed off Service Report ${reportNumber} for Lift ${liftId || 'Unit'}.`,
+            type: 'SERVICE_REPORT',
+            entityType: 'ServiceReport',
+            entityId: rep.id,
+          },
+        });
+
         return rep;
       });
     } catch {

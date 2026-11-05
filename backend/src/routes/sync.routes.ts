@@ -117,6 +117,7 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response): P
       prisma.workOrder.findMany({
         where: {
           companyId,
+          ...(isClient && clientId ? { clientId } : {}),
           ...(isTech && technicianId ? { technicianId } : {}),
         },
         include: {
@@ -170,18 +171,21 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response): P
         take: 50,
       }).catch(() => db.invoices.filter(i => i.companyId === companyId)),
 
-      // Inventory (Admin only)
-      isAdmin
+      // Inventory (Admin & Field Technicians for repair parts selection)
+      (isAdmin || isTech)
         ? prisma.inventoryPart.findMany({
             where: { companyId },
             take: 100,
           }).catch(() => db.inventory)
         : Promise.resolve([]),
 
-      // Inventory Movements (Admin only)
-      isAdmin
+      // Inventory Movements (Admin & Field Technicians)
+      (isAdmin || isTech)
         ? prisma.inventoryMovement.findMany({
-            where: { companyId },
+            where: {
+              companyId,
+              ...(isTech && technicianId ? { technicianId } : {}),
+            },
             orderBy: { timestamp: 'desc' },
             take: 50,
           }).catch(() => db.inventoryMovements)

@@ -390,18 +390,51 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): 
           data: { currentStatus: 'BREAKDOWN' },
         });
 
-        // 4. Create notification
+        // 4. Create broadcast notification for Admin & Operations Desk
+        await tx.notification.create({
+          data: {
+            companyId,
+            userId: null,
+            title: isEmergency ? `🚨 Emergency Breakdown: ${ticketNumber}` : `📋 New Service Complaint: ${ticketNumber}`,
+            message: `Priority: ${normalizedPriority} • ${title} (${comp.lift?.permanentLiftId || 'Lift'})`,
+            type: isEmergency ? 'EMERGENCY' : 'BREAKDOWN',
+            entityType: 'Complaint',
+            entityId: comp.id,
+          },
+        });
+
+        // 5. Create confirmation notification for Client
         await tx.notification.create({
           data: {
             companyId,
             userId: currentUserId,
-            title: `New Ticket: ${ticketNumber}`,
-            message: `Priority: ${normalizedPriority} - ${title}`,
+            title: `Ticket Logged: ${ticketNumber}`,
+            message: `Your breakdown request has been received. Our service desk is dispatching an engineer.`,
             type: 'BREAKDOWN',
             entityType: 'Complaint',
             entityId: comp.id,
           },
         });
+
+        // 6. If technician assigned on creation, notify technician
+        if (effectiveTechId) {
+          const techUser = await tx.user.findFirst({
+            where: { technicianId: effectiveTechId, companyId },
+          });
+          if (techUser) {
+            await tx.notification.create({
+              data: {
+                companyId,
+                userId: techUser.id,
+                title: `👷 New Job Assigned: ${ticketNumber}`,
+                message: `You have been assigned to Ticket #${ticketNumber} at ${comp.lift?.permanentLiftId || 'Site'}.`,
+                type: 'BREAKDOWN',
+                entityType: 'Complaint',
+                entityId: comp.id,
+              },
+            });
+          }
+        }
 
         return comp;
       });
@@ -541,6 +574,91 @@ router.patch('/:id', requireAuth, async (req: AuthenticatedRequest, res: Respons
               description: actionTaken || diagnosisRemarks || 'Complaint status updated',
               actorName: user.name || user.email,
               actorRole: user.role,
+            },
+          });
+        }
+
+        // Notification: Technician Assigned (Admin -> Tech & Admin -> Client)
+        if (assignedTechnicianId && userRole !== 'TECHNICIAN' && assignedTechnicianId !== existing.assignedTechnicianId) {
+          const tech = await tx.technician.findUnique({
+            where: { id: assignedTechnicianId },
+            include: { user: true },
+          });
+
+          if (tech) {
+            // Notify Technician
+            if (tech.user?.id) {
+              await tx.notification.create({
+                data: {
+                  companyId,
+                  userId: tech.user.id,
+                  title: `👷 New Job Assigned: ${existing.ticketNumber}`,
+                  message: `You have been assigned to Ticket #${existing.ticketNumber} at ${existing.lift?.permanentLiftId || 'Site'}.`,
+                  type: 'BREAKDOWN',
+                  entityType: 'Complaint',
+                  entityId: id,
+                },
+              });
+            }
+
+            // Notify Client
+            if (existing.createdById) {
+              await tx.notification.create({
+                data: {
+                  companyId,
+                  userId: existing.createdById,
+                  title: `👨‍🔧 Technician Assigned: ${tech.name}`,
+                  message: `${tech.name} has been assigned to your Ticket #${existing.ticketNumber}.`,
+                  type: 'BREAKDOWN',
+                  entityType: 'Complaint',
+                  entityId: id,
+                },
+              });
+            }
+          }
+        }
+
+        // Notification: Technician On The Way (Tech -> Client)
+        if (normalizedStatus === 'TECHNICIAN_ON_WAY') {
+          if (existing.createdById) {
+            await tx.notification.create({
+              data: {
+                companyId,
+                userId: existing.createdById,
+                title: '🚚 Field Engineer En Route',
+                message: `Technician is travelling to your site for Ticket #${existing.ticketNumber}.`,
+                type: 'BREAKDOWN',
+                entityType: 'Complaint',
+                entityId: id,
+              },
+            });
+          }
+        }
+
+        // Notification: Resolved / Closed (Tech -> Client & Tech -> Admin)
+        if (normalizedStatus === 'RESOLVED') {
+          if (existing.createdById) {
+            await tx.notification.create({
+              data: {
+                companyId,
+                userId: existing.createdById,
+                title: `✅ Breakdown Resolved: ${existing.ticketNumber}`,
+                message: 'Your lift service request is completed and operational. Please rate your experience.',
+                type: 'BREAKDOWN',
+                entityType: 'Complaint',
+                entityId: id,
+              },
+            });
+          }
+          await tx.notification.create({
+            data: {
+              companyId,
+              userId: null,
+              title: `✅ Ticket Resolved: ${existing.ticketNumber}`,
+              message: `Service completed for Ticket #${existing.ticketNumber}. Lift operational.`,
+              type: 'BREAKDOWN',
+              entityType: 'Complaint',
+              entityId: id,
             },
           });
         }

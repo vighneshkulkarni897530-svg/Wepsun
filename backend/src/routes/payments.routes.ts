@@ -176,6 +176,40 @@ router.post('/razorpay/verify', requireAuth, requireRole(['CLIENT', 'ACCOUNTS', 
               details: `Online payment of ₹${inv.grandTotal} settled successfully (Ref: ${razorpayPaymentId})`,
             },
           });
+
+          // Notify Admin
+          await tx.notification.create({
+            data: {
+              companyId,
+              userId: null,
+              title: `💰 Payment Received: ₹${inv.grandTotal.toLocaleString('en-IN')}`,
+              message: `Payment settled for Invoice ${inv.invoiceNumber} via ${paymentMethod} (Ref: ${razorpayPaymentId}).`,
+              type: 'PAYMENT',
+              entityType: 'Invoice',
+              entityId: inv.id,
+            },
+          }).catch(() => {});
+
+          // Notify Client
+          if (inv.clientId) {
+            const clientUsers = await tx.user.findMany({
+              where: { clientId: inv.clientId, companyId },
+              select: { id: true },
+            });
+            for (const cu of clientUsers) {
+              await tx.notification.create({
+                data: {
+                  companyId,
+                  userId: cu.id,
+                  title: `🧾 Payment Confirmed: ${inv.invoiceNumber}`,
+                  message: `Your payment of ₹${inv.grandTotal.toLocaleString('en-IN')} has been credited successfully.`,
+                  type: 'PAYMENT',
+                  entityType: 'Invoice',
+                  entityId: inv.id,
+                },
+              }).catch(() => {});
+            }
+          }
         }
       });
     } catch (err: any) {

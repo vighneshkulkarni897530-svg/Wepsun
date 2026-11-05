@@ -107,6 +107,7 @@ export interface Building {
   contactPhone: string;
   clientId: string;
   clientName: string;
+  createdById?: string;
   totalLifts: number;
   liftIds: string[];
   lat?: number;
@@ -211,6 +212,7 @@ export interface Complaint {
   buildingName: string;
   clientId: string;
   clientName: string;
+  createdById?: string;
   clientPhone: string;
   clientEmail?: string;
   issueType: IssueType;

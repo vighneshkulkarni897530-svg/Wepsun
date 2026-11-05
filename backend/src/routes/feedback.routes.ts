@@ -168,6 +168,19 @@ router.post('/submit', async (req: any, res: Response): Promise<void> => {
           details: `Customer submitted ${ratingNum}-star review for Lift ${liftNumber} at ${buildingName}`,
         },
       });
+
+      // Notify Admin & Quality Desk
+      await prisma.notification.create({
+        data: {
+          companyId,
+          userId: null,
+          title: `⭐ New Customer Review: ${ratingNum} Stars`,
+          message: `${clientName} submitted a ${ratingNum}-star review for Lift ${liftNumber} (${buildingName}).`,
+          type: 'FEEDBACK',
+          entityType: 'CustomerFeedback',
+          entityId: newFeedback.id,
+        },
+      }).catch(() => {});
     } catch {
       newFeedback = {
         id: `fb_${Date.now()}`,

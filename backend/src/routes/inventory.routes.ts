@@ -158,6 +158,21 @@ router.post('/movements', requireAuth, requireRole(['SUPER_ADMIN', 'COMPANY_ADMI
           },
         });
 
+        // 5. Low-Stock Alert Notification for Admin
+        if (newStock <= part.minStockThreshold) {
+          await tx.notification.create({
+            data: {
+              companyId: part.companyId,
+              userId: null,
+              title: `⚠️ Low Stock Alert: ${part.name}`,
+              message: `Inventory stock reached ${newStock} ${part.unit} (Threshold: ${part.minStockThreshold}). Reorder recommended.`,
+              type: 'INVENTORY_ALERT',
+              entityType: 'InventoryPart',
+              entityId: part.id,
+            },
+          }).catch(() => {});
+        }
+
         return { movement, updatedStock: updatedPart };
       });
     } catch (err: any) {
