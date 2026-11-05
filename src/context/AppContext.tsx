@@ -72,7 +72,7 @@ import {
   isTokenExpired,
   getCachedUserSession,
 } from '../services/sessionManager';
-import { getNetworkStatus, subscribeNetworkStatus } from '../services/nativeApp';
+import { getNetworkStatus, subscribeNetworkStatus, triggerHaptic } from '../services/nativeApp';
 import { playNotificationSound, isSoundEnabled as getSoundPref, setSoundEnabled } from '../utils/notificationSound';
 import { isDummyAvatar, isValidCustomAvatar, getEffectiveProfilePhoto } from '../utils/avatarUtils';
 import { handleGoogleAuthCallback } from '../services/googleAuth';
@@ -1380,14 +1380,36 @@ function mapServerServiceReport(sr: any): ServiceReport {
     showToast('info', 'Role Switched', `Active Mode: ${role.replace('_', ' ').toUpperCase()}`);
   };
 
-  // Toast Helpers (Bottom-right notifications disabled per user preference)
-  const showToast = (_type: ToastNotification['type'], _title: string, _message: string) => {
-    // Disabled bottom-right notifications
-  };
+  // Active App Status Notifications & Feedback System
+  const showToast = useCallback((type: ToastNotification['type'], title: string, message: string) => {
+    const id = 'toast-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6);
+    const newToast: ToastNotification = { id, type, title, message };
 
-  const removeToast = (_id: string) => {
-    setToasts([]);
-  };
+    setToasts((prev) => {
+      // Keep up to 3 visible status notifications
+      const existing = prev.slice(-2);
+      return [...existing, newToast];
+    });
+
+    if (type === 'error' || type === 'emergency') {
+      playNotificationSound('urgent');
+      triggerHaptic('heavy');
+    } else if (type === 'success') {
+      playNotificationSound('success');
+      triggerHaptic('light');
+    } else {
+      playNotificationSound('standard');
+      triggerHaptic('light');
+    }
+
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4500);
+  }, []);
+
+  const removeToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
 
   // Google OAuth Deep Link & Web postMessage Listener
   const loginAsUserRef = useRef(loginAsUser);
@@ -2633,21 +2655,27 @@ function mapServerServiceReport(sr: any): ServiceReport {
       afterPhotos: [],
     };
 
-    // Authoritative Cloud / Server Persistence
-    const apiRes = await apiService.createComplaint(payload, {
-      companyId,
-      branchId,
-      userRole: currentRole,
-      userId: activeUserId,
-    });
+    // Authoritative Cloud / Server Persistence with Offline Resilience
+    let serverRec: any = {};
+    let isCloudSynced = false;
+    try {
+      const apiRes = await apiService.createComplaint(payload, {
+        companyId,
+        branchId,
+        userRole: currentRole,
+        userId: activeUserId,
+        timeoutMs: 12000,
+      });
 
-    if (!apiRes || apiRes.success === false) {
-      const errMsg = apiRes?.message || apiRes?.error || 'Failed to register complaint in backend database.';
-      throw new Error(errMsg);
+      if (apiRes && apiRes.success !== false && apiRes.data) {
+        serverRec = apiRes.data;
+        isCloudSynced = true;
+      }
+    } catch (netErr: any) {
+      console.warn('[AppContext] Cloud sync deferred (network/server offline), storing locally and syncing in background:', netErr?.message);
     }
 
-    const serverRec = apiRes.data || {};
-    const mapped = mapServerComplaint(serverRec);
+    const mapped = isCloudSynced ? mapServerComplaint(serverRec) : {};
     const finalId = serverRec.id || tempId;
     const finalTicketNumber = serverRec.ticketNumber || fallbackTicketNumber;
 

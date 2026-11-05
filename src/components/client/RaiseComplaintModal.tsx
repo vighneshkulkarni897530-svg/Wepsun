@@ -389,30 +389,40 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
 
     // 1. Validate Lift selection
     if (!currentLift || !currentLift.id) {
-      showToast('error', 'Validation Error', 'Please select a valid elevator / lift unit.');
+      const msg = 'Please select a valid elevator / lift unit.';
+      setSubmitError(msg);
+      showToast('error', 'Validation Error', msg);
       return;
     }
 
     // 2. Validate Complaint Type
     if (!complaintType) {
-      showToast('error', 'Validation Error', 'Please select a complaint type.');
+      const msg = 'Please select a complaint type.';
+      setSubmitError(msg);
+      showToast('error', 'Validation Error', msg);
       return;
     }
 
     // 3. Validate Priority
     if (!priority) {
-      showToast('error', 'Validation Error', 'Please select a priority level.');
+      const msg = 'Please select a priority level.';
+      setSubmitError(msg);
+      showToast('error', 'Validation Error', msg);
       return;
     }
 
     // 4. Validate Problem Description
     const trimmedDesc = description.trim();
     if (!trimmedDesc) {
-      showToast('error', 'Validation Error', 'Please enter a description of the problem.');
+      const msg = 'Please enter a description of the problem.';
+      setSubmitError(msg);
+      showToast('error', 'Validation Error', msg);
       return;
     }
     if (trimmedDesc.length < 5) {
-      showToast('error', 'Validation Error', 'Please provide a more detailed description (at least 5 characters).');
+      const msg = 'Please provide a more detailed description (at least 5 characters).';
+      setSubmitError(msg);
+      showToast('error', 'Validation Error', msg);
       return;
     }
 
@@ -499,19 +509,25 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
     if (isSubmitting) return;
 
     if (!currentLift || !currentLift.id) {
-      showToast('error', 'Validation Error', 'Please select a valid elevator / lift unit.');
+      const msg = 'Please select a valid elevator / lift unit.';
+      setSubmitError(msg);
+      showToast('error', 'Validation Error', msg);
       return;
     }
 
     const trimmedContact = emergencyContact.trim();
     if (!trimmedContact) {
-      showToast('error', 'Validation Error', 'Please enter a caller contact phone number.');
+      const msg = 'Please enter a caller contact phone number.';
+      setSubmitError(msg);
+      showToast('error', 'Validation Error', msg);
       return;
     }
 
     const trimmedDesc = emergencyDesc.trim();
     if (!trimmedDesc) {
-      showToast('error', 'Validation Error', 'Please enter emergency details.');
+      const msg = 'Please enter emergency details.';
+      setSubmitError(msg);
+      showToast('error', 'Validation Error', msg);
       return;
     }
 
@@ -968,6 +984,14 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
                   )}
                 </div>
 
+                {/* Immediate Inline Status / Error Message */}
+                {submitError && (
+                  <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" />
+                    <span>{submitError}</span>
+                  </div>
+                )}
+
                 {/* 
                   FINAL ACTION BUTTONS: Cancel and Submit Complaint
                   Thanks to the bottom padding on the scrollable container,
@@ -1164,6 +1188,14 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
                     </div>
                   )}
                 </div>
+
+                {/* Immediate Inline Status / Error Message */}
+                {submitError && (
+                  <div className="p-3 rounded-xl bg-red-100 border border-red-300 text-red-800 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-red-700" />
+                    <span>{submitError}</span>
+                  </div>
+                )}
 
                 {/* Emergency Action Button */}
                 <div className="pt-3 border-t border-red-100 flex items-center gap-3">

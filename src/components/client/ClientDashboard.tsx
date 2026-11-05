@@ -828,12 +828,8 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
               </div>
 
               <div className="flex items-center gap-3.5 pt-1">
-                <div className="w-16 h-16 rounded-2xl overflow-hidden border border-slate-200 shrink-0 bg-slate-100">
-                  <img
-                    src="https://images.unsplash.com/photo-1574958269340-fa927304f208?w=200&auto=format&fit=crop&q=80"
-                    alt="Lift Equipment"
-                    className="w-full h-full object-cover"
-                  />
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl border border-blue-100 shrink-0 bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center text-[#123B5D] shadow-xs">
+                  <Wrench className="w-6 h-6 sm:w-7 sm:h-7 text-[#1976D2]" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <span className="font-bold text-slate-900 text-sm block truncate" title={nextUpcomingServiceLiftName}>
