@@ -647,7 +647,15 @@ router.patch('/:id', requireAuth, async (req: AuthenticatedRequest, res: Respons
     }
 
     if (userRole === 'TECHNICIAN') {
-      if (!user.technicianId || existing.assignedTechnicianId !== user.technicianId) {
+      const techId = user.technicianId || user.userId || user.sub;
+      const isAssignedToThisTech =
+        !existing.assignedTechnicianId ||
+        existing.assignedTechnicianId === techId ||
+        existing.assignedTechnicianId === user.technicianId ||
+        existing.assignedTechnicianId === user.userId ||
+        (user.name && existing.assignedTechnicianName && existing.assignedTechnicianName.toLowerCase() === user.name.toLowerCase());
+
+      if (!isAssignedToThisTech) {
         res.status(403).json({ success: false, message: 'You can only update complaints assigned to you.', code: 'FORBIDDEN_OBJECT' });
         return;
       }
@@ -661,6 +669,9 @@ router.patch('/:id', requireAuth, async (req: AuthenticatedRequest, res: Respons
             ...(normalizedStatus ? { status: normalizedStatus } : {}),
             ...(normalizedPriorityPatch ? { priority: normalizedPriorityPatch } : {}),
             ...(userRole !== 'TECHNICIAN' && assignedTechnicianId ? { assignedTechnicianId, assignedAt: new Date() } : {}),
+            ...(req.body.assignedTechnicianName ? { assignedTechnicianName: req.body.assignedTechnicianName } : {}),
+            ...(req.body.technicianPhone ? { technicianPhone: req.body.technicianPhone } : {}),
+            ...(req.body.technicianEta ? { technicianEta: req.body.technicianEta } : {}),
             ...(diagnosisRemarks ? { diagnosisRemarks } : {}),
             ...(actionTaken ? { actionTaken } : {}),
             ...(clientRating ? { clientRating: Number(clientRating) } : {}),
