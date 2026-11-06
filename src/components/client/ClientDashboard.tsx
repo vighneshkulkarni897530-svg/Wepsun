@@ -480,7 +480,7 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
             <div className="bg-gradient-to-r from-[#EBF5FB] via-[#E8F4F8] to-[#E3F2FD] border border-blue-100/90 rounded-2xl sm:rounded-3xl p-4 sm:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm relative overflow-hidden">
               <div className="space-y-1.5 max-w-md z-10">
                 <h1 className="text-lg sm:text-2xl font-black text-slate-900 tracking-tight leading-snug">
-                  {new Date().getHours() < 12 ? 'Good Morning' : new Date().getHours() < 17 ? 'Good Afternoon' : 'Good Evening'}, {currentUser?.name || 'Priya Sharma'}!
+                  {new Date().getHours() < 12 ? 'Good Morning' : new Date().getHours() < 17 ? 'Good Afternoon' : 'Good Evening'}, {currentUser?.name || 'Client'}!
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-600 font-medium">
                   Here&apos;s an overview of your lift services and activities.

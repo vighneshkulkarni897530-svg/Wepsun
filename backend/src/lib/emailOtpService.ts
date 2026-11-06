@@ -821,9 +821,10 @@ export async function sendEmailOtp(params: {
 
   // Always store OTP record before or on dispatch so it can be verified
   const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
+  const allowTestOtp = isDev || process.env.NODE_ENV === 'test' || process.env.ALLOW_TEST_OTP === 'true';
   otpStore.set(key, {
     email: cleanEmail,
-    otp: isDev ? otp : undefined,
+    otp: allowTestOtp ? otp : undefined,
     otpHash,
     type: params.type,
     expiresAt,

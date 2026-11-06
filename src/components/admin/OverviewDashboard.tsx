@@ -231,7 +231,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
     tenantLifts.forEach((l) => {
       if (l.clientId) clientIds.add(l.clientId);
     });
-    return Math.max(1, clientIds.size);
+    return clientIds.size;
   }, [users, tenantBuildings, tenantLifts]);
 
   const isMasterOrSuper = currentUser.role === 'master_admin' || currentUser.role === 'super_admin';

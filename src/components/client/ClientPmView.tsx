@@ -87,8 +87,12 @@ export const ClientPmView: React.FC = () => {
       showToast('error', 'Date Required', 'Please select a preferred date for the maintenance visit.');
       return;
     }
+    if (!currentLift?.id) {
+      showToast('error', 'Lift Required', 'No lift selected for rescheduling.');
+      return;
+    }
     requestPmReschedule(
-      currentLift?.id || 'lift-1',
+      currentLift.id,
       rescheduleForm.preferredDate,
       rescheduleForm.timeSlot,
       rescheduleForm.reason || 'Client convenience'

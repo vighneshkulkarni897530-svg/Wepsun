@@ -288,8 +288,8 @@ export const AdminClientsView: React.FC = () => {
 
     addNewLift({
       liftNumber: generatedNumber,
-      buildingId: bld?.id || 'bld-1',
-      buildingName: targetClientForLift.building || bld?.name || 'Main Tower',
+      buildingId: bld?.id || targetClientForLift.id,
+      buildingName: targetClientForLift.building || bld?.name || 'Main Facility',
       clientId: targetClientForLift.id,
       clientName: targetClientForLift.name,
       clientPhone: targetClientForLift.phone,

@@ -16,6 +16,9 @@
  * 13. Cryptographic security -> OTP hash stored, timing-safe comparison used
  */
 
+process.env.NODE_ENV = 'test';
+process.env.ALLOW_TEST_OTP = 'true';
+
 import http from 'http';
 import express from 'express';
 import apiRouter from '../routes/index.js';

@@ -22,7 +22,7 @@
  * ==============================================================================
  */
 
-import { prisma } from '../lib/prisma.js';
+import { getTestPrisma } from './testPrismaClient.js';
 import {
   hashPassword,
   verifyPassword,
@@ -58,6 +58,8 @@ async function runTechnicianApprovalTests() {
   console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('🧪 WEPSUN — TECHNICIAN APPROVAL & MANAGEMENT AUTOMATED TEST SUITE');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+
+  const prisma = await getTestPrisma();
 
   // Find or create test company
   let company = await prisma.company.findFirst();

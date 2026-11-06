@@ -295,8 +295,70 @@ const complaintSyncChannel = typeof window !== 'undefined' && typeof BroadcastCh
   ? new BroadcastChannel('wepsun_complaint_realtime_channel')
   : null;
 
+function scrubLegacyStorage() {
+  if (typeof window === 'undefined') return;
+  const CLEAN_STORE_VERSION = 'wepsun_clean_store_v3';
+  if (localStorage.getItem(CLEAN_STORE_VERSION) === 'true') return;
+
+  const legacyDemoIds = new Set([
+    'tkt-001', 'tkt-002', 'tkt-003', 'tkt-004', 'tkt-005',
+    'bld-1', 'bld-2', 'bld-3', 'bld-4', 'bld-5',
+    'lift-1', 'lift-2', 'lift-3', 'lift-4', 'lift-5', 'lift-6', 'lift-7', 'lift-8', 'lift-9', 'lift-10', 'lift-11',
+    'amc-1', 'amc-2', 'amc-3', 'amc-4',
+    'qt-001', 'qt-002', 'qt-003',
+    'wo-001', 'wo-002', 'wo-003',
+    'inv-001', 'inv-002', 'inv-003', 'inv-004',
+    'sr-001', 'sr-002', 'sr-003',
+    'fb-001', 'fb-002', 'fb-003', 'fb-004',
+    'enq-001', 'enq-002', 'enq-003',
+    'log-001', 'log-002', 'log-003', 'log-004',
+    'client-1', 'client-2', 'client-3', 'client-4', 'client-priya'
+  ]);
+
+  const keysToCheck = [
+    STORAGE_PREFIX + 'buildings',
+    STORAGE_PREFIX + 'lifts',
+    STORAGE_PREFIX + 'complaints',
+    STORAGE_PREFIX + 'amcContracts',
+    STORAGE_PREFIX + 'quotations',
+    STORAGE_PREFIX + 'workOrders',
+    STORAGE_PREFIX + 'invoices',
+    STORAGE_PREFIX + 'inventoryMovements',
+    STORAGE_PREFIX + 'serviceReports',
+    STORAGE_PREFIX + 'auditLogs',
+    STORAGE_PREFIX + 'feedbacks',
+    STORAGE_PREFIX + 'enquiries',
+    STORAGE_PREFIX + 'partsReplacements',
+    STORAGE_PREFIX + 'clientNotifications',
+    STORAGE_PREFIX + 'appNotifications',
+  ];
+
+  keysToCheck.forEach((key) => {
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const items = JSON.parse(raw);
+        if (Array.isArray(items)) {
+          const sanitized = items.filter((item: any) => {
+            if (!item || typeof item !== 'object') return false;
+            if (legacyDemoIds.has(item.id)) return false;
+            if (item.clientId && legacyDemoIds.has(item.clientId)) return false;
+            if (item.buildingId && legacyDemoIds.has(item.buildingId)) return false;
+            if (item.liftId && legacyDemoIds.has(item.liftId)) return false;
+            return true;
+          });
+          localStorage.setItem(key, JSON.stringify(sanitized));
+        }
+      }
+    } catch {}
+  });
+
+  localStorage.setItem(CLEAN_STORE_VERSION, 'true');
+}
+
 function safeStorageParse<T>(key: string, fallback: T): T {
   try {
+    scrubLegacyStorage();
     const saved = localStorage.getItem(key);
     if (!saved || saved === 'undefined' || saved === 'null') return fallback;
     const parsed = JSON.parse(saved);
@@ -3873,7 +3935,7 @@ function mapServerServiceReport(sr: any): ServiceReport {
       companyId: liftData.companyId || activeCompanyId,
       branchId: liftData.branchId || (activeBranchId !== 'all' ? activeBranchId : 'br-thn-1'),
       liftNumber,
-      buildingId: liftData.buildingId || (buildings.length > 0 ? buildings[0].id : 'bld-1'),
+      buildingId: liftData.buildingId || (buildings.length > 0 ? buildings[0].id : ''),
       buildingName: liftData.buildingName || (buildings.length > 0 ? buildings[0].name : 'Primary Premises'),
       clientId: liftData.clientId || (currentRole === 'client' ? (currentUser.clientId || effectiveClientId) : (activeClientId || '')),
       clientName: liftData.clientName || (currentRole === 'client' ? (currentUser.companyName || currentUser.name || 'Valued Client') : 'Valued Client'),
@@ -4126,9 +4188,9 @@ function mapServerServiceReport(sr: any): ServiceReport {
       contractNumber,
       clientId: contractData.clientId || (currentRole === 'client' ? (currentUser.clientId || effectiveClientId) : (activeClientId || '')),
       clientName: contractData.clientName || (currentRole === 'client' ? (currentUser.companyName || currentUser.name || 'Valued Society') : 'Valued Society'),
-      buildingId: contractData.buildingId || 'bld-1',
-      buildingName: contractData.buildingName || 'Greenwood Heights CHS',
-      liftIds: contractData.liftIds || ['lift-1'],
+      buildingId: contractData.buildingId || (buildings.length > 0 ? buildings[0].id : ''),
+      buildingName: contractData.buildingName || (buildings.length > 0 ? buildings[0].name : 'Primary Building'),
+      liftIds: contractData.liftIds || [],
       amcType: contractData.amcType || 'Comprehensive',
       startDate: contractData.startDate || new Date().toISOString().split('T')[0],
       endDate: contractData.endDate || new Date(Date.now() + 365 * 86400000).toISOString().split('T')[0],

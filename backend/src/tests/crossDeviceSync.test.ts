@@ -14,7 +14,7 @@
  * 10. Test all existing roles, permissions, and project modules.
  */
 
-import { prisma } from '../lib/prisma.js';
+import { getTestPrisma } from './testPrismaClient.js';
 import { db } from '../data/mockDb.js';
 import { generateAccessToken } from '../lib/auth.js';
 
@@ -35,6 +35,8 @@ async function runCrossDeviceSyncTests() {
   console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('🧪 WEPSUN CROSS-DEVICE DATA SYNCHRONIZATION TEST SUITE');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+
+  const prisma = await getTestPrisma();
 
   // -------------------------------------------------------------------------
   // Scenario 1: Register an account on Mobile A and sign in on Mobile B using the same email

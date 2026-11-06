@@ -115,7 +115,7 @@ export const AdminBuildingsView: React.FC<AdminBuildingsViewProps> = ({ onNaviga
       liftNumber: liftNumber || `WEP-LFT-${Math.floor(100 + Math.random() * 900)}`,
       buildingId: bld.id,
       buildingName: bld.name,
-      clientId: 'usr-client-1',
+      clientId: (bld as any).clientId || bld.id,
       clientName: bld.client,
       brand,
       model,
@@ -185,8 +185,17 @@ export const AdminBuildingsView: React.FC<AdminBuildingsViewProps> = ({ onNaviga
       </div>
 
       {/* Building Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {filteredBuildings.map((bld) => (
+      {filteredBuildings.length === 0 ? (
+        <div className="bg-white border border-dashed border-slate-200 rounded-2xl p-12 text-center text-slate-500 space-y-3">
+          <BuildingIcon className="w-10 h-10 text-slate-300 mx-auto" />
+          <h3 className="font-bold text-sm text-slate-700">No Buildings Registered Yet</h3>
+          <p className="text-xs text-slate-400 max-w-sm mx-auto">
+            Click &quot;Register Building&quot; to add your client societies and commercial facilities.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {filteredBuildings.map((bld) => (
           <div
             key={bld.id}
             className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-4"
@@ -266,7 +275,8 @@ export const AdminBuildingsView: React.FC<AdminBuildingsViewProps> = ({ onNaviga
             </div>
           </div>
         ))}
-      </div>
+        </div>
+      )}
 
       {/* Add Building Modal */}
       {isAddBuildingModalOpen && (

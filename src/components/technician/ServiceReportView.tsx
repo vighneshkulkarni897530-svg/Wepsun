@@ -20,6 +20,7 @@ import {
 import { TechnicianJob, ServiceReport, Company } from '../../types';
 import { downloadServiceReportPdf } from '../../services/pdfGenerator';
 import { WepsunLogo } from '../common/WepsunLogo';
+import { useApp } from '../../context/AppContext';
 
 interface ServiceReportViewProps {
   job: TechnicianJob;
@@ -34,6 +35,7 @@ export const ServiceReportView: React.FC<ServiceReportViewProps> = ({
   showToast,
   onFinalizeReport,
 }) => {
+  const { currentUser } = useApp();
   const [isFinalized, setIsFinalized] = React.useState(!!job?.serviceReportNumber);
   const reportNumber = job?.serviceReportNumber || (job?.jobId ? `SR-WEP-2026-${job.jobId.slice(-4)}` : 'SR-WEP-2026-0001');
   const completionDate = job?.checkOutDate || job?.scheduledDate || new Date().toISOString().split('T')[0];
@@ -46,19 +48,19 @@ export const ServiceReportView: React.FC<ServiceReportViewProps> = ({
     companyId: 'comp-1',
     branchId: 'br-thn-1',
     reportNumber,
-    ticketId: job?.id || 'job-001',
-    ticketNumber: job?.jobId || 'JOB-001',
-    liftId: job?.liftId || 'lift-1',
-    liftNumber: job?.liftNumber || 'WPS-PUN-000101',
-    liftBrand: 'WEPSUN MRL Traction',
-    liftModel: 'WEP-MAX 3000 Eco',
-    buildingName: job?.buildingName || 'Greenwood Heights CHS',
-    buildingAddress: job?.serviceAddress || 'Sector 19, Vashi, Navi Mumbai',
-    clientName: job?.clientName || 'Greenwood Heights Society',
-    clientContact: job?.clientPhone || '+91 98220 11223',
-    technicianId: job?.technicianId || '',
-    technicianName: job?.technicianName || 'Assigned Field Engineer',
-    technicianPhone: job?.clientPhone || '+91 98203 11223',
+    ticketId: job?.id || '',
+    ticketNumber: job?.jobId || (job as any)?.ticketNumber || '',
+    liftId: job?.liftId || '',
+    liftNumber: job?.liftNumber || '',
+    liftBrand: (job as any)?.liftBrand || 'WEPSUN Elevator',
+    liftModel: (job as any)?.liftModel || 'AeroGlide Series',
+    buildingName: job?.buildingName || '',
+    buildingAddress: job?.serviceAddress || '',
+    clientName: job?.clientName || '',
+    clientContact: job?.clientPhone || '',
+    technicianId: job?.technicianId || currentUser?.id || '',
+    technicianName: job?.technicianName || currentUser?.name || 'Field Service Engineer',
+    technicianPhone: (job as any)?.technicianPhone || currentUser?.phone || '',
     serviceDate: completionDate,
     serviceStartTime: startTime,
     serviceEndTime: endTime,

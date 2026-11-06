@@ -183,7 +183,18 @@ export const QuotationManager: React.FC = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {filteredQuotes.map((q) => (
+            {filteredQuotes.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="p-12 text-center text-slate-400">
+                  <div className="flex flex-col items-center justify-center gap-2">
+                    <FileText className="w-8 h-8 text-slate-300" />
+                    <span className="font-bold text-sm text-slate-700">No Quotations Found</span>
+                    <span className="text-xs text-slate-400">Click &quot;New Quotation&quot; to draft and dispatch a formal quotation.</span>
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              filteredQuotes.map((q) => (
               <tr key={q.id} className="hover:bg-blue-50/50 text-slate-700 transition-colors">
                 <td className="p-3.5 font-bold text-[#1976D2] font-mono">
                   <span className="bg-blue-50 px-2 py-1 rounded border border-blue-200">
@@ -249,7 +260,7 @@ export const QuotationManager: React.FC = () => {
                   )}
                 </td>
               </tr>
-            ))}
+            )))}
           </tbody>
         </table>
       </div>

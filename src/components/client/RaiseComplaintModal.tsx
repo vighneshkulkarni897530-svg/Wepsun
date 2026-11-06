@@ -43,149 +43,6 @@ export interface RaiseComplaintModalProps {
   onNavigateTab?: (tab: 'home' | 'complaints', ticketNumber?: string) => void;
 }
 
-export const FOUR_NAMED_LIFTS: Lift[] = [
-  {
-    id: 'lift-traction',
-    companyId: 'comp-1',
-    branchId: 'br-pune-1',
-    liftNumber: 'Traction Lift',
-    buildingId: 'bld-abc-1',
-    buildingName: 'ABC Residency, Pune',
-    clientId: 'client-1',
-    clientName: 'ABC Residency Co-op Housing Society',
-    clientPhone: '+91 85959 40077',
-    brand: 'WEPSUN Traction',
-    model: 'TR-5000 Eco',
-    type: 'Passenger',
-    capacityPersons: 8,
-    capacityKg: 544,
-    speedMps: 1.5,
-    floors: 'G + 10 Floors',
-    stops: 11,
-    machineType: 'Geared Traction',
-    motorKw: 7.5,
-    controllerBrand: 'Integrated VVVF',
-    doorOperator: 'Center Opening Auto Door',
-    ardSystem: 'Automatic Rescue Device 415V',
-    governorSpeed: 1.75,
-    ropeDiaMm: 10,
-    installationDate: '2023-01-01',
-    warrantyExpiry: '2026-01-01',
-    currentStatus: 'operational',
-    amcStatus: 'active',
-    lastPmDate: '2024-01-01',
-    nextPmDate: '2024-04-01',
-    safetyCertificateNumber: 'MH-PUN-SAFE-001',
-    safetyCertificateExpiry: '2026-12-31',
-    locationDetails: 'Traction Lift',
-  },
-  {
-    id: 'lift-machine-room',
-    companyId: 'comp-1',
-    branchId: 'br-pune-1',
-    liftNumber: 'Machine Room Lift',
-    buildingId: 'bld-abc-1',
-    buildingName: 'ABC Residency, Pune',
-    clientId: 'client-1',
-    clientName: 'ABC Residency Co-op Housing Society',
-    clientPhone: '+91 85959 40077',
-    brand: 'WEPSUN MR Series',
-    model: 'MR-Classic 400',
-    type: 'Passenger',
-    capacityPersons: 10,
-    capacityKg: 680,
-    speedMps: 1.75,
-    floors: 'G + 12 Floors',
-    stops: 13,
-    machineType: 'Geared Traction',
-    motorKw: 9.0,
-    controllerBrand: 'Microprocessor MR-300',
-    doorOperator: 'Telescopic Auto Door',
-    ardSystem: 'Automatic Rescue Device 415V',
-    governorSpeed: 2.0,
-    ropeDiaMm: 12,
-    installationDate: '2022-06-15',
-    warrantyExpiry: '2025-06-15',
-    currentStatus: 'operational',
-    amcStatus: 'active',
-    lastPmDate: '2024-01-01',
-    nextPmDate: '2024-04-01',
-    safetyCertificateNumber: 'MH-PUN-SAFE-002',
-    safetyCertificateExpiry: '2026-12-31',
-    locationDetails: 'Machine Room Lift',
-  },
-  {
-    id: 'lift-machine-roomless',
-    companyId: 'comp-1',
-    branchId: 'br-pune-1',
-    liftNumber: 'Machine Roomless',
-    buildingId: 'bld-abc-1',
-    buildingName: 'ABC Residency, Pune',
-    clientId: 'client-1',
-    clientName: 'ABC Residency Co-op Housing Society',
-    clientPhone: '+91 85959 40077',
-    brand: 'WEPSUN MRL Eco',
-    model: 'MRL-SpaceSaver',
-    type: 'Passenger',
-    capacityPersons: 8,
-    capacityKg: 544,
-    speedMps: 1.5,
-    floors: 'G + 8 Floors',
-    stops: 9,
-    machineType: 'Gearless PMSM',
-    motorKw: 5.5,
-    controllerBrand: 'NICE 3000+ MRL',
-    doorOperator: 'VVVF Center Opening',
-    ardSystem: 'Automatic Rescue Device 415V',
-    governorSpeed: 1.75,
-    ropeDiaMm: 10,
-    installationDate: '2023-03-10',
-    warrantyExpiry: '2026-03-10',
-    currentStatus: 'operational',
-    amcStatus: 'active',
-    lastPmDate: '2024-01-01',
-    nextPmDate: '2024-04-01',
-    safetyCertificateNumber: 'MH-PUN-SAFE-003',
-    safetyCertificateExpiry: '2026-12-31',
-    locationDetails: 'Machine Roomless',
-  },
-  {
-    id: 'lift-goods',
-    companyId: 'comp-1',
-    branchId: 'br-pune-1',
-    liftNumber: 'Goods Lift',
-    buildingId: 'bld-abc-1',
-    buildingName: 'ABC Residency, Pune',
-    clientId: 'client-1',
-    clientName: 'ABC Residency Co-op Housing Society',
-    clientPhone: '+91 85959 40077',
-    brand: 'WEPSUN HeavyDuty',
-    model: 'GL-Freight 2000',
-    type: 'Freight / Goods',
-    capacityPersons: 15,
-    capacityKg: 1500,
-    speedMps: 1.0,
-    floors: 'B + G + 6 Floors',
-    stops: 8,
-    machineType: 'Gearless PMSM',
-    motorKw: 11.0,
-    controllerBrand: 'Industrial Heavy Duty VFD',
-    doorOperator: 'Collapsible Gate / 2-Speed Power Door',
-    ardSystem: 'Automatic Rescue Device 415V Heavy',
-    governorSpeed: 1.25,
-    ropeDiaMm: 13,
-    installationDate: '2021-11-20',
-    warrantyExpiry: '2024-11-20',
-    currentStatus: 'operational',
-    amcStatus: 'active',
-    lastPmDate: '2024-01-01',
-    nextPmDate: '2024-04-01',
-    safetyCertificateNumber: 'MH-PUN-SAFE-004',
-    safetyCertificateExpiry: '2026-12-31',
-    locationDetails: 'Goods Lift',
-  },
-];
-
 export interface SubmittedTicketDetails {
   id: string;
   rawId?: string;
@@ -220,23 +77,14 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
 
   const availableLifts = currentRole === 'client' ? clientScopedLifts : lifts;
 
-  // Prioritize client's actual lifts, followed by the 4 standard fleet lifts
+  // Real database-backed lift options
   const liftOptions = useMemo(() => {
-    if (availableLifts && availableLifts.length > 0) {
-      const list = [...availableLifts];
-      FOUR_NAMED_LIFTS.forEach((fl) => {
-        if (!list.some((l) => l.id === fl.id || l.liftNumber.toLowerCase() === fl.liftNumber.toLowerCase())) {
-          list.push(fl);
-        }
-      });
-      return list;
-    }
-    return [...FOUR_NAMED_LIFTS];
+    return availableLifts || [];
   }, [availableLifts]);
 
   const [modalMode, setModalMode] = useState<'normal' | 'emergency'>(initialMode);
   const [selectedLiftId, setSelectedLiftId] = useState<string>(
-    initialLiftId || preselectedLift?.id || liftOptions[0]?.id || 'lift-traction'
+    initialLiftId || preselectedLift?.id || liftOptions[0]?.id || ''
   );
 
   // Normal mode fields (Page 5)
@@ -459,8 +307,8 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
     const activeClientId =
       (currentUser as any)?.clientId ||
       clientProfile?.clientId ||
-      (currentLift.clientId && currentLift.clientId !== 'client-1' ? currentLift.clientId : null) ||
-      'client-1';
+      currentLift?.clientId ||
+      (currentUser?.role === 'client' ? currentUser.id : '');
 
     const activeClientName =
       (currentUser as any)?.name ||
@@ -560,8 +408,8 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
     const activeClientId =
       (currentUser as any)?.clientId ||
       clientProfile?.clientId ||
-      (currentLift.clientId && currentLift.clientId !== 'client-1' ? currentLift.clientId : null) ||
-      'client-1';
+      currentLift?.clientId ||
+      (currentUser?.role === 'client' ? currentUser.id : '');
 
     const activeClientName =
       (currentUser as any)?.name ||
@@ -828,16 +676,11 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
                     onChange={(e) => setSelectedLiftId(e.target.value)}
                     className="w-full px-3.5 py-3 sm:py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-base sm:text-xs font-medium focus:bg-white focus:border-[#1976D2] outline-none transition-colors"
                   >
-                    {liftOptions.map((l) => {
-                      const isNamedLift = FOUR_NAMED_LIFTS.some((f) => f.id === l.id);
-                      return (
-                        <option key={l.id} value={l.id}>
-                          {isNamedLift
-                            ? l.liftNumber
-                            : `${l.liftNumber} — ${l.buildingName} (${l.capacityPersons ? `${l.capacityPersons} Persons / ` : ''}${l.locationDetails || `${l.capacityKg || 544} kg`})`}
-                        </option>
-                      );
-                    })}
+                    {liftOptions.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.liftNumber} — {l.buildingName} ({l.capacityPersons ? `${l.capacityPersons} Persons / ` : ''}{l.locationDetails || `${l.capacityKg || 544} kg`})
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -1159,16 +1002,11 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
                     onChange={(e) => setSelectedLiftId(e.target.value)}
                     className="w-full px-3.5 py-3 sm:py-2.5 rounded-xl border border-red-200 bg-red-50/40 text-slate-800 text-base sm:text-xs font-bold focus:bg-white focus:border-[#D32F2F] outline-none transition-colors"
                   >
-                    {liftOptions.map((l) => {
-                      const isNamedLift = FOUR_NAMED_LIFTS.some((f) => f.id === l.id);
-                      return (
-                        <option key={l.id} value={l.id}>
-                          {isNamedLift
-                            ? `${l.liftNumber} — ${l.buildingName}`
-                            : `${l.liftNumber} — ${l.buildingName} (${l.locationDetails || 'Passenger Lift'})`}
-                        </option>
-                      );
-                    })}
+                    {liftOptions.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.liftNumber} — {l.buildingName} ({l.locationDetails || 'Passenger Lift'})
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -1178,7 +1016,7 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
                     <label className="block text-slate-700 font-bold mb-1">Building Name & Site</label>
                     <input
                       type="text"
-                      value={emergencyBuilding || currentLift?.buildingName || 'ABC Residency, Pune'}
+                      value={emergencyBuilding || currentLift?.buildingName || ''}
                       onChange={(e) => setEmergencyBuilding(e.target.value)}
                       placeholder="Building name"
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-xs focus:bg-white focus:border-[#D32F2F] outline-none transition-colors"
