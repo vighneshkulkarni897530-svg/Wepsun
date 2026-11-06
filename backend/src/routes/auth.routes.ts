@@ -547,8 +547,23 @@ router.post('/google', authLimiter, async (req: AuthenticatedRequest, res: Respo
         return;
       }
 
-      // If no administrator pre-registered this email, provision a dedicated isolated tenant company.
-      // Uninvited self-signups must NEVER share a company with existing tenants.
+      // In WEPSUN Service Ecosystem, default uninvited users to comp-1 if active,
+      // so Clients, Technicians, and Admins can interact seamlessly.
+      if (!resolvedCompanyId) {
+        try {
+          const defaultComp = await prisma.company.findFirst({
+            where: { id: process.env.DEFAULT_COMPANY_ID || 'comp-1', isActive: true },
+          });
+          if (defaultComp) {
+            resolvedCompanyId = defaultComp.id;
+          }
+        } catch {
+          const mockComp = (db as any).companies?.find((c: any) => c.id === 'comp-1');
+          if (mockComp) resolvedCompanyId = 'comp-1';
+        }
+      }
+
+      // Fallback: If no central company exists, provision dedicated isolated tenant workspace
       if (!resolvedCompanyId) {
         const emailHash = crypto.createHash('sha256').update(cleanEmail).digest('hex').substring(0, 16);
         const isolatedCompanyId = 'comp-self-' + emailHash;
@@ -2697,6 +2712,20 @@ const handleAccountRegistration = async (req: AuthenticatedRequest, res: Respons
           }
         }
       } catch {}
+
+      if (!resolvedCompanyId) {
+        try {
+          const defaultComp = await prisma.company.findFirst({
+            where: { id: process.env.DEFAULT_COMPANY_ID || 'comp-1', isActive: true },
+          });
+          if (defaultComp) {
+            resolvedCompanyId = defaultComp.id;
+          }
+        } catch {
+          const mockComp = (db as any).companies?.find((c: any) => c.id === 'comp-1');
+          if (mockComp) resolvedCompanyId = 'comp-1';
+        }
+      }
 
       if (!resolvedCompanyId) {
         const isolatedCompanyId = 'comp-self-' + crypto.createHash('sha256').update(cleanEmail).digest('hex').substring(0, 16);

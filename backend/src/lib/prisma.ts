@@ -46,9 +46,12 @@ export async function checkDatabaseConnection(): Promise<{ connected: boolean; l
 export async function runTransaction<T>(
   fn: (tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]) => Promise<T>
 ): Promise<T> {
-  return await prisma.$transaction(async (tx) => {
-    return await fn(tx);
-  });
+  return await prisma.$transaction(
+    async (tx) => {
+      return await fn(tx);
+    },
+    { timeout: 25000, maxWait: 10000 }
+  );
 }
 
 export default prisma;

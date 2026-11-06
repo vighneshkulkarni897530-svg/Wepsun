@@ -213,22 +213,25 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
     createComplaintAsync,
     clientScopedLifts,
     currentRole,
+    currentUser,
+    clientProfile,
     showToast,
   } = useApp();
 
   const availableLifts = currentRole === 'client' ? clientScopedLifts : lifts;
 
-  // Combine the 4 named lifts (Traction Lift, Machine Room Lift, Machine Roomless, Goods Lift) with any existing fleet lifts
+  // Prioritize client's actual lifts, followed by the 4 standard fleet lifts
   const liftOptions = useMemo(() => {
-    const combined = [...FOUR_NAMED_LIFTS];
     if (availableLifts && availableLifts.length > 0) {
-      availableLifts.forEach((l) => {
-        if (!combined.some((c) => c.id === l.id || c.liftNumber.toLowerCase() === l.liftNumber.toLowerCase())) {
-          combined.push(l);
+      const list = [...availableLifts];
+      FOUR_NAMED_LIFTS.forEach((fl) => {
+        if (!list.some((l) => l.id === fl.id || l.liftNumber.toLowerCase() === fl.liftNumber.toLowerCase())) {
+          list.push(fl);
         }
       });
+      return list;
     }
-    return combined;
+    return [...FOUR_NAMED_LIFTS];
   }, [availableLifts]);
 
   const [modalMode, setModalMode] = useState<'normal' | 'emergency'>(initialMode);
@@ -453,42 +456,49 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
         ? 'lift_not_moving'
         : 'other';
 
+    const activeClientId =
+      (currentUser as any)?.clientId ||
+      clientProfile?.clientId ||
+      (currentLift.clientId && currentLift.clientId !== 'client-1' ? currentLift.clientId : null) ||
+      'client-1';
+
+    const activeClientName =
+      (currentUser as any)?.name ||
+      clientProfile?.companyName ||
+      clientProfile?.contactPerson ||
+      currentLift.clientName ||
+      'WEPSUN Client';
+
+    const activeClientPhone =
+      (currentUser as any)?.phone ||
+      clientProfile?.phone ||
+      currentLift.clientPhone ||
+      '+91 85959 40077';
+
     try {
       let createdResult;
+      const complaintPayload = {
+        liftId: currentLift.id,
+        liftNumber: currentLift.liftNumber,
+        buildingId: currentLift.buildingId,
+        buildingName: currentLift.buildingName,
+        clientId: activeClientId,
+        clientName: activeClientName,
+        clientPhone: activeClientPhone,
+        createdById: currentUser?.id,
+        issueType: mappedIssueType,
+        title: `${complaintType}: ${currentLift.liftNumber}`,
+        description: trimmedDesc,
+        priority,
+        isEmergency: priority === 'critical',
+        beforePhotos: photos,
+        afterPhotos: [],
+      };
+
       if (createComplaintAsync) {
-        createdResult = await createComplaintAsync({
-          liftId: currentLift.id,
-          liftNumber: currentLift.liftNumber,
-          buildingId: currentLift.buildingId,
-          buildingName: currentLift.buildingName,
-          clientId: currentLift.clientId,
-          clientName: currentLift.clientName,
-          clientPhone: currentLift.clientPhone || '+91 85959 40077',
-          issueType: mappedIssueType,
-          title: `${complaintType}: ${currentLift.liftNumber}`,
-          description: trimmedDesc,
-          priority,
-          isEmergency: priority === 'critical',
-          beforePhotos: photos,
-          afterPhotos: [],
-        });
+        createdResult = await createComplaintAsync(complaintPayload);
       } else {
-        createdResult = createComplaint({
-          liftId: currentLift.id,
-          liftNumber: currentLift.liftNumber,
-          buildingId: currentLift.buildingId,
-          buildingName: currentLift.buildingName,
-          clientId: currentLift.clientId,
-          clientName: currentLift.clientName,
-          clientPhone: currentLift.clientPhone || '+91 85959 40077',
-          issueType: mappedIssueType,
-          title: `${complaintType}: ${currentLift.liftNumber}`,
-          description: trimmedDesc,
-          priority,
-          isEmergency: priority === 'critical',
-          beforePhotos: photos,
-          afterPhotos: [],
-        });
+        createdResult = createComplaint(complaintPayload);
       }
 
       const ticketNumber = createdResult?.ticketNumber || '#CMP-' + Date.now().toString().slice(-5);
@@ -547,42 +557,46 @@ export const RaiseComplaintModal: React.FC<RaiseComplaintModalProps> = ({
     setIsSubmitting(true);
     setSubmitError(null);
 
+    const activeClientId =
+      (currentUser as any)?.clientId ||
+      clientProfile?.clientId ||
+      (currentLift.clientId && currentLift.clientId !== 'client-1' ? currentLift.clientId : null) ||
+      'client-1';
+
+    const activeClientName =
+      (currentUser as any)?.name ||
+      clientProfile?.companyName ||
+      clientProfile?.contactPerson ||
+      currentLift.clientName ||
+      'WEPSUN Client';
+
     try {
       let createdResult;
+      const emergencyPayload = {
+        liftId: currentLift.id,
+        liftNumber: currentLift.liftNumber,
+        buildingId: currentLift.buildingId,
+        buildingName: emergencyBuilding || currentLift.buildingName,
+        clientId: activeClientId,
+        clientName: activeClientName,
+        clientPhone: trimmedContact,
+        createdById: currentUser?.id,
+        issueType: 'stuck_passengers' as IssueType,
+        emergencyType,
+        trappedPassengerCount: trappedPassengers,
+        currentLocation: emergencyFloorLocation,
+        title: `🚨 EMERGENCY BREAKDOWN: ${currentLift.liftNumber}`,
+        description: trimmedDesc,
+        priority: 'critical' as ComplaintPriority,
+        isEmergency: true,
+        beforePhotos: emergencyPhotos,
+        afterPhotos: [],
+      };
+
       if (createComplaintAsync) {
-        createdResult = await createComplaintAsync({
-          liftId: currentLift.id,
-          liftNumber: currentLift.liftNumber,
-          buildingId: currentLift.buildingId,
-          buildingName: emergencyBuilding || currentLift.buildingName,
-          clientId: currentLift.clientId,
-          clientName: currentLift.clientName,
-          clientPhone: trimmedContact,
-          issueType: 'stuck_passengers',
-          title: `🚨 EMERGENCY BREAKDOWN: ${currentLift.liftNumber}`,
-          description: trimmedDesc,
-          priority: 'critical',
-          isEmergency: true,
-          beforePhotos: emergencyPhotos,
-          afterPhotos: [],
-        });
+        createdResult = await createComplaintAsync(emergencyPayload);
       } else {
-        createdResult = createComplaint({
-          liftId: currentLift.id,
-          liftNumber: currentLift.liftNumber,
-          buildingId: currentLift.buildingId,
-          buildingName: emergencyBuilding || currentLift.buildingName,
-          clientId: currentLift.clientId,
-          clientName: currentLift.clientName,
-          clientPhone: trimmedContact,
-          issueType: 'stuck_passengers',
-          title: `🚨 EMERGENCY BREAKDOWN: ${currentLift.liftNumber}`,
-          description: trimmedDesc,
-          priority: 'critical',
-          isEmergency: true,
-          beforePhotos: emergencyPhotos,
-          afterPhotos: [],
-        });
+        createdResult = createComplaint(emergencyPayload);
       }
 
       const ticketNumber = createdResult?.ticketNumber || '#EMG-' + Date.now().toString().slice(-5);

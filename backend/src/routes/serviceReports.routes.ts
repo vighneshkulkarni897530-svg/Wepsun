@@ -167,6 +167,24 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): 
       clientFeedback,
     } = req.body;
 
+    const validServiceTypes: Record<string, string> = {
+      breakdown_repair: 'BREAKDOWN_REPAIR',
+      'breakdown repair': 'BREAKDOWN_REPAIR',
+      emergency_call: 'EMERGENCY_CALL',
+      'emergency call': 'EMERGENCY_CALL',
+      emergency_rescue: 'EMERGENCY_CALL',
+      preventive_maintenance: 'PREVENTIVE_MAINTENANCE',
+      'preventive maintenance': 'PREVENTIVE_MAINTENANCE',
+      safety_audit: 'SAFETY_AUDIT',
+      'safety audit': 'SAFETY_AUDIT',
+      modernization: 'MODERNIZATION',
+      part_replacement: 'PART_REPLACEMENT',
+      'part replacement': 'PART_REPLACEMENT',
+    };
+    const normalizedServiceType = (serviceType && validServiceTypes[String(serviceType).toLowerCase()])
+      ? (validServiceTypes[String(serviceType).toLowerCase()] as any)
+      : 'BREAKDOWN_REPAIR';
+
     const count = Math.floor(10000 + Math.random() * 90000);
     const reportNumber = `WPS-SR-${count}`;
     const effectiveTechId = req.user!.technicianId || technicianId || (await prisma.technician.findFirst({ where: { companyId } }))?.id || '';
@@ -174,40 +192,51 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): 
     let newReport: any = null;
 
     try {
-      newReport = await prisma.$transaction(async (tx) => {
-        let targetClientId: string | null = null;
-        if (liftId) {
-          const l = await tx.lift.findUnique({ where: { id: liftId } });
-          if (l) targetClientId = l.clientId;
-        } else if (ticketId) {
-          const c = await tx.complaint.findUnique({ where: { id: ticketId } });
-          if (c) targetClientId = c.clientId;
-        }
+      newReport = await prisma.$transaction(
+        async (tx) => {
+          let targetClientId: string | null = null;
+          if (liftId) {
+            const l = await tx.lift.findUnique({ where: { id: liftId } });
+            if (l) targetClientId = l.clientId;
+          } else if (ticketId) {
+            const c = await tx.complaint.findUnique({ where: { id: ticketId } });
+            if (c) targetClientId = c.clientId;
+          }
 
-        // 1. Create service report
-        const rep = await tx.serviceReport.create({
-          data: {
-            companyId,
-            branchId,
-            clientId: targetClientId,
-            reportNumber,
-            ticketId,
-            liftId,
-            technicianId: effectiveTechId,
-            serviceStartTime: '10:00 AM',
-            serviceEndTime: '11:30 AM',
-            serviceType: serviceType || 'BREAKDOWN_REPAIR',
-            initialDiagnosis: initialDiagnosis || 'Intermittent breakdown',
-            rootCause: rootCause || 'Mechanical/electrical wear',
-            workPerformed: workPerformed || 'Repaired and tested',
-            technicianRecommendations: technicianRecommendations || 'Regular preventive maintenance',
-            technicianSignature: technicianSignature || 'signed_tech',
-            clientSignature: clientSignature || customerSignature || 'signed_client',
-            clientRating: clientRating ? Number(clientRating) : 5,
-            clientFeedback: clientFeedback || null,
-            pdfUrl: `https://app.wepsun.com/reports/${reportNumber}.pdf`,
-          },
-        });
+          // Verify technician foreign key exists in PostgreSQL
+          let resolvedTechId = effectiveTechId;
+          const techExists = resolvedTechId ? await tx.technician.findUnique({ where: { id: resolvedTechId } }) : null;
+          if (!techExists) {
+            const fallbackTech = await tx.technician.findFirst({
+              where: { companyId: companyId || 'comp-1' },
+            });
+            resolvedTechId = fallbackTech?.id || 'tech-rohan';
+          }
+
+          // 1. Create service report
+          const rep = await tx.serviceReport.create({
+            data: {
+              companyId,
+              branchId,
+              clientId: targetClientId,
+              reportNumber,
+              ticketId,
+              liftId,
+              technicianId: resolvedTechId,
+              serviceStartTime: '10:00 AM',
+              serviceEndTime: '11:30 AM',
+              serviceType: normalizedServiceType,
+              initialDiagnosis: initialDiagnosis || 'Intermittent breakdown',
+              rootCause: rootCause || 'Mechanical/electrical wear',
+              workPerformed: workPerformed || 'Repaired and tested',
+              technicianRecommendations: technicianRecommendations || 'Regular preventive maintenance',
+              technicianSignature: technicianSignature || 'signed_tech',
+              clientSignature: clientSignature || customerSignature || 'signed_client',
+              clientRating: clientRating ? Number(clientRating) : 5,
+              clientFeedback: clientFeedback || null,
+              pdfUrl: `https://app.wepsun.com/reports/${reportNumber}.pdf`,
+            },
+          });
 
         // 2. Resolve Complaint
         if (ticketId) {
@@ -289,7 +318,7 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): 
         });
 
         return rep;
-      });
+      }, { timeout: 25000, maxWait: 10000 });
     } catch {
       // In-memory fallback
       newReport = {
