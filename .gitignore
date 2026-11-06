@@ -33,7 +33,6 @@ android/.gradle
 android/app/build
 android/build
 *.apk
-!wepsun-engineering-solution.apk
 *.aab
 
 # Scratch & temporary benchmarks
