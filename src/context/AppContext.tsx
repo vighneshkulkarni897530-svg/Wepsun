@@ -2976,6 +2976,9 @@ function mapServerServiceReport(sr: any): ServiceReport {
       branchId: activeBranchId,
       userRole: currentRole,
       userId: activeUserId,
+      assignedTechnicianName: tech.name,
+      technicianPhone: tech.phone,
+      technicianEta: eta,
     }).catch((err) => console.warn('[AppContext] Background assignTechnician API sync:', err));
 
     const targetComp = complaints.find((c) => c.id === ticketId);
@@ -3299,7 +3302,7 @@ function mapServerServiceReport(sr: any): ServiceReport {
       clientOtpVerified: boolean;
     }
   ): ServiceReport => {
-    const complaint = complaints.find((c) => c.id === ticketId);
+    const complaint = complaints.find((c) => c.id === ticketId || c.ticketNumber === ticketId);
     const lift = lifts.find((l) => l.id === complaint?.liftId);
     const tech = technicians.find((t) => t.id === complaint?.assignedTechnicianId) || technicians[0];
 
@@ -3314,7 +3317,7 @@ function mapServerServiceReport(sr: any): ServiceReport {
       branchId: complaint?.branchId || 'br-thn-1',
       clientId: complaint?.clientId || lift?.clientId || currentUser.clientId || activeClientId || '',
       reportNumber,
-      ticketId,
+      ticketId: complaint?.id || ticketId,
       ticketNumber: complaint?.ticketNumber || 'TKT-000',
       liftId: lift?.id || complaint?.liftId || '',
       liftNumber: lift?.liftNumber || complaint?.liftNumber || 'WEP-LIFT',
@@ -3353,14 +3356,15 @@ function mapServerServiceReport(sr: any): ServiceReport {
     setServiceReports((prev) => [report, ...prev]);
 
     // Close / Resolve Complaint
+    let updatedComplaintRecord: Complaint | null = null;
     setComplaints((prev) =>
       prev.map((c) => {
-        if (c.id === ticketId) {
+        if (c.id === ticketId || c.ticketNumber === ticketId) {
           const updatedTimeline = [
             ...(c.timeline || []),
             {
               id: 'tl-' + Date.now(),
-              status: 'closed' as ComplaintStatus,
+              status: 'resolved' as ComplaintStatus,
               title: 'Job Completed & Report Generated',
               description: `Service Report ${reportNumber} signed and archived. Status: ${data.liftOperatingStatus}.`,
               timestamp: now,
@@ -3368,9 +3372,9 @@ function mapServerServiceReport(sr: any): ServiceReport {
               actorRole: 'Technician',
             },
           ];
-          return {
+          const updated: Complaint = {
             ...c,
-            status: 'closed',
+            status: 'resolved',
             checkOutTime: now,
             diagnosisRemarks: data.diagnosis,
             actionTaken: data.actionTaken,
@@ -3380,13 +3384,46 @@ function mapServerServiceReport(sr: any): ServiceReport {
             technicianSignature: data.technicianSignature,
             clientSignature: data.clientSignature,
             serviceReportId: reportId,
+            resolvedAt: now,
             closedAt: now,
             timeline: updatedTimeline,
           };
+          updatedComplaintRecord = updated;
+          return updated;
         }
         return c;
       })
     );
+
+    if (updatedComplaintRecord) {
+      complaintSyncChannel?.postMessage({
+        type: 'COMPLAINT_UPDATED',
+        data: updatedComplaintRecord,
+      });
+
+      apiService.updateComplaint(
+        (updatedComplaintRecord as Complaint).id,
+        {
+          status: 'resolved',
+          serviceReportId: reportId,
+          diagnosisRemarks: data.diagnosis,
+          actionTaken: data.actionTaken,
+          partsReplaced: data.partsReplaced,
+          beforePhotos: data.beforePhotos,
+          afterPhotos: data.afterPhotos,
+          technicianSignature: data.technicianSignature,
+          clientSignature: data.clientSignature,
+          resolvedAt: now,
+          closedAt: now,
+        },
+        {
+          companyId: report.companyId,
+          branchId: report.branchId,
+          userRole: 'technician',
+          userId: tech.id,
+        }
+      ).catch((err) => console.warn('[AppContext] Background updateComplaint API sync:', err));
+    }
 
     // Update lift status
     if (lift) {

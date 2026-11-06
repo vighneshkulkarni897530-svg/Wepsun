@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { db } from '../data/mockDb.js';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
+import { complaintEvents } from './complaints.routes.js';
 
 const router = Router();
 
@@ -290,7 +291,7 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): 
         return rep;
       });
     } catch {
-      // Fallback
+      // In-memory fallback
       newReport = {
         id: `rep_${Date.now()}`,
         companyId,
@@ -299,8 +300,61 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): 
         ticketId,
         liftId,
         technicianId: effectiveTechId,
-        serviceDate: new Date().toISOString(),
+        technicianName: technicianName || req.user?.email || 'Field Engineer',
+        serviceDate: new Date().toISOString().split('T')[0],
+        serviceStartTime: '10:00 AM',
+        serviceEndTime: '11:30 AM',
+        serviceType: serviceType || 'BREAKDOWN_REPAIR',
+        initialDiagnosis: initialDiagnosis || 'Intermittent breakdown diagnosed',
+        rootCause: rootCause || 'Operating wear and tear',
+        workPerformed: workPerformed || 'Repaired, adjusted, and tested',
+        technicianRecommendations: technicianRecommendations || 'Regular PM check recommended',
+        technicianSignature: technicianSignature || 'signed_tech',
+        clientSignature: clientSignature || customerSignature || 'signed_client',
+        clientRating: clientRating ? Number(clientRating) : 5,
+        clientFeedback: clientFeedback || null,
+        pdfUrl: `https://app.wepsun.com/reports/${reportNumber}.pdf`,
+        createdAt: new Date().toISOString(),
       };
+
+      db.serviceReports.unshift(newReport);
+
+      // If tied to complaint, update complaint status to RESOLVED and notify listeners
+      if (ticketId) {
+        const compIdx = db.complaints.findIndex((c) => c.id === ticketId || c.ticketNumber === ticketId);
+        if (compIdx !== -1) {
+          const comp = db.complaints[compIdx];
+          const updatedComp = {
+            ...comp,
+            status: 'resolved',
+            serviceReportId: newReport.id,
+            closedAt: new Date().toISOString(),
+            clientRating: clientRating ? Number(clientRating) : comp.clientRating,
+            clientFeedback: clientFeedback || comp.clientFeedback,
+            timeline: [
+              ...(comp.timeline || []),
+              {
+                id: `tl-${Date.now()}`,
+                status: 'resolved',
+                title: 'Service Report Signed & Work Complete',
+                description: `Report ${reportNumber} generated. Work signed off by customer.`,
+                timestamp: new Date().toISOString(),
+                actorName: technicianName || req.user?.email || 'Technician',
+                actorRole: 'technician',
+              },
+            ],
+          };
+          db.complaints[compIdx] = updatedComp;
+          complaintEvents.emit('complaint_updated', updatedComp);
+        }
+      }
+
+      if (liftId) {
+        const liftIdx = db.lifts.findIndex((l) => l.id === liftId || l.liftNumber === liftId);
+        if (liftIdx !== -1) {
+          db.lifts[liftIdx].currentStatus = 'operational';
+        }
+      }
     }
 
     res.status(201).json({

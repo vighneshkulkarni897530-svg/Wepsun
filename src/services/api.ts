@@ -542,8 +542,26 @@ export const apiService = {
     apiFetch('/complaints', { method: 'POST', body: JSON.stringify(payload), ...options }),
   updateComplaint: (id: string, payload: any, options?: ApiRequestOptions) =>
     apiFetch(`/complaints/${id}`, { method: 'PATCH', body: JSON.stringify(payload), ...options }),
-  assignTechnician: (id: string, assignedTechnicianId: string, options?: ApiRequestOptions) =>
-    apiFetch(`/complaints/${id}`, { method: 'PATCH', body: JSON.stringify({ assignedTechnicianId, status: 'ASSIGNED' }), ...options }),
+  assignTechnician: (
+    id: string,
+    assignedTechnicianId: string,
+    options?: ApiRequestOptions & {
+      assignedTechnicianName?: string;
+      technicianPhone?: string;
+      technicianEta?: string;
+    }
+  ) =>
+    apiFetch(`/complaints/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        assignedTechnicianId,
+        status: 'ASSIGNED',
+        assignedTechnicianName: options?.assignedTechnicianName,
+        technicianPhone: options?.technicianPhone,
+        technicianEta: options?.technicianEta,
+      }),
+      ...options,
+    }),
   subscribeComplaintStream: (onEvent: (event: any) => void) => {
     if (typeof window === 'undefined' || typeof EventSource === 'undefined') return () => {};
     try {

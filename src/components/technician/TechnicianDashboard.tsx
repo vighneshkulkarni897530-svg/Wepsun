@@ -42,8 +42,6 @@ import {
   TechNotificationItem,
   ServiceReport,
 } from '../../types';
-import { INITIAL_TECHNICIAN_JOBS, INITIAL_TECH_NOTIFICATIONS } from '../../data/mockTechnicianJobs';
-import { INITIAL_LIFTS } from '../../data/initialData';
 import { TodaysJobsView } from './TodaysJobsView';
 import { ClientLiftDetailsView } from './ClientLiftDetailsView';
 import { ServiceHistoryView } from './ServiceHistoryView';
@@ -90,6 +88,8 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
     technicians,
     lifts,
     complaints,
+    workOrders,
+    updateWorkOrderStatus,
     updateComplaintStatus,
     checkInJob,
     completeJobAndGenerateReport,
@@ -100,9 +100,20 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
     activeCompany,
     serviceReports,
     aiErrorCodes,
+    notifications: appNotifications,
+    markNotificationRead,
+    deleteNotification,
     showLogoutModal,
     logout,
   } = useApp();
+
+  // Clear obsolete mock technician storage
+  useEffect(() => {
+    try {
+      localStorage.removeItem('wepsun_tech_jobs_v2');
+      localStorage.removeItem('wepsun_tech_notifs_v2');
+    } catch {}
+  }, []);
 
   const normalizeTechTab = (tabStr?: string): TechNavTab => {
     if (!tabStr) return 'jobs';
@@ -145,80 +156,79 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
     }
   };
 
-  // Load technician jobs with localStorage persistence
-  const [techJobs, setTechJobs] = useState<TechnicianJob[]>(() => {
-    const saved = localStorage.getItem('wepsun_tech_jobs_v2');
-    if (saved && saved !== 'undefined' && saved !== 'null') {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch (e) {
-        console.error('Failed to parse cached technician jobs', e);
-      }
-    }
-    return INITIAL_TECHNICIAN_JOBS;
-  });
-
-  // Load technician notifications
-  const [notifications, setNotifications] = useState<TechNotificationItem[]>(() => {
-    const saved = localStorage.getItem('wepsun_tech_notifs_v2');
-    if (saved && saved !== 'undefined' && saved !== 'null') {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-      } catch (e) {
-        console.error('Failed to parse cached notifications', e);
-      }
-    }
-    return INITIAL_TECH_NOTIFICATIONS;
-  });
-
   // Current logged in technician profile
   const currentTech = useMemo(() => {
     const matched = technicians.find(
-      (t) => t.id === activeTechnicianId || t.email === currentUser?.email || (t as any).userId === currentUser?.id
+      (t) =>
+        t.id === activeTechnicianId ||
+        t.email === currentUser?.email ||
+        (t as any).userId === currentUser?.id ||
+        t.id === currentUser?.technicianId
     );
     if (matched) return matched;
     if (currentUser && (currentUser.role === 'technician' || currentUser.technicianId)) {
       return {
         id: currentUser.technicianId || currentUser.id,
-        name: currentUser.name || 'Technician',
-        phone: currentUser.phone || '',
+        name: currentUser.name || 'Field Engineer',
+        phone: currentUser.phone || '+91 85959 40077',
         email: currentUser.email || '',
         branchName: 'Service Hub',
+        employeeCode: 'TECH-WPS-LIVE',
+        currentStatus: 'available' as const,
+        zone: 'Operational Zone',
       };
     }
-    return technicians[0] || {
-      id: activeTechnicianId || 'tech-field',
-      name: currentUser?.name || 'Field Technician',
-      phone: currentUser?.phone || '',
-      email: currentUser?.email || '',
-      branchName: 'Service Hub',
-    };
+    return (
+      technicians[0] || {
+        id: activeTechnicianId || 'tech-field',
+        name: currentUser?.name || 'Field Technician',
+        phone: currentUser?.phone || '+91 85959 40077',
+        email: currentUser?.email || '',
+        branchName: 'Service Hub',
+        employeeCode: 'TECH-WPS-LIVE',
+        currentStatus: 'available' as const,
+        zone: 'Operational Zone',
+      }
+    );
   }, [technicians, activeTechnicianId, currentUser]);
+
+  const effectiveTechId = useMemo(() => {
+    if (activeTechnicianId) return activeTechnicianId;
+    if (currentUser?.technicianId) return currentUser.technicianId;
+    if (currentTech?.id) return currentTech.id;
+    if (currentUser?.role === 'technician') return currentUser.id;
+    return technicians[0]?.id || '';
+  }, [activeTechnicianId, currentUser, currentTech, technicians]);
 
   // Dynamic conversion: Map live complaints assigned by Admin into TechnicianJob records
   const liveComplaintJobs = useMemo(() => {
-    const activeId = activeTechnicianId || currentUser?.technicianId;
-    const relevantComplaints = complaints.filter(
-      (c) =>
-        c.status !== 'closed' &&
-        (c.assignedTechnicianId === activeId ||
-          !activeId ||
-          c.assignedTechnicianId === 'tech-1' ||
-          c.assignedTechnicianId === 'tech-rohan' ||
-          c.assignedTechnicianName?.toLowerCase().includes('rohan'))
-    );
+    const relevantComplaints = complaints.filter((c) => {
+      if (c.status === 'archived' || c.isArchived) return false;
+      if (effectiveTechId) {
+        if (c.assignedTechnicianId === effectiveTechId) return true;
+        if (currentUser?.id && c.assignedTechnicianId === currentUser.id) return true;
+        if (currentTech?.name && c.assignedTechnicianName && c.assignedTechnicianName.toLowerCase() === currentTech.name.toLowerCase()) return true;
+      }
+      if (currentUser?.role === 'technician' && !c.assignedTechnicianId) {
+        return true;
+      }
+      if (!effectiveTechId) {
+        return !!(c.assignedTechnicianId || c.status === 'assigned' || c.status === 'technician_on_way' || c.status === 'inspection_repair');
+      }
+      return false;
+    });
 
     return relevantComplaints.map((c): TechnicianJob => {
       let mappedStatus: JobWorkflowStatus = 'Assigned';
-      if (c.status === 'technician_on_way') mappedStatus = 'On The Way';
-      else if (c.status === 'inspection_repair') mappedStatus = c.checkInTime ? 'In Progress' : 'Checked In';
-      else if (c.status === 'resolved') mappedStatus = 'Completed';
+      if (c.status === 'accepted') mappedStatus = 'Accepted';
+      else if (c.status === 'technician_on_way' || c.status === 'en_route') mappedStatus = 'On The Way';
+      else if (c.status === 'inspection_repair' || c.status === 'in_progress' || c.status === 'arrived') {
+        mappedStatus = c.checkInTime ? 'In Progress' : 'Checked In';
+      } else if (c.status === 'resolved') mappedStatus = 'Completed';
       else if (c.status === 'closed') mappedStatus = 'Checked Out';
 
       const jobPriority: JobPriority =
-        c.priority === 'critical' ? 'Emergency' : c.priority === 'high' ? 'High' : 'Medium';
+        c.priority === 'critical' || c.isEmergency ? 'Emergency' : c.priority === 'high' ? 'High' : 'Medium';
 
       return {
         id: c.id,
@@ -235,20 +245,21 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
         buildingId: c.buildingId || '',
         liftId: c.liftId,
         liftNumber: c.liftNumber,
-        locationDetails: `${c.buildingName} - ${c.liftNumber}`,
+        locationDetails: `${c.buildingName || 'Building'} - ${c.liftNumber}`,
         scheduledDate: c.reportedAt ? c.reportedAt.split('T')[0] : new Date().toISOString().split('T')[0],
         scheduledTime: c.technicianEta || 'Within 45 mins',
         jobStatus: mappedStatus,
         estimatedDuration: '45 mins',
         assignedBy: 'Control Room Dispatch',
         assignedAt: c.assignedAt || c.reportedAt || new Date().toISOString(),
-        technicianId: c.assignedTechnicianId || activeId || '',
+        technicianId: c.assignedTechnicianId || effectiveTechId || '',
         technicianName: c.assignedTechnicianName || currentTech.name,
         checkInDate: c.checkInTime ? c.checkInTime.split('T')[0] : undefined,
         checkInTime: c.checkInTime ? new Date(c.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined,
         checkOutDate: c.closedAt ? c.closedAt.split('T')[0] : undefined,
         checkOutTime: c.closedAt ? new Date(c.closedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined,
         complaintReported: `${c.title}${c.description ? ' - ' + c.description : ''}`,
+        faultCategory: c.issueType || 'Elevator Breakdown',
         diagnosis: c.diagnosisRemarks,
         workPerformed: c.actionTaken,
         parts: (c.partsReplaced || []).map((p, idx) => ({
@@ -291,47 +302,142 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
         serviceReportNumber: c.serviceReportId ? `WPS-SR-${c.serviceReportId.slice(-6)}` : undefined,
       };
     });
-  }, [complaints, activeTechnicianId, currentUser, currentTech]);
+  }, [complaints, effectiveTechId, currentUser, currentTech]);
 
-  // Strict RBAC: Merge live complaints with any scheduled jobs scoped to the logged-in technician
+  // Dynamic conversion: Map live work orders assigned to technician
+  const liveWorkOrderJobs = useMemo(() => {
+    const relevantWOs = (workOrders || []).filter((wo) => {
+      if (wo.status === 'cancelled') return false;
+      if (effectiveTechId) {
+        if (wo.technicianId === effectiveTechId || wo.technicianId === currentUser?.id) return true;
+        if (currentTech?.name && wo.technicianName && wo.technicianName.toLowerCase() === currentTech.name.toLowerCase()) return true;
+      }
+      if (currentUser?.role === 'technician' && !wo.technicianId) return true;
+      if (!effectiveTechId) return true;
+      return false;
+    });
+
+    return relevantWOs.map((wo): TechnicianJob => {
+      let mappedStatus: JobWorkflowStatus = 'Assigned';
+      if (wo.status === 'in_progress') mappedStatus = 'In Progress';
+      else if (wo.status === 'completed') mappedStatus = 'Completed';
+
+      const jobType: JobType =
+        wo.title?.toLowerCase().includes('pm') || wo.title?.toLowerCase().includes('maintenance')
+          ? 'Preventive Maintenance (PM)'
+          : wo.priority === 'critical'
+          ? 'Emergency Call'
+          : 'Repair';
+
+      const priority: JobPriority =
+        wo.priority === 'critical' ? 'Emergency' : wo.priority === 'high' ? 'High' : 'Medium';
+
+      return {
+        id: wo.id,
+        jobId: wo.workOrderNumber,
+        jobType,
+        priority,
+        clientName: wo.clientName || 'Client Complex',
+        clientId: wo.clientId || '',
+        contactPerson: wo.clientName || 'Site Coordinator',
+        clientPhone: '+91 85959 40077',
+        clientEmail: '',
+        serviceAddress: wo.buildingName || 'Building Premises',
+        buildingName: wo.buildingName || 'Building Premises',
+        buildingId: '',
+        liftId: wo.liftId,
+        liftNumber: wo.liftNumber,
+        locationDetails: `${wo.buildingName} - ${wo.liftNumber}`,
+        scheduledDate: wo.scheduledDate || new Date().toISOString().split('T')[0],
+        scheduledTime: '10:00 AM',
+        jobStatus: mappedStatus,
+        estimatedDuration: `${wo.estimatedHours || 2} hrs`,
+        assignedBy: 'Operations Dispatch',
+        assignedAt: wo.createdAt || new Date().toISOString(),
+        technicianId: wo.technicianId || effectiveTechId || '',
+        technicianName: wo.technicianName || currentTech.name,
+        complaintReported: wo.title + (wo.description ? ' - ' + wo.description : ''),
+        faultCategory: 'Mechanical & Electrical',
+        diagnosis: '',
+        workPerformed: '',
+        parts: [],
+        beforeEvidence: [],
+        afterEvidence: [],
+        otpSent: false,
+        otpVerified: wo.status === 'completed',
+      };
+    });
+  }, [workOrders, effectiveTechId, currentUser, currentTech]);
+
+  // Local state for interactive draft adjustments
+  const [jobDrafts, setJobDrafts] = useState<Record<string, Partial<TechnicianJob>>>({});
+
+  // Unified Live Assigned Jobs
   const assignedJobs = useMemo(() => {
     const combined = [...liveComplaintJobs];
-    const existingIds = new Set(liveComplaintJobs.map((j) => j.id));
-    const activeId = activeTechnicianId || currentUser?.technicianId;
-    techJobs.forEach((tj) => {
-      if (!existingIds.has(tj.id) && ((activeId && tj.technicianId === activeId) || !tj.technicianId)) {
-        combined.push(tj);
+    const complaintJobIds = new Set(liveComplaintJobs.map((j) => j.id));
+    liveWorkOrderJobs.forEach((woJob) => {
+      if (!complaintJobIds.has(woJob.id)) {
+        combined.push(woJob);
       }
     });
-    return combined.length > 0 ? combined : INITIAL_TECHNICIAN_JOBS;
-  }, [liveComplaintJobs, techJobs, activeTechnicianId, currentUser]);
+
+    return combined.map((j) => {
+      const draft = jobDrafts[j.id];
+      return draft ? { ...j, ...draft } : j;
+    });
+  }, [liveComplaintJobs, liveWorkOrderJobs, jobDrafts]);
 
   // Selected active job for detail views
-  const [selectedJobId, setSelectedJobId] = useState<string>(() => {
-    return assignedJobs[0]?.id || 'job-001';
-  });
+  const [selectedJobId, setSelectedJobId] = useState<string>('');
 
   const selectedJob = useMemo(() => {
-    return assignedJobs.find((j) => j.id === selectedJobId) || assignedJobs[0] || techJobs[0] || INITIAL_TECHNICIAN_JOBS[0];
-  }, [assignedJobs, selectedJobId, techJobs]);
+    if (!assignedJobs || assignedJobs.length === 0) return null;
+    if (selectedJobId) {
+      const found = assignedJobs.find((j) => j.id === selectedJobId);
+      if (found) return found;
+    }
+    return assignedJobs[0];
+  }, [assignedJobs, selectedJobId]);
 
   const activeLift: Lift = useMemo(() => {
-    if (!selectedJob) return lifts[0] || INITIAL_LIFTS[0];
-    return lifts.find((l) => l.liftNumber === selectedJob.liftNumber || l.id === selectedJob.liftId) || lifts[0] || INITIAL_LIFTS[0];
+    if (!selectedJob) return lifts[0];
+    return (
+      lifts.find((l) => l.liftNumber === selectedJob.liftNumber || l.id === selectedJob.liftId) ||
+      lifts[0]
+    );
   }, [lifts, selectedJob]);
+
+  // Live Technician Notifications
+  const notifications: TechNotificationItem[] = useMemo(() => {
+    const filtered = (appNotifications || []).filter((n) => {
+      if (n.category === 'technician') return true;
+      if (n.type === 'technician_dispatched' || n.type === 'emergency') return true;
+      if (effectiveTechId && n.technicianId === effectiveTechId) return true;
+      return false;
+    });
+
+    return filtered.map((n): TechNotificationItem => {
+      const mappedPriority: 'normal' | 'high' | 'urgent' =
+        n.priority === 'urgent' || (n.priority as any) === 'critical' ? 'urgent' : n.priority === 'high' ? 'high' : 'normal';
+
+      return {
+        id: n.id,
+        technicianId: n.technicianId || effectiveTechId || '',
+        title: n.title,
+        message: n.message,
+        timestamp: n.timestamp || new Date().toISOString(),
+        isRead: !!n.isRead,
+        type: n.type === 'emergency' ? 'emergency_call' : n.type === 'technician_dispatched' ? 'job_assigned' : 'job_reminder',
+        priority: mappedPriority,
+        jobId: n.ticketNumber || n.referenceId,
+      };
+    });
+  }, [appNotifications, effectiveTechId]);
 
   // Modals
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [isCreateQuoteOpen, setIsCreateQuoteOpen] = useState(false);
-
-  // Sync state changes back to localStorage
-  useEffect(() => {
-    localStorage.setItem('wepsun_tech_jobs_v2', JSON.stringify(techJobs));
-  }, [techJobs]);
-
-  useEffect(() => {
-    localStorage.setItem('wepsun_tech_notifs_v2', JSON.stringify(notifications));
-  }, [notifications]);
 
   // Sync hash routing
   useEffect(() => {
@@ -374,62 +480,75 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
     const targetComp = complaints.find((c) => c.id === selectedJob.id || c.ticketNumber === selectedJob.jobId);
     if (targetComp) {
       updateComplaintStatus(targetComp.id, targetComp.status, {
-        diagnosisRemarks: updatedFields.diagnosis || targetComp.diagnosisRemarks,
-        actionTaken: updatedFields.workPerformed || targetComp.actionTaken,
-        clientSignature: updatedFields.clientSignature || targetComp.clientSignature,
-        technicianSignature: updatedFields.technicianSignature || targetComp.technicianSignature,
-        beforePhotos: updatedFields.beforeEvidence?.map((e) => e.url) || targetComp.beforePhotos,
-        afterPhotos: updatedFields.afterEvidence?.map((e) => e.url) || targetComp.afterPhotos,
+        diagnosisRemarks: updatedFields.diagnosis !== undefined ? updatedFields.diagnosis : targetComp.diagnosisRemarks,
+        actionTaken: updatedFields.workPerformed !== undefined ? updatedFields.workPerformed : targetComp.actionTaken,
+        clientSignature: updatedFields.clientSignature !== undefined ? updatedFields.clientSignature : targetComp.clientSignature,
+        technicianSignature: updatedFields.technicianSignature !== undefined ? updatedFields.technicianSignature : targetComp.technicianSignature,
+        beforePhotos: updatedFields.beforeEvidence ? updatedFields.beforeEvidence.map((e) => e.url) : targetComp.beforePhotos,
+        afterPhotos: updatedFields.afterEvidence ? updatedFields.afterEvidence.map((e) => e.url) : targetComp.afterPhotos,
       });
     }
 
-    setTechJobs((prev) =>
-      prev.map((j) => {
-        if (j.id === selectedJob.id) {
-          return { ...j, ...updatedFields };
-        }
-        return j;
-      })
-    );
+    setJobDrafts((prev) => ({
+      ...prev,
+      [selectedJob.id]: {
+        ...(prev[selectedJob.id] || {}),
+        ...updatedFields,
+      },
+    }));
   };
 
   const handleUpdateJobStatus = (jobId: string, nextStatus: JobWorkflowStatus) => {
     // Sync to AppContext complaint status
     const targetComp = complaints.find((c) => c.id === jobId || c.ticketNumber === jobId);
     if (targetComp) {
-      if (nextStatus === 'On The Way') {
+      if (nextStatus === 'Accepted') {
+        updateComplaintStatus(targetComp.id, 'accepted');
+      } else if (nextStatus === 'On The Way') {
         updateComplaintStatus(targetComp.id, 'technician_on_way');
       } else if (nextStatus === 'Checked In' || nextStatus === 'In Progress') {
         checkInJob(targetComp.id);
         updateComplaintStatus(targetComp.id, 'inspection_repair', { checkInTime: new Date().toISOString() });
-      } else if (nextStatus === 'Completed' || nextStatus === 'Checked Out') {
-        updateComplaintStatus(targetComp.id, 'resolved');
+      } else if (nextStatus === 'Completed') {
+        updateComplaintStatus(targetComp.id, 'resolved', { resolvedAt: new Date().toISOString() });
+      } else if (nextStatus === 'Checked Out') {
+        updateComplaintStatus(targetComp.id, 'closed', { closedAt: new Date().toISOString() });
       }
     }
 
-    setTechJobs((prev) =>
-      prev.map((j) => {
-        if (j.id === jobId || j.jobId === jobId) {
-          const updates: Partial<TechnicianJob> = { jobStatus: nextStatus };
-          const now = new Date();
-          if (nextStatus === 'Checked In' && !j.checkInTime) {
-            updates.checkInDate = now.toISOString().split('T')[0];
-            updates.checkInTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          }
-          if (nextStatus === 'Checked Out' && !j.checkOutTime) {
-            updates.checkOutDate = now.toISOString().split('T')[0];
-            updates.checkOutTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          }
-          return { ...j, ...updates };
-        }
-        return j;
-      })
-    );
+    // Sync to AppContext work order status
+    const targetWo = (workOrders || []).find((w) => w.id === jobId || w.workOrderNumber === jobId);
+    if (targetWo) {
+      if (nextStatus === 'On The Way' || nextStatus === 'Checked In' || nextStatus === 'In Progress') {
+        updateWorkOrderStatus(targetWo.id, 'in_progress');
+      } else if (nextStatus === 'Completed' || nextStatus === 'Checked Out') {
+        updateWorkOrderStatus(targetWo.id, 'completed');
+      }
+    }
+
+    setJobDrafts((prev) => {
+      const existing = prev[jobId] || {};
+      const updates: Partial<TechnicianJob> = { jobStatus: nextStatus };
+      const now = new Date();
+      if (nextStatus === 'Checked In' && !existing.checkInTime) {
+        updates.checkInDate = now.toISOString().split('T')[0];
+        updates.checkInTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      }
+      if (nextStatus === 'Checked Out' && !existing.checkOutTime) {
+        updates.checkOutDate = now.toISOString().split('T')[0];
+        updates.checkOutTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      }
+      return {
+        ...prev,
+        [jobId]: { ...existing, ...updates },
+      };
+    });
     showToast('info', 'Status Updated', `Job status advanced to ${nextStatus}.`);
   };
 
   // Full integration: Complete job and generate official service report in AppContext
   const handleFinalizeServiceReport = (reportData: ServiceReport) => {
+    if (!selectedJob) return;
     completeJobAndGenerateReport(selectedJob.id, {
       diagnosis: selectedJob.diagnosis || 'Elevator defect diagnosed and rectified per safety standards.',
       rootCause: selectedJob.rootCause || 'Operating wear and tear on components.',
@@ -472,11 +591,11 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
 
   // Notification actions
   const handleMarkNotifRead = (id: string) => {
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
+    markNotificationRead(id);
   };
 
   const handleClearAllNotifs = () => {
-    setNotifications([]);
+    notifications.forEach((n) => deleteNotification(n.id));
     showToast('info', 'Notifications Cleared', 'All field alerts cleared.');
   };
 
@@ -1140,7 +1259,7 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
             return (
               <TodaysJobsView
                 jobs={assignedJobs}
-                selectedJobId={selectedJob.id}
+                selectedJobId={selectedJob?.id || ''}
                 onSelectJob={(j) => setSelectedJobId(j.id)}
                 onUpdateJobStatus={handleUpdateJobStatus}
                 onNavigateToTab={(tab) => navigateTab(tab as TechNavTab)}
@@ -1148,6 +1267,23 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
             );
 
           case 'client_lift':
+            if (!selectedJob) {
+              return (
+                <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
+                  <Wrench className="w-12 h-12 text-slate-400 mx-auto mb-3" />
+                  <h3 className="text-base font-bold text-slate-900">No Job Selected</h3>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
+                    Please select an active ticket or work order from Today's Jobs.
+                  </p>
+                  <button
+                    onClick={() => navigateTab('jobs')}
+                    className="mt-4 px-4 py-2 rounded-xl bg-[#123B5D] text-white text-xs font-bold hover:bg-[#0e2f4a]"
+                  >
+                    View Assigned Jobs
+                  </button>
+                </div>
+              );
+            }
             return (
               <ClientLiftDetailsView
                 job={selectedJob}
@@ -1158,6 +1294,23 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
             );
 
           case 'service_history':
+            if (!selectedJob) {
+              return (
+                <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
+                  <Wrench className="w-12 h-12 text-slate-400 mx-auto mb-3" />
+                  <h3 className="text-base font-bold text-slate-900">No Job Selected</h3>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
+                    Please select an active ticket from Today's Jobs to view its service history.
+                  </p>
+                  <button
+                    onClick={() => navigateTab('jobs')}
+                    className="mt-4 px-4 py-2 rounded-xl bg-[#123B5D] text-white text-xs font-bold hover:bg-[#0e2f4a]"
+                  >
+                    View Assigned Jobs
+                  </button>
+                </div>
+              );
+            }
             return (
               <ServiceHistoryView
                 job={selectedJob}
@@ -1167,6 +1320,23 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
             );
 
           case 'checkin_checkout':
+            if (!selectedJob) {
+              return (
+                <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
+                  <Wrench className="w-12 h-12 text-slate-400 mx-auto mb-3" />
+                  <h3 className="text-base font-bold text-slate-900">No Job Selected</h3>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
+                    Select a ticket from Today's Jobs to record GPS site arrival or departure.
+                  </p>
+                  <button
+                    onClick={() => navigateTab('jobs')}
+                    className="mt-4 px-4 py-2 rounded-xl bg-[#123B5D] text-white text-xs font-bold hover:bg-[#0e2f4a]"
+                  >
+                    View Assigned Jobs
+                  </button>
+                </div>
+              );
+            }
             return (
               <CheckInOutTracker
                 job={selectedJob}
@@ -1177,6 +1347,23 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
             );
 
           case 'diagnosis':
+            if (!selectedJob) {
+              return (
+                <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
+                  <Wrench className="w-12 h-12 text-slate-400 mx-auto mb-3" />
+                  <h3 className="text-base font-bold text-slate-900">No Job Selected</h3>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
+                    Select a ticket from Today's Jobs to document fault diagnosis and corrective actions.
+                  </p>
+                  <button
+                    onClick={() => navigateTab('jobs')}
+                    className="mt-4 px-4 py-2 rounded-xl bg-[#123B5D] text-white text-xs font-bold hover:bg-[#0e2f4a]"
+                  >
+                    View Assigned Jobs
+                  </button>
+                </div>
+              );
+            }
             return (
               <FaultDiagnosisForm
                 job={selectedJob}
@@ -1188,6 +1375,23 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
             );
 
           case 'parts':
+            if (!selectedJob) {
+              return (
+                <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
+                  <Wrench className="w-12 h-12 text-slate-400 mx-auto mb-3" />
+                  <h3 className="text-base font-bold text-slate-900">No Job Selected</h3>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
+                    Select an active job to issue or consume replacement parts from warehouse inventory.
+                  </p>
+                  <button
+                    onClick={() => navigateTab('jobs')}
+                    className="mt-4 px-4 py-2 rounded-xl bg-[#123B5D] text-white text-xs font-bold hover:bg-[#0e2f4a]"
+                  >
+                    View Assigned Jobs
+                  </button>
+                </div>
+              );
+            }
             return (
               <PartsManagerView
                 job={selectedJob}
@@ -1201,6 +1405,23 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
             );
 
           case 'photos':
+            if (!selectedJob) {
+              return (
+                <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
+                  <Wrench className="w-12 h-12 text-slate-400 mx-auto mb-3" />
+                  <h3 className="text-base font-bold text-slate-900">No Job Selected</h3>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
+                    Select an active job to upload before and after proof photos.
+                  </p>
+                  <button
+                    onClick={() => navigateTab('jobs')}
+                    className="mt-4 px-4 py-2 rounded-xl bg-[#123B5D] text-white text-xs font-bold hover:bg-[#0e2f4a]"
+                  >
+                    View Assigned Jobs
+                  </button>
+                </div>
+              );
+            }
             return (
               <EvidencePhotoManager
                 job={selectedJob}
@@ -1211,6 +1432,23 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
             );
 
           case 'signature_otp':
+            if (!selectedJob) {
+              return (
+                <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
+                  <Wrench className="w-12 h-12 text-slate-400 mx-auto mb-3" />
+                  <h3 className="text-base font-bold text-slate-900">No Job Selected</h3>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
+                    Select an active job to obtain digital customer signature or OTP signoff.
+                  </p>
+                  <button
+                    onClick={() => navigateTab('jobs')}
+                    className="mt-4 px-4 py-2 rounded-xl bg-[#123B5D] text-white text-xs font-bold hover:bg-[#0e2f4a]"
+                  >
+                    View Assigned Jobs
+                  </button>
+                </div>
+              );
+            }
             return (
               <SignatureOtpSignoff
                 job={selectedJob}
@@ -1221,6 +1459,23 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
             );
 
           case 'service_report':
+            if (!selectedJob) {
+              return (
+                <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
+                  <Wrench className="w-12 h-12 text-slate-400 mx-auto mb-3" />
+                  <h3 className="text-base font-bold text-slate-900">No Job Selected</h3>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
+                    Select a completed job to review or generate the official digital service report.
+                  </p>
+                  <button
+                    onClick={() => navigateTab('jobs')}
+                    className="mt-4 px-4 py-2 rounded-xl bg-[#123B5D] text-white text-xs font-bold hover:bg-[#0e2f4a]"
+                  >
+                    View Assigned Jobs
+                  </button>
+                </div>
+              );
+            }
             return (
               <ServiceReportView
                 job={selectedJob}
@@ -1292,7 +1547,9 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
                 <PmChecklistRunner
                   lift={activeLift}
                   onComplete={() => {
-                    handleUpdateJobStatus(selectedJob.id, 'Completed');
+                    if (selectedJob) {
+                      handleUpdateJobStatus(selectedJob.id, 'Completed');
+                    }
                     showToast('success', 'PM Checklist Verified', 'All 24 checkpoint items passed and recorded.');
                     navigateTab('diagnosis');
                   }}
@@ -1322,7 +1579,7 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
       )}
 
       {/* Technician Create Quotation Modal */}
-      {isCreateQuoteOpen && (
+      {isCreateQuoteOpen && selectedJob && (
         <TechnicianCreateQuotationModal
           isOpen={isCreateQuoteOpen}
           onClose={() => setIsCreateQuoteOpen(false)}

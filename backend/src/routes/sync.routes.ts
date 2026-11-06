@@ -112,7 +112,7 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response): P
         },
         orderBy: { createdAt: 'desc' },
         take: 100,
-      }).catch(() => db.complaints.filter(c => c.companyId === companyId)),
+      }).catch(() => db.complaints.filter(c => c.companyId === companyId && (!isClient || !clientId || c.clientId === clientId))),
 
       // Work Orders
       prisma.workOrder.findMany({
