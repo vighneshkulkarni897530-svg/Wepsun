@@ -39,32 +39,8 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
         orderBy: { createdAt: 'desc' },
       });
     } catch {
-      // Fallback
-      result = [
-        {
-          id: 'fb_1',
-          companyId,
-          clientName: 'Sanjay Deshmukh (Secretary)',
-          clientPhone: '+91 98220 11223',
-          buildingName: 'Greenwood Heights CHS',
-          liftNumber: 'WPS-PUN-000123',
-          technicianName: 'Field Service Engineer',
-          ticketNumber: 'CMP-2026-0416',
-          serviceType: 'Breakdown Resolution',
-          overallRating: 5,
-          punctuality: 5,
-          technicalSkill: 5,
-          rideSmoothness: 5,
-          communication: 5,
-          tags: ['Fast Arrival', 'Clean Work', 'Polite Technician', 'Digital Report'],
-          comments: 'Emergency door jam breakdown was attended in just 22 minutes! The field technician replaced the lock microswitch and completed safety run cycles with utmost professionalism.',
-          adminReply: 'Thank you Sanjay ji! Our 24x7 rapid response unit is committed to 30-min SLA for all passenger elevators.',
-          adminReplyBy: 'Vikram Joshi (Service Manager)',
-          adminReplyAt: new Date().toISOString(),
-          status: 'published',
-          createdAt: new Date().toISOString(),
-        },
-      ];
+      // In-memory fallback
+      result = (db.feedbacks || []).filter((fb: any) => !companyId || fb.companyId === companyId);
     }
 
     const total = result.length;

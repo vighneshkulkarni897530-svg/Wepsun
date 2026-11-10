@@ -688,29 +688,15 @@ router.patch('/:id', requireAuth, async (req: AuthenticatedRequest, res: Respons
               });
             }
 
-            if (!tech && (assignedTechnicianId === 'tech-rohan' || assignedTechnicianId === 'tech-1' || assignedTechnicianId === 'tech-2')) {
-              tech = await tx.technician.upsert({
-                where: { id: assignedTechnicianId },
-                create: {
-                  id: assignedTechnicianId,
-                  companyId: companyId || 'comp-1',
-                  branchId: req.body.branchId || 'br-mum-1',
-                  name: req.body.assignedTechnicianName || (assignedTechnicianId === 'tech-rohan' ? 'Rohan Gaikwad' : 'Rajesh Sharma'),
-                  employeeCode: assignedTechnicianId === 'tech-rohan' ? 'TECH-WPS-012' : 'TECH-001',
-                  phone: req.body.technicianPhone || '+91 98203 44556',
-                  email: assignedTechnicianId === 'tech-rohan' ? 'rohan.tech@wepsun.com' : 'tech1@wepsun.com',
-                  accountStatus: 'APPROVED',
-                },
-                update: {},
-                include: { user: true },
-              });
-            }
-
             if (tech) {
               resolvedTechId = tech.id;
               resolvedTechName = tech.name;
               resolvedTechPhone = tech.phone;
               techUser = tech.user;
+            } else if (req.body.assignedTechnicianName) {
+              resolvedTechId = assignedTechnicianId;
+              resolvedTechName = req.body.assignedTechnicianName;
+              resolvedTechPhone = req.body.technicianPhone || '';
             }
           }
 

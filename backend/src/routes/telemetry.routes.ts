@@ -125,10 +125,10 @@ router.get('/live/:liftId', requireAuth, async (req: AuthenticatedRequest, res: 
       data: {
         lift: {
           id: liftId,
-          permanentLiftId: lift?.permanentLiftId || 'WPS-PUN-000123',
+          permanentLiftId: lift?.permanentLiftId || 'LIFT',
           brand: lift?.brand || 'WEPSUN Elevators',
-          model: lift?.model || 'Zenith-V4 PMSM Gearless',
-          buildingName: lift?.building?.name || 'Greenwood Heights CHS',
+          model: lift?.model || 'Elevator System',
+          buildingName: lift?.building?.name || 'Elevator Facility',
           floors: lift?.floors || 'G + 14 Floors',
           stops: lift?.stops || 15,
           speedMps: lift?.speedMps || 1.5,

@@ -27,27 +27,8 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
         orderBy: { createdAt: 'desc' },
       });
     } catch {
-      // Fallback
-      notificationsList = [
-        {
-          id: 'notif_1',
-          companyId,
-          title: '🚨 Emergency Breakdown Reported',
-          message: 'Skyline Towers (Lift WPS-PUN-000123) reported Door Jammed. Assigned to Field Service Engineer.',
-          type: 'BREAKDOWN',
-          isRead: false,
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: 'notif_2',
-          companyId,
-          title: '⏱️ PM Visit Due in 48 Hours',
-          message: 'Greenwood Heights CHS (Lift WPS-PUN-000124) scheduled for monthly 4-zone safety inspection.',
-          type: 'PM_DUE',
-          isRead: false,
-          createdAt: new Date(Date.now() - 3600000).toISOString(),
-        },
-      ];
+      // In-memory fallback
+      notificationsList = (db.notifications || []).filter((n: any) => !companyId || n.companyId === companyId);
     }
 
     const unreadCount = notificationsList.filter((n) => !n.isRead).length;
@@ -202,8 +183,8 @@ router.post('/dispatch-emergency', requireAuth, async (req: AuthRequest, res: Re
       templateName: 'emergency_breakdown_alert',
       params: {
         ticketNumber: ticketNumber || `TKT-${Date.now().toString().slice(-4)}`,
-        liftNumber: liftNumber || 'WPS-PUN-000123',
-        buildingName: buildingName || 'Skyline Towers',
+        liftNumber: liftNumber || 'LIFT',
+        buildingName: buildingName || 'Elevator Facility',
         clientName: clientName || 'Resident',
         technicianName: technicianName || 'Field Service Engineer',
         issueType: issueType || 'Breakdown Call',

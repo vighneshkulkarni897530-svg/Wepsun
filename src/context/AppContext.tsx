@@ -297,7 +297,7 @@ const complaintSyncChannel = typeof window !== 'undefined' && typeof BroadcastCh
 
 function scrubLegacyStorage() {
   if (typeof window === 'undefined') return;
-  const CLEAN_STORE_VERSION = 'wepsun_clean_store_v3';
+  const CLEAN_STORE_VERSION = 'wepsun_clean_store_v4';
   if (localStorage.getItem(CLEAN_STORE_VERSION) === 'true') return;
 
   const legacyDemoIds = new Set([
@@ -312,7 +312,9 @@ function scrubLegacyStorage() {
     'fb-001', 'fb-002', 'fb-003', 'fb-004',
     'enq-001', 'enq-002', 'enq-003',
     'log-001', 'log-002', 'log-003', 'log-004',
-    'client-1', 'client-2', 'client-3', 'client-4', 'client-priya'
+    'client-1', 'client-2', 'client-3', 'client-4', 'client-priya',
+    'usr-super-1', 'usr-admin-1', 'usr-sm-1', 'usr-acc-1', 'usr-sales-1', 'usr-tech-rohan',
+    'comp-2', 'br-apx-1'
   ]);
 
   const keysToCheck = [
@@ -450,7 +452,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   });
   const [users, setUsers] = useState<User[]>(() => {
     const raw = safeStorageParse<User[]>(STORAGE_PREFIX + 'users', INITIAL_USERS);
-    const demoUserIds = new Set(['usr-tech-1', 'usr-tech-2', 'usr-tech-rohan', 'usr-inactive-1', 'usr-client-priya', 'usr-client-1', 'usr-client-2', 'usr-admin-2']);
+    const demoUserIds = new Set([
+      'usr-tech-1', 'usr-tech-2', 'usr-tech-rohan', 'usr-inactive-1',
+      'usr-client-priya', 'usr-client-1', 'usr-client-2', 'usr-admin-2',
+      'usr-super-1', 'usr-admin-1', 'usr-sm-1', 'usr-acc-1', 'usr-sales-1'
+    ]);
     const filtered = (raw || []).filter(
       (u) => !demoUserIds.has(u.id) && !u.email?.toLowerCase().includes('tech1@wepsun.com') && !u.email?.toLowerCase().includes('inactive@wepsun.com')
     );
