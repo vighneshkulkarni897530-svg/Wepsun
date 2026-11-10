@@ -404,6 +404,10 @@ model Lift {
 
   @@index([companyId, branchId, buildingId])
   @@index([companyId, clientId])
+  @@index([buildingId])
+  @@index([clientId])
+  @@index([currentStatus])
+  @@index([amcStatus])
   @@map("lifts")
 }
 
@@ -498,9 +502,12 @@ model Complaint {
   timelineEntries      ComplaintTimeline[]
 
   @@index([companyId, status, priority])
+  @@index([companyId, isEmergency, status])
   @@index([companyId, clientId])
   @@index([companyId, createdById])
   @@index([companyId, assignedTechnicianId])
+  @@index([companyId, reportedAt])
+  @@index([liftId, status])
   @@map("complaints")
 }
 
@@ -697,6 +704,7 @@ model AmcContract {
   invoices       Invoice[]
 
   @@index([companyId, status, endDate])
+  @@index([companyId, clientId, status])
   @@map("amc_contracts")
 }
 
@@ -783,6 +791,8 @@ model WorkOrder {
 
   @@index([companyId, status])
   @@index([companyId, clientId])
+  @@index([companyId, technicianId, status])
+  @@index([liftId, status])
   @@map("work_orders")
 }
 
@@ -819,6 +829,7 @@ model Invoice {
   payments          Payment[]
 
   @@index([companyId, status, dueDate])
+  @@index([companyId, clientId, status])
   @@map("invoices")
 }
 
@@ -865,6 +876,7 @@ model InventoryPart {
   movements         InventoryMovement[]
 
   @@index([companyId, category])
+  @@index([companyId, currentStock, minStockThreshold])
   @@map("inventory_parts")
 }
 
@@ -928,7 +940,9 @@ model ServiceReport {
   technician                  Technician  @relation(fields: [technicianId], references: [id], onDelete: Cascade)
 
   @@index([companyId, liftId, serviceDate])
+  @@index([companyId, technicianId, serviceDate])
   @@index([companyId, clientId])
+  @@index([ticketId])
   @@map("service_reports")
 }
 
@@ -937,19 +951,26 @@ model ServiceReport {
 // --------------------------------------------------------
 
 model AuditLog {
-  id          String   @id @default(uuid())
-  companyId   String
-  entityType  String   // Lift, Complaint, AmcContract, Quotation, WorkOrder, Invoice, Inventory
-  entityId    String
-  action      String   // CREATE, UPDATE, DISPATCH, CONVERT, RESTOCK, CONSUME
-  performedBy String
-  userRole    String
-  details     String
-  timestamp   DateTime @default(now())
+  id             String   @id @default(uuid())
+  companyId      String
+  entityType     String   // Lift, Complaint, AmcContract, Quotation, WorkOrder, Invoice, Inventory, User, Technician
+  entityId       String
+  action         String   // CREATE, UPDATE, DELETE, ARCHIVE, ASSIGN, RESOLVE, CONSUME, RESTOCK
+  performedBy    String
+  userRole       String
+  userId         String?
+  previousValues String?  // JSON stringified diff / snapshot before mutation
+  newValues      String?  // JSON stringified diff / snapshot after mutation
+  ipAddress      String?
+  userAgent      String?
+  details        String
+  timestamp      DateTime @default(now())
 
-  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([companyId, entityType, timestamp])
+  @@index([companyId, entityId])
+  @@index([companyId, timestamp])
   @@map("audit_logs")
 }
 

@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma.js';
 import { db } from '../data/mockDb.js';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
 import { serverCache } from '../lib/cache.js';
+import { recordAuditLog } from '../lib/auditLogger.js';
 import { EventEmitter } from 'events';
 
 export const complaintEvents = new EventEmitter();
@@ -482,6 +483,28 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): 
           },
         });
 
+        // 6. Record immutable enterprise audit log
+        await recordAuditLog({
+          companyId,
+          entityType: 'Complaint',
+          entityId: comp.id,
+          action: isEmergency ? 'CREATE_EMERGENCY' : 'CREATE',
+          performedBy: user.name || user.email || 'Client User',
+          userRole: user.role || 'CLIENT',
+          userId: currentUserId,
+          newValues: {
+            ticketNumber: comp.ticketNumber,
+            priority: comp.priority,
+            isEmergency: comp.isEmergency,
+            liftId: comp.liftId,
+            status: comp.status,
+            assignedTechnicianId: comp.assignedTechnicianId,
+          },
+          details: `${isEmergency ? 'Critical Emergency breakdown' : 'Service complaint'} ticket #${comp.ticketNumber} registered for lift ${comp.lift?.permanentLiftId || liftId}`,
+          req,
+          tx,
+        });
+
         // 6. If technician assigned on creation, notify technician
         if (effectiveTechId) {
           const techUser = await tx.user.findFirst({
@@ -803,6 +826,31 @@ router.patch('/:id', requireAuth, async (req: AuthenticatedRequest, res: Respons
             },
           });
         }
+
+        // Record immutable enterprise audit log
+        await recordAuditLog({
+          companyId: existing.companyId || companyId || 'comp-1',
+          entityType: 'Complaint',
+          entityId: id,
+          action: normalizedStatus === 'RESOLVED' ? 'RESOLVE' : normalizedStatus === 'CLOSED' ? 'CLOSE' : resolvedTechId && resolvedTechId !== existing.assignedTechnicianId ? 'ASSIGN' : 'STATUS_CHANGE',
+          performedBy: user.name || user.email || 'Admin User',
+          userRole: userRole,
+          userId: currentUserId,
+          previousValues: {
+            status: existing.status,
+            priority: existing.priority,
+            assignedTechnicianId: existing.assignedTechnicianId,
+          },
+          newValues: {
+            status: normalizedStatus || existing.status,
+            priority: normalizedPriorityPatch || existing.priority,
+            assignedTechnicianId: resolvedTechId || existing.assignedTechnicianId,
+            actionTaken: actionTaken || diagnosisRemarks || null,
+          },
+          details: `Complaint #${existing.ticketNumber} updated: status -> ${normalizedStatus || existing.status}${resolvedTechId ? `, assigned to ${resolvedTechName || resolvedTechId}` : ''}`,
+          req,
+          tx,
+        });
       }, { timeout: 25000, maxWait: 10000 });
 
       const freshRecord = await prisma.complaint.findUnique({

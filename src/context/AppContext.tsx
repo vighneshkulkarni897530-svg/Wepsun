@@ -73,6 +73,8 @@ import {
   getCachedUserSession,
 } from '../services/sessionManager';
 import { getNetworkStatus, subscribeNetworkStatus, triggerHaptic } from '../services/nativeApp';
+import { saveOfflineCollection } from '../services/offlineStorage';
+import { syncEngine } from '../services/syncQueue';
 import { playNotificationSound, isSoundEnabled as getSoundPref, setSoundEnabled } from '../utils/notificationSound';
 import { isDummyAvatar, isValidCustomAvatar, getEffectiveProfilePhoto } from '../utils/avatarUtils';
 import { handleGoogleAuthCallback } from '../services/googleAuth';
@@ -572,6 +574,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     localStorage.setItem(STORAGE_PREFIX + 'complaints', JSON.stringify(complaints));
+    saveOfflineCollection('complaints', complaints).catch(() => {});
   }, [complaints]);
 
   useEffect(() => {
@@ -580,6 +583,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     localStorage.setItem(STORAGE_PREFIX + 'amcContracts', JSON.stringify(amcContracts));
+    saveOfflineCollection('amcContracts', amcContracts).catch(() => {});
   }, [amcContracts]);
 
   useEffect(() => {
@@ -592,10 +596,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     localStorage.setItem(STORAGE_PREFIX + 'invoices', JSON.stringify(invoices));
+    saveOfflineCollection('invoices', invoices).catch(() => {});
   }, [invoices]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_PREFIX + 'inventory', JSON.stringify(inventory));
+    saveOfflineCollection('inventory', inventory).catch(() => {});
   }, [inventory]);
 
   useEffect(() => {
@@ -604,6 +610,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     localStorage.setItem(STORAGE_PREFIX + 'serviceReports', JSON.stringify(serviceReports));
+    saveOfflineCollection('serviceReports', serviceReports).catch(() => {});
   }, [serviceReports]);
 
   useEffect(() => {
@@ -633,6 +640,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setIsServerConnected(res.connected);
     setServerLatencyMs(res.latencyMs);
     return res;
+  }, []);
+
+  // Subscribe to offline sync queue status updates
+  useEffect(() => {
+    const unsub = syncEngine.subscribe((status) => {
+      setSyncStatus(status);
+      if (status === 'synced') {
+        setLastSyncedAt(new Date());
+      }
+    });
+    return unsub;
   }, []);
 
 function mapServerComplaint(sc: any): Complaint {
@@ -2843,6 +2861,23 @@ function mapServerServiceReport(sr: any): ServiceReport {
       console.warn('[AppContext] Cloud sync deferred (network/server offline), storing locally and syncing in background:', netErr?.message);
     }
 
+    if (!isCloudSynced) {
+      syncEngine.queueOperation({
+        action: 'CREATE_COMPLAINT',
+        endpoint: '/complaints',
+        method: 'POST',
+        payload: {
+          ...payload,
+          id: tempId,
+          ticketNumber: fallbackTicketNumber,
+        },
+        companyId,
+        branchId,
+        userId: activeUserId,
+        userRole: currentRole,
+      }).catch((err) => console.warn('[AppContext] Failed to queue offline complaint mutation:', err));
+    }
+
     const mapped = isCloudSynced ? mapServerComplaint(serverRec) : {};
     const finalId = serverRec.id || tempId;
     const finalTicketNumber = serverRec.ticketNumber || fallbackTicketNumber;
@@ -3095,13 +3130,25 @@ function mapServerServiceReport(sr: any): ServiceReport {
       })
     );
 
-    // Cloud Database Persistence
+    // Cloud Database Persistence with Offline Resilient Queueing
     apiService.updateComplaint(ticketId, { status, ...extra }, {
       companyId: activeCompanyId,
       branchId: activeBranchId,
       userRole: currentRole,
       userId: activeUserId,
-    }).catch((err) => console.warn('[AppContext] Background updateComplaint API sync:', err));
+    }).catch((err) => {
+      console.warn('[AppContext] Background updateComplaint API deferred to offline queue:', err);
+      syncEngine.queueOperation({
+        action: 'UPDATE_COMPLAINT_STATUS',
+        endpoint: `/complaints/${ticketId}`,
+        method: 'PATCH',
+        payload: { status, ...extra },
+        companyId: activeCompanyId,
+        branchId: activeBranchId,
+        userId: activeUserId,
+        userRole: currentRole,
+      }).catch(() => {});
+    });
   };
 
   const checkInJob = (ticketId: string, gpsData?: { lat: number; lng: number; address: string; accuracy?: number }) => {
@@ -3490,7 +3537,27 @@ function mapServerServiceReport(sr: any): ServiceReport {
           userRole: 'technician',
           userId: tech.id,
         }
-      ).catch((err) => console.warn('[AppContext] Background updateComplaint API sync:', err));
+      ).catch((err) => {
+        console.warn('[AppContext] Background updateComplaint API sync deferred to offline queue:', err);
+        syncEngine.queueOperation({
+          action: 'SUBMIT_SERVICE_REPORT',
+          endpoint: `/complaints/${(updatedComplaintRecord as Complaint).id}`,
+          method: 'PATCH',
+          payload: {
+            status: 'resolved',
+            serviceReportId: reportId,
+            diagnosisRemarks: data.diagnosis,
+            actionTaken: data.actionTaken,
+            partsReplaced: data.partsReplaced,
+            technicianSignature: data.technicianSignature,
+            clientSignature: data.clientSignature,
+          },
+          companyId: report.companyId,
+          branchId: report.branchId,
+          userRole: 'technician',
+          userId: tech.id,
+        }).catch(() => {});
+      });
     }
 
     // Update lift status

@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import apiRouter from './routes/index.js';
+import healthRoutes from './routes/health.routes.js';
 import { checkDatabaseConnection } from './lib/prisma.js';
 import { scrubLegacyUserAgentCredentials, pruneExpiredSessionRotations } from './lib/auth.js';
 
@@ -96,6 +97,8 @@ app.use(
       'x-user-id',
       'x-client-version',
       'x-requested-with',
+      'x-idempotency-key',
+      'x-request-id',
     ],
   })
 );
@@ -138,27 +141,8 @@ app.get('/', (_req, res) => {
   });
 });
 
-// Health Check Endpoint
-app.get('/api/health', async (_req, res) => {
-  const dbHealth = await checkDatabaseConnection();
-  res.json({
-    status: 'ok',
-    service: 'WEPSUN Lift Service & AMC SaaS REST API',
-    version: '2.0.0',
-    environment: process.env.NODE_ENV || 'development',
-    timestamp: new Date().toISOString(),
-    security: {
-      auth: 'JWT (HS256) + Refresh Token Rotation',
-      rbac: 'Enforced (7 Roles: Super Admin, Company Admin, Service Manager, Technician, Client, Accounts, Sales)',
-      multiTenancy: 'Enforced (Server-Side)',
-    },
-    database: {
-      connected: dbHealth.connected,
-      latencyMs: dbHealth.latencyMs,
-      provider: 'postgresql',
-    },
-  });
-});
+// Health Check & Production Monitoring Endpoints
+app.use('/api/health', healthRoutes);
 
 // Digital Asset Links for Android App Links verification
 app.get('/.well-known/assetlinks.json', (_req, res) => {

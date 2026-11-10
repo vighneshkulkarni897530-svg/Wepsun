@@ -20,6 +20,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio --schema=./prisma/schema.prisma",
     "test:db": "tsx backend/src/tests/dbIntegration.test.ts",
+    "test:enterprise-db": "tsx backend/src/tests/enterpriseDatabaseArchitecture.test.ts",
     "test:auth": "tsx backend/src/tests/authSecurity.test.ts",
     "test:session": "tsx backend/src/tests/sessionRestoration.test.ts",
     "test:sync": "tsx backend/src/tests/crossDeviceSync.test.ts",

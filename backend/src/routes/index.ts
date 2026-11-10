@@ -20,6 +20,7 @@ import telemetryRoutes from './telemetry.routes.js';
 import webhooksRoutes from './webhooks.routes.js';
 import syncRoutes from './sync.routes.js';
 import clientsRoutes from './clients.routes.js';
+import healthRoutes from './health.routes.js';
 import { requireAuth, requireRole, AuthenticatedRequest } from '../middleware/auth.js';
 import { getEmailServiceHealth } from '../lib/emailOtpService.js';
 
@@ -29,6 +30,7 @@ const router = Router();
 router.use('/sync', syncRoutes);
 
 // Domain Routers
+router.use('/health', healthRoutes);
 router.use('/auth', authRoutes);
 router.use('/webhooks', webhooksRoutes);
 router.use('/companies', companiesRoutes);
